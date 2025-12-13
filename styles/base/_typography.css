@@ -1,0 +1,465 @@
+/* ========== 排版与间距优化 ========== */
+
+/* 段落间距 - 增加呼吸感 */
+.message-content p {
+    margin: 0 0 16px 0;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* 标题样式与间距 */
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4,
+.message-content h5,
+.message-content h6 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 28px 0 16px 0;
+    color: var(--md-charcoal);
+    position: relative;
+}
+
+.message-content h1 {
+    font-size: 28px;
+    margin-top: 32px;
+    padding-bottom: 12px;
+    border-bottom: 3px solid var(--md-blue);
+}
+
+.message-content h2 {
+    font-size: 24px;
+    margin-top: 28px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--md-orange);
+}
+
+.message-content h3 {
+    font-size: 20px;
+    color: var(--md-blue);
+}
+
+.message-content h4 {
+    font-size: 18px;
+    color: var(--md-orange);
+}
+
+.message-content h5 {
+    font-size: 16px;
+    color: var(--md-teal);
+}
+
+.message-content h6 {
+    font-size: 14px;
+    color: var(--md-coral);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* 第一个元素不需要上边距 */
+.message-content > *:first-child {
+    margin-top: 0 !important;
+}
+
+/* 最后一个元素不需要下边距 */
+.message-content > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 标题后紧跟的段落间距缩小 */
+.message-content h1 + p,
+.message-content h2 + p,
+.message-content h3 + p,
+.message-content h4 + p,
+.message-content h5 + p,
+.message-content h6 + p {
+    margin-top: 0;
+}
+
+/* 列表与周围元素的间距 */
+.message-content ul,
+.message-content ol {
+    margin: 16px 0;
+}
+
+/* 列表项之间的间距 */
+.message-content li {
+    margin-bottom: 8px;
+}
+
+.message-content li:last-child {
+    margin-bottom: 0;
+}
+
+/* 嵌套列表的间距 */
+.message-content li > ul,
+.message-content li > ol {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+/* 代码块与周围元素的间距 */
+.message-content pre {
+    margin: 20px 0;
+}
+
+/* 行内代码与周围文字的间距 */
+.message-content code {
+    margin: 0 2px;
+}
+
+/* 引用块与周围元素的间距 */
+.message-content blockquote {
+    margin: 20px 0;
+}
+
+/* 表格与周围元素的间距 */
+.message-content table {
+    margin: 24px 0;
+}
+
+/* 水平分隔线 - 像素风格纯色线 */
+.message-content hr {
+    margin: 28px 0;
+    border: none;
+    height: 4px;
+    background: var(--md-charcoal);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 像素装饰线 */
+.message-content hr::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 30%;
+    height: 100%;
+    background: var(--md-blue);
+}
+
+.message-content hr::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 30%;
+    height: 100%;
+    background: var(--md-teal);
+}
+
+/* 强调文本 */
+.message-content strong,
+.message-content b {
+    font-weight: 600;
+    color: var(--md-charcoal);
+}
+
+.message-content em,
+.message-content i {
+    font-style: italic;
+    color: var(--md-muted);
+}
+
+/* 删除线 */
+.message-content del,
+.message-content s {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* 下划线 */
+.message-content u {
+    text-decoration: underline;
+    text-decoration-color: var(--md-blue);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
+}
+
+/* 键盘按键样式 */
+.message-content kbd {
+    display: inline-block;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--md-charcoal);
+    background: var(--md-white);
+    border: var(--border);
+    border-radius: 4px;
+    box-shadow:
+        0 2px 0 rgba(56, 56, 56, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    margin: 0 2px;
+}
+
+/* 响应式排版 - 移动端 */
+@media (max-width: 768px) {
+    .message-content {
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    .message-content h1 { font-size: 24px; margin-top: 24px; }
+    .message-content h2 { font-size: 20px; margin-top: 20px; }
+    .message-content h3 { font-size: 18px; }
+    .message-content h4 { font-size: 16px; }
+    .message-content h5 { font-size: 15px; }
+    .message-content h6 { font-size: 13px; }
+
+    .message-content p { margin-bottom: 12px; }
+    .message-content ul,
+    .message-content ol { margin: 12px 0; }
+    .message-content pre { margin: 16px 0; }
+    .message-content blockquote { margin: 16px 0; }
+    .message-content table { margin: 20px 0; }
+    .message-content hr { margin: 20px 0; }
+}
+
+/* 代码块容器 - 像素风格直角 */
+.message-content pre {
+    position: relative;
+    background: var(--md-charcoal);
+    color: var(--md-white);
+    border: var(--border);
+    border-radius: 0;
+    overflow: hidden;
+    margin: 10px 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+/* 代码块顶部栏 */
+.code-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.code-language {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--md-blue);
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+/* 复制按钮 */
+.copy-code-btn {
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.copy-code-btn:hover {
+    background: var(--md-blue);
+    border-color: var(--md-blue);
+    color: var(--md-charcoal);
+    transform: translateY(-1px);
+}
+
+.copy-code-btn:active {
+    transform: translateY(0);
+}
+
+.copy-code-btn.copied {
+    background: var(--md-teal);
+    border-color: var(--md-teal);
+    color: var(--md-charcoal);
+}
+
+/* 代码块内容 */
+.code-block-content {
+    padding: 12px;
+    overflow-x: auto;
+}
+
+/* 行内代码 */
+.message-content code {
+    background: var(--md-cream);
+    padding: 2px 6px;
+    border: 1px solid var(--md-border);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    border-radius: 3px;
+}
+
+.message-content pre code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    color: inherit;
+    border-radius: 0;
+}
+
+.message-content a {
+    color: var(--md-blue-dark);
+    text-decoration: none;
+    border-bottom: 2px solid var(--md-blue);
+    transition: all 0.2s ease;
+    position: relative;
+    padding: 2px 4px;
+}
+
+.message-content a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--md-blue);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: -1;
+    border-radius: 2px;
+}
+
+.message-content a:hover::before {
+    opacity: 0.15;
+}
+
+.message-content a:hover {
+    color: var(--md-charcoal);
+    border-bottom-width: 3px;
+    transform: translateY(-1px);
+}
+
+/* 外部链接图标 */
+.message-content a[href^="http"]::after {
+    content: ' ▸';
+    font-size: 0.85em;
+    opacity: 0.6;
+}
+
+.message-content ul,
+.message-content ol {
+    margin: 16px 0;
+    padding-left: 28px;
+}
+
+.message-content li {
+    margin: 8px 0;
+    padding-left: 8px;
+    position: relative;
+    line-height: 1.7;
+}
+
+/* 自定义项目符号 */
+.message-content ul {
+    list-style: none;
+}
+
+.message-content ul li::before {
+    content: '▸';
+    position: absolute;
+    left: -20px;
+    color: var(--md-blue);
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* 有序列表彩色数字 */
+.message-content ol {
+    counter-reset: custom-counter;
+    list-style: none;
+}
+
+.message-content ol li {
+    counter-increment: custom-counter;
+    padding-left: 36px;
+}
+
+.message-content ol li::before {
+    content: counter(custom-counter);
+    position: absolute;
+    left: -8px;
+    width: 24px;
+    height: 24px;
+    background: var(--md-blue);
+    color: var(--md-white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    border: 2px solid var(--md-charcoal);
+}
+
+.message-content ol li:nth-child(2)::before { background: var(--md-teal); }
+.message-content ol li:nth-child(3)::before { background: var(--md-orange); }
+.message-content ol li:nth-child(4)::before { background: var(--md-coral); }
+.message-content ol li:nth-child(5)::before { background: var(--md-yellow); }
+.message-content ol li:nth-child(n+6)::before { background: var(--md-pink); }
+
+.message-content blockquote {
+    border-left: 4px solid var(--md-orange);
+    padding: 16px 20px;
+    margin: 16px 0;
+    background: rgba(249, 115, 22, 0.05);
+    border-radius: 0 4px 4px 0;
+    position: relative;
+    font-style: italic;
+    color: var(--md-muted);
+}
+
+/* 引用标记 */
+.message-content blockquote::before {
+    content: '"';
+    position: absolute;
+    top: 8px;
+    left: -16px;
+    font-size: 48px;
+    color: var(--md-orange);
+    opacity: 0.3;
+    font-family: Georgia, serif;
+    line-height: 1;
+}
+
+.message-content img {
+    max-width: min(100%, 480px);
+    max-height: 400px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border: var(--border);
+    border-radius: 2px;
+    margin: 16px 0;
+    display: block;
+    box-shadow: var(--shadow-md);
+    transition: all 0.2s ease;
+    cursor: zoom-in;
+}
+
+.message-content img:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-lg);
+}
+
+/* 图片包装器内的图片（生成的图片） */
+.message-content .image-wrapper {
+    max-width: min(100%, 480px);
+}
+
+.message-content .image-wrapper img {
+    max-width: 100%;
+    max-height: 400px;
+    margin: 0;
+}
+

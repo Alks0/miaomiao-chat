@@ -1,0 +1,198 @@
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+    .chat-container {
+        padding: 12px;
+    }
+
+    .message {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .message.user,
+    .message.assistant {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        font-size: 10px;
+    }
+
+    .input-bar {
+        padding: 10px 12px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .input-bar-inner {
+        gap: 6px;
+        padding: 6px 10px;
+    }
+
+    .settings-panel,
+    .sidebar {
+        width: 90%;
+        max-width: 400px;
+    }
+
+    /* 移动端禁用侧边栏resize手柄 */
+    .settings-panel-resize-handle,
+    .sidebar-resize-handle {
+        display: none;
+    }
+
+    /* 移动端输入框resize手柄 - 增大触摸区域 */
+    .input-resize-handle {
+        height: 20px;
+        margin-bottom: 4px;
+        opacity: 0.7;
+    }
+
+    .input-resize-handle::before {
+        width: 50px;
+        height: 5px;
+    }
+
+    /* 移动端增强关闭按钮可见性 */
+    .settings-header,
+    .sidebar-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: var(--shadow-md);
+    }
+
+    /* 增强overlay的可点击性 */
+    .settings-overlay,
+    .sidebar-overlay {
+        cursor: pointer;
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .welcome-message {
+        padding: 24px 16px;
+    }
+
+    .welcome-message h2 {
+        font-size: 20px;
+    }
+
+    /* 保持触摸目标最小44px（WCAG标准）*/
+    .session-action-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .remove-image {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* 移动端字符计数器调整到输入框内部 */
+    .char-counter {
+        bottom: 8px;
+        right: 8px;
+        font-size: 10px;
+        background: var(--md-surface);
+        padding: 2px 6px;
+        border-radius: 3px;
+        opacity: 0.8;
+    }
+}
+
+/* 小屏幕设备 (< 480px) - 面板全屏 */
+@media (max-width: 480px) {
+    .settings-panel,
+    .sidebar {
+        width: 100%;
+        max-width: none;
+        min-width: unset;
+    }
+
+    /* 输入栏紧凑布局 */
+    .input-bar-inner {
+        padding: 4px 8px;
+    }
+
+    /* 保持触摸目标最小44px（WCAG标准）*/
+    .send-btn,
+    .input-icon-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* 快捷开关栏换行 */
+    .input-quick-toggles {
+        gap: 4px;
+    }
+
+    .quick-toggle-btn {
+        padding: 6px 10px;
+        font-size: 9px;
+        min-width: 44px; /* 保持触摸目标 */
+        min-height: 44px;
+    }
+
+    .quick-toggle-btn span {
+        font-size: 9px; /* 保留文字，使用更小字号 */
+        margin-left: 3px;
+    }
+
+    /* 消息更紧凑 */
+    .message {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .message-avatar {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        font-size: 9px;
+    }
+
+    /* 回复选择器紧凑 */
+    .reply-selector {
+        gap: 4px;
+        padding: 4px;
+    }
+
+    .reply-tab {
+        min-width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+
+    /* 欢迎消息紧凑 */
+    .welcome-message {
+        padding: 20px 12px;
+    }
+
+    .welcome-message h2 {
+        font-size: 18px;
+    }
+
+    .gemini-logo svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    /* 设置面板内容紧凑 */
+    .settings-content {
+        padding: 12px;
+    }
+
+    .settings-group {
+        padding: 12px;
+        margin-bottom: 16px;
+    }
+
+    /* 图片删除按钮始终显示（移动端无hover）*/
+    .remove-image {
+        opacity: 1;
+    }
+}
+

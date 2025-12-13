@@ -1,0 +1,105 @@
+{
+  "name": "webchat",
+  "version": "1.0.0",
+  "description": "Web Chat Application with Electron",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "cap:prepare": "node scripts/prepare-capacitor.js",
+    "cap:sync": "npm run cap:prepare && npx cap sync android",
+    "cap:build": "npm run cap:sync && cd android && gradlew assembleRelease",
+    "cap:open": "npx cap open android"
+  },
+  "keywords": [
+    "electron",
+    "chat",
+    "ai"
+  ],
+  "author": {
+    "name": "odysseiaDev",
+    "email": "dev@odysseia.example"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "electron-log": "^5.0.1",
+    "electron-updater": "^6.1.7"
+  },
+  "build": {
+    "appId": "com.webchat.app",
+    "productName": "Webchat",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist",
+      "!.git",
+      "!docs",
+      "!android",
+      "!www",
+      "!resources",
+      "!scripts",
+      "!README-APK.md",
+      "!capacitor.config.json",
+      "!.github",
+      "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/*.d.ts",
+      "!node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Webchat",
+      "differentialPackage": false
+    },
+    "compression": "normal",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    },
+    "publish": null
+  }
+}

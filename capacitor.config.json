@@ -1,0 +1,17 @@
+{
+  "appId": "com.webchat.app",
+  "appName": "Webchat",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": []
+  },
+  "android": {
+    "allowMixedContent": true,
+    "buildOptions": {
+      "keystorePath": "",
+      "keystoreAlias": ""
+    }
+  }
+}

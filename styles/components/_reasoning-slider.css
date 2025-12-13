@@ -1,0 +1,74 @@
+/* ========== 思维链强度选择 ========== */
+.thinking-strength {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.strength-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid var(--md-border);
+    background: var(--md-surface);
+    color: var(--md-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s var(--ease);
+}
+
+.strength-btn:hover {
+    border-color: var(--md-blue);
+    color: var(--md-text);
+}
+
+.strength-btn.active {
+    background: var(--md-blue);
+    border-color: var(--md-blue);
+    color: var(--md-charcoal);
+}
+
+/* 自定义思考 token 预算输入 */
+.thinking-budget-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--md-surface);
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+}
+
+.thinking-budget-input label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--md-text);
+    white-space: nowrap;
+}
+
+.thinking-budget-input input {
+    flex: 1;
+    min-width: 80px;
+    padding: 6px 10px;
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--md-white);
+    color: var(--md-text);
+}
+
+.thinking-budget-input input:focus {
+    outline: none;
+    border-color: var(--md-blue);
+}
+
+.thinking-budget-input .budget-hint {
+    font-size: 10px;
+    color: var(--md-muted);
+    white-space: nowrap;
+}
+

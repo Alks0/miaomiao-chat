@@ -1,0 +1,103 @@
+/* ========== 图片加载占位符 ========== */
+.image-loading-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    background: var(--md-cream);
+    border: 3px solid var(--md-charcoal);
+    box-shadow: var(--shadow-md);
+}
+
+.dark-theme .image-loading-placeholder {
+    background: #2a2a2a;
+    border-color: #444444;
+}
+
+.image-loading-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--md-sky-blue);
+    border: 2px solid var(--md-charcoal);
+    color: var(--md-charcoal);
+    animation: image-pulse 1.5s ease-in-out infinite;
+}
+
+.image-loading-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+@keyframes image-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.95); }
+}
+
+.image-loading-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.image-loading-text {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.image-loading-progress {
+    height: 12px;
+    background: var(--md-white);
+    border: 2px solid var(--md-charcoal);
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.dark-theme .image-loading-progress {
+    background: #1a1a1a;
+}
+
+.image-loading-progress .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg,
+        var(--md-sky-blue) 0%,
+        var(--md-teal) 50%,
+        var(--md-lime) 100%
+    );
+    transition: width 0.3s ease-out;
+    position: relative;
+}
+
+.image-loading-progress .progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.image-loading-size {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+

@@ -1,0 +1,243 @@
+/**
+ * 自定义对话框样式（Pixel Art 风格）
+ * 替代 Electron 中不支持的 prompt 和 confirm
+ */
+
+/* 对话框遮罩层 */
+#input-dialog-modal.modal,
+#confirm-dialog-modal.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+
+#input-dialog-modal.modal[style*="display: flex"],
+#confirm-dialog-modal.modal[style*="display: flex"] {
+    display: flex !important;
+}
+
+#input-dialog-modal .modal-overlay,
+#confirm-dialog-modal .modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(40, 40, 43, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 1;  /* 遮罩层在底层 */
+}
+
+/* 对话框内容 */
+#input-dialog-modal .modal-content,
+#confirm-dialog-modal .modal-content {
+    position: relative;
+    z-index: 10;  /* 对话框内容在遮罩层上面 */
+    background: var(--md-cream, #FFF8E7);
+    border: 3px solid var(--md-charcoal, #2C2C2C);
+    box-shadow:
+        0 8px 16px rgba(0, 0, 0, 0.3),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+    max-width: 450px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: auto;
+    animation: dialogSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes dialogSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 对话框头部 */
+#input-dialog-modal .modal-header,
+#confirm-dialog-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--md-blue, #4A90E2);
+    border-bottom: 3px solid var(--md-charcoal, #2C2C2C);
+}
+
+#input-dialog-modal .modal-header h2,
+#confirm-dialog-modal .modal-header h2 {
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--md-cream, #FFF8E7);
+    margin: 0;
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+#input-dialog-modal .modal-header .icon-button,
+#confirm-dialog-modal .modal-header .icon-button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: var(--md-cream, #FFF8E7);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#input-dialog-modal .modal-header .icon-button:hover,
+#confirm-dialog-modal .modal-header .icon-button:hover {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+/* 对话框主体 */
+#input-dialog-modal .modal-body,
+#confirm-dialog-modal .modal-body {
+    padding: 20px;
+}
+
+#input-dialog-modal .modal-body p,
+#confirm-dialog-modal .modal-body p {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--md-charcoal, #2C2C2C);
+    line-height: 1.6;
+    margin: 0 0 16px 0;
+}
+
+/* 输入框样式 */
+#input-dialog-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--md-charcoal, #2C2C2C);
+    background: #FFFFFF;
+    border: 2px solid var(--md-charcoal, #2C2C2C);
+    box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+}
+
+#input-dialog-input:focus {
+    outline: none;
+    border-color: var(--md-blue, #4A90E2);
+    box-shadow:
+        inset 2px 2px 0 rgba(0, 0, 0, 0.1),
+        0 0 0 3px rgba(74, 144, 226, 0.2);
+}
+
+/* 对话框底部按钮 */
+#input-dialog-modal .modal-footer,
+#confirm-dialog-modal .modal-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.03);
+    border-top: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+#input-dialog-modal .btn-primary,
+#input-dialog-modal .btn-secondary,
+#confirm-dialog-modal .btn-primary,
+#confirm-dialog-modal .btn-secondary {
+    flex: 1;
+    padding: 10px 16px;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 10px;
+    border: 2px solid var(--md-charcoal, #2C2C2C);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    position: relative;
+}
+
+#input-dialog-modal .btn-primary,
+#confirm-dialog-modal .btn-primary {
+    background: var(--md-blue, #4A90E2);
+    color: var(--md-cream, #FFF8E7);
+    box-shadow:
+        0 4px 0 #2C5F9E,
+        0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+#input-dialog-modal .btn-primary:hover,
+#confirm-dialog-modal .btn-primary:hover {
+    background: #5BA0F2;
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 0 #2C5F9E,
+        0 8px 12px rgba(0, 0, 0, 0.3);
+}
+
+#input-dialog-modal .btn-primary:active,
+#confirm-dialog-modal .btn-primary:active {
+    transform: translateY(2px);
+    box-shadow:
+        0 2px 0 #2C5F9E,
+        0 3px 4px rgba(0, 0, 0, 0.2);
+}
+
+#input-dialog-modal .btn-secondary,
+#confirm-dialog-modal .btn-secondary {
+    background: var(--md-gray, #E0E0E0);
+    color: var(--md-charcoal, #2C2C2C);
+    box-shadow:
+        0 4px 0 #A0A0A0,
+        0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+#input-dialog-modal .btn-secondary:hover,
+#confirm-dialog-modal .btn-secondary:hover {
+    background: #F0F0F0;
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 0 #A0A0A0,
+        0 8px 12px rgba(0, 0, 0, 0.25);
+}
+
+#input-dialog-modal .btn-secondary:active,
+#confirm-dialog-modal .btn-secondary:active {
+    transform: translateY(2px);
+    box-shadow:
+        0 2px 0 #A0A0A0,
+        0 3px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+    #input-dialog-modal .modal-content,
+    #confirm-dialog-modal .modal-content {
+        width: 95%;
+        max-width: none;
+    }
+
+    #input-dialog-modal .modal-header h2,
+    #confirm-dialog-modal .modal-header h2 {
+        font-size: 10px;
+    }
+
+    #input-dialog-modal .modal-footer,
+    #confirm-dialog-modal .modal-footer {
+        flex-direction: column;
+    }
+
+    #input-dialog-modal .btn-primary,
+    #input-dialog-modal .btn-secondary,
+    #confirm-dialog-modal .btn-primary,
+    #confirm-dialog-modal .btn-secondary {
+        width: 100%;
+    }
+}

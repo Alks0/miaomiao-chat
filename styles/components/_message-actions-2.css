@@ -1,0 +1,135 @@
+/* ========== 消息操作按钮 ========== */
+.message-actions {
+    /* ✅ 使用 CSS Grid 叠加定位到右上角 */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    grid-column-end: 3;    /* 跨越两列（头像列 + 内容列） */
+    justify-self: end;     /* 水平靠右 */
+    align-self: start;     /* 垂直靠上 */
+    margin: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;           /* 确保在内容上方 */
+}
+
+.message:hover .message-actions,
+.message:focus-within .message-actions {
+    opacity: 1;
+}
+
+/* 移动端：始终显示操作按钮（触摸设备无hover） */
+@media (max-width: 768px) {
+    .message-actions {
+        opacity: 1;
+    }
+}
+
+.msg-action-btn {
+    padding: 6px 8px;
+    background: var(--md-white);
+    border: var(--border);
+    cursor: pointer;
+    color: var(--md-charcoal);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s var(--ease);
+    position: relative;
+    overflow: hidden;
+}
+
+.msg-action-btn svg {
+    display: block;
+    stroke: currentColor;
+}
+
+.msg-action-btn:hover {
+    background: var(--md-blue);
+    transform: translate(2px, -2px);
+    box-shadow: none;
+    color: var(--md-charcoal);
+}
+
+.msg-action-btn.delete-msg:hover {
+    background: var(--md-coral);
+    color: var(--md-charcoal);
+}
+
+/* ✅ 引用按钮特殊样式 */
+.msg-action-btn.quote-msg:hover {
+    background: var(--md-teal);
+    color: var(--md-charcoal);
+}
+
+/* 编辑模式 */
+.message.editing .message-actions {
+    display: none;
+}
+
+.message-edit-area {
+    width: 100%;
+    min-height: 80px;
+    padding: 8px;
+    border: 2px solid var(--md-green);
+    border-radius: 4px;
+    font-size: 13px;
+    background: var(--md-bg);
+    color: var(--md-text);
+    resize: vertical;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+    font-family: var(--font-sans);
+}
+
+.message-edit-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.message-edit-actions button {
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    transition: all 0.15s var(--ease);
+    border: var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.edit-save-btn {
+    background: var(--md-green);
+    color: var(--md-charcoal);
+}
+
+.edit-save-btn:hover {
+    transform: translate(2px, -2px);
+    box-shadow: none;
+}
+
+.edit-cancel-btn {
+    background: var(--md-white);
+    color: var(--md-charcoal);
+}
+
+.edit-cancel-btn:hover {
+    background: var(--md-yellow);
+    transform: translate(2px, -2px);
+    box-shadow: none;
+}
+
+.edit-send-btn {
+    background: var(--md-blue);
+    color: var(--md-white);
+}
+
+.edit-send-btn:hover {
+    background: var(--md-teal);
+    transform: translate(2px, -2px);
+    box-shadow: none;
+}
+

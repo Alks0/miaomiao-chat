@@ -1,0 +1,49 @@
+/* ========== ✅ 虚拟滚动样式 ========== */
+
+/* 虚拟滚动占位符（用于撑开空间） */
+.virtual-spacer-top,
+.virtual-spacer-bottom {
+    width: 100%;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+/* 虚拟滚动容器优化 */
+.messages-area.virtual-scroll-active {
+    /* 启用 GPU 加速 */
+    will-change: scroll-position;
+    transform: translateZ(0);
+
+    /* 优化滚动性能 */
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 虚拟滚动消息项优化 */
+.messages-area.virtual-scroll-active .message {
+    /* 使用 content-visibility 优化渲染 */
+    content-visibility: auto;
+    contain-intrinsic-size: 150px; /* 预估高度，避免布局抖动 */
+}
+
+/* 虚拟滚动加载指示器 */
+.virtual-scroll-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--md-muted);
+}
+
+.virtual-scroll-loading::before {
+    content: '⏳';
+    margin-right: 8px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

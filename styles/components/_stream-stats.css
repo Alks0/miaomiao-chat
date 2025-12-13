@@ -1,0 +1,36 @@
+/* ========== 流式输出统计 ========== */
+.stream-stats {
+    display: flex;
+    gap: 16px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--md-charcoal);
+    background: var(--md-white);
+    border: var(--border);
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+}
+
+.stream-stats span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.stream-stats svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.dark-theme .stream-stats {
+    background: var(--md-surface);
+    color: var(--md-text);
+}
+
+.dark-theme .stream-stats svg {
+    opacity: 0.6;
+}
+

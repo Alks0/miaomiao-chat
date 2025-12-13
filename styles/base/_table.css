@@ -1,0 +1,314 @@
+/* ========== 表格美化 - 像素风格 ========== */
+.message-content table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 20px 0;
+    background: var(--md-white);
+    border: var(--border);
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    font-size: 14px;
+}
+
+/* 表头样式 - 纯色像素风格 */
+.message-content thead {
+    background: var(--md-blue);
+    color: var(--md-white);
+    position: relative;
+}
+
+/* 表头装饰条纹 */
+.message-content thead::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--md-orange);
+}
+
+.message-content th {
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 3px solid var(--md-charcoal);
+    position: relative;
+}
+
+/* 表头分隔线 */
+.message-content th:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 25%;
+    height: 50%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* 表格主体 */
+.message-content tbody tr {
+    transition: all 0.3s ease;
+}
+
+/* 斑马纹行 */
+.message-content tbody tr:nth-child(odd) {
+    background: rgba(111, 194, 255, 0.03);
+}
+
+.message-content tbody tr:nth-child(even) {
+    background: rgba(155, 148, 242, 0.03);
+}
+
+.message-content tbody tr:hover {
+    background: rgba(14, 165, 233, 0.12);
+    transform: translateX(4px);
+    box-shadow: inset 4px 0 0 var(--md-blue);
+}
+
+/* 单元格样式 */
+.message-content td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(56, 56, 56, 0.08);
+    color: var(--md-charcoal);
+}
+
+.message-content tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* 表格列分隔 */
+.message-content td:not(:last-child) {
+    border-right: 1px solid rgba(56, 56, 56, 0.05);
+}
+
+/* 第一列加粗（通常是标题列） */
+.message-content td:first-child {
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* 空表格友好提示 */
+.message-content table:empty::after {
+    content: '暂无数据';
+    display: block;
+    padding: 40px;
+    text-align: center;
+    color: var(--md-muted);
+    font-style: italic;
+}
+
+/* 响应式表格（移动端） */
+@media (max-width: 768px) {
+    .message-content table {
+        font-size: 12px;
+    }
+
+    .message-content th,
+    .message-content td {
+        padding: 10px 12px;
+    }
+
+    /* 移动端横向滚动提示 */
+    .message-content table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}
+
+/* 图片包装器（带下载按钮） */
+.image-wrapper {
+    /* ✅ 使用 CSS Grid 让按钮和图片重叠，不需要 position: absolute */
+    display: inline-grid;
+    grid-template: 1fr / 1fr; /* 单行单列网格 */
+    margin: 10px 0;
+    max-width: min(100%, 600px);
+}
+
+.image-wrapper img {
+    /* ✅ 图片占据网格的第1行第1列 */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+    margin: 0;
+    display: block;
+}
+
+.download-image-btn {
+    /* ✅ 按钮也占据网格的第1行第1列（与图片重叠） */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    /* ✅ 使用 justify-self 和 align-self 定位到右上角 */
+    justify-self: end; /* 右对齐 */
+    align-self: start; /* 上对齐 */
+    margin: 8px; /* 距离边缘的间距 */
+    width: 32px;
+    height: 32px;
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* ✅ 使用 opacity: 0 + transform: scale(0.8) */
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.15s var(--ease);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 1;
+}
+
+.image-wrapper:hover .download-image-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.download-image-btn:hover {
+    transform: scale(1.1);
+    background: var(--md-teal);
+}
+
+/* ✅ 移动端：始终显示下载按钮（触摸设备没有 hover 状态） */
+@media (hover: none) {
+    .download-image-btn {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 加载状态 */
+.loading-indicator {
+    display: flex;
+    gap: 6px;
+    padding: 8px 0;
+}
+
+.loading-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--md-charcoal);
+    animation: bounce 1.4s infinite var(--ease) both;
+}
+
+.loading-dot:nth-child(1) { animation-delay: -0.32s; }
+.loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-12px); }
+}
+
+/* AI 思考中动画 */
+.thinking-indicator {
+    animation: fadeIn 0.3s ease;
+}
+
+.thinking-dots {
+    display: flex;
+    gap: 6px;
+    padding: 12px 0;
+}
+
+.thinking-dots span {
+    width: 10px;
+    height: 10px;
+    background: var(--md-orange);
+    border-radius: 50%;
+    animation: thinking 1.4s infinite ease-in-out both;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes thinking {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* 打字光标 */
+.typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--md-charcoal);
+    animation: blink 1s steps(2) infinite;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+}
+
+.message.assistant .typing-cursor {
+    background: var(--md-orange);
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.image-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--md-yellow);
+    border: var(--border);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.image-error {
+    padding: 6px 12px;
+    background: var(--md-coral);
+    border: var(--border);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.error-details {
+    background: var(--md-coral);
+    border: var(--border);
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.error-title {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.error-content {
+    background: var(--md-white);
+    border: var(--border);
+    padding: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+}
+

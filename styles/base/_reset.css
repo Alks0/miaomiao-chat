@@ -1,0 +1,21 @@
+/* ========== 基础重置 ========== */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: var(--font-sans);
+    background: var(--md-cream);
+    color: var(--md-charcoal);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    display: flex;
+    overflow: hidden;
+}
+

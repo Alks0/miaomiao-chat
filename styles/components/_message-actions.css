@@ -1,0 +1,65 @@
+/* ========== 重试/编辑按钮 ========== */
+.retry-button {
+    padding: 6px 12px;
+    border: var(--border);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s var(--ease);
+}
+
+.message.assistant .retry-button {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+}
+
+.retry-button:hover {
+    background: var(--md-blue);
+    transform: translate(3px, -3px);
+    box-shadow: none;
+}
+
+.retry-icon {
+    display: inline-block;
+}
+
+.message.user .edit-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: transparent;
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.15s var(--ease);
+}
+
+.message.user:hover .edit-button {
+    opacity: 1;
+}
+
+.message.user .edit-button:hover {
+    background: var(--md-yellow);
+    border-color: var(--md-yellow);
+    color: var(--md-charcoal);
+}
+
+/* 移动端：始终显示编辑按钮（触摸设备无hover） */
+@media (max-width: 768px) {
+    .message.user .edit-button {
+        opacity: 1;
+    }
+}
+

@@ -1,0 +1,86 @@
+/* ========== 按钮通用 ========== */
+.icon-button {
+    width: 44px;  /* WCAG触摸目标最小尺寸 */
+    height: 44px;
+    border: var(--border);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s var(--ease);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.icon-button:hover {
+    transform: translate(3px, -3px);
+    box-shadow: none;
+    background: var(--md-yellow);
+}
+
+.icon-button:active {
+    transform: translate(1px, 1px) scale(0.95);
+}
+
+/* 图标旋转动画 */
+#theme-toggle svg {
+    transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+#theme-toggle:hover svg {
+    transform: rotate(180deg);
+}
+
+#refresh-models svg {
+    transition: transform 0.6s ease;
+}
+
+#refresh-models:hover svg {
+    transform: rotate(360deg);
+}
+
+#refresh-models.loading svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 涟漪效果 */
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    transform: scale(0);
+    animation: ripple-animation 0.6s ease-out;
+    pointer-events: none;
+}
+
+@keyframes ripple-animation {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* 为按钮启用涟漪效果 */
+.send-btn,
+.cancel-btn,
+.settings-icon-btn,
+.new-session-btn,
+.icon-button,
+.input-icon-btn,
+.session-action-btn,
+.close-settings-btn,
+.close-sidebar-btn,
+.format-btn,
+.reply-tab {
+    position: relative;
+    overflow: hidden;
+}
+

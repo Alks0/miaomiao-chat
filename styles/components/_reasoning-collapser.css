@@ -1,0 +1,86 @@
+/* ========== 思维链折叠面板 ========== */
+.thinking-block {
+    border-left: 3px solid var(--md-yellow);
+    background: var(--md-surface);
+    margin: 12px 0;
+    border-radius: 0 4px 4px 0;
+    overflow: hidden;
+}
+
+/* 多个连续思考块的间距优化 */
+.thinking-block + .thinking-block {
+    margin-top: 8px;
+}
+
+.thinking-block.collapsed .thinking-content {
+    display: none;
+}
+
+.thinking-block.streaming .thinking-header::after {
+    content: '...';
+    animation: thinking-dots 1s infinite;
+}
+
+@keyframes thinking-dots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
+.thinking-header {
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--md-muted);
+    background: rgba(251, 191, 36, 0.1);
+    transition: background 0.15s;
+}
+
+.thinking-header:hover {
+    background: rgba(251, 191, 36, 0.2);
+}
+
+.thinking-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f59e0b;
+}
+
+.thinking-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.thinking-toggle-icon {
+    margin-left: auto;
+    transition: transform 0.2s;
+    font-size: 10px;
+}
+
+.thinking-block:not(.collapsed) .thinking-toggle-icon {
+    transform: rotate(90deg);
+}
+
+.thinking-content {
+    padding: 14px;
+    border-top: 1px dashed var(--md-yellow);
+    font-size: 13px;
+    opacity: 0.85;
+    max-height: 400px;
+    overflow-y: auto;
+    line-height: 1.6;
+}
+
+.thinking-content p {
+    margin: 0 0 8px;
+}
+
+.thinking-content p:last-child {
+    margin-bottom: 0;
+}
+

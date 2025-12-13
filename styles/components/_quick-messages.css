@@ -1,0 +1,218 @@
+/**
+ * 快捷消息模态框样式
+ */
+
+/* ========== 主模态框 ========== */
+.quick-messages-modal-content {
+    width: 700px;
+    max-height: 600px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========== 消息列表 ========== */
+.quick-messages-list {
+    padding: 16px;
+    overflow-y: auto;
+    max-height: 500px;
+}
+
+/* 空状态 */
+.empty-quick-messages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--md-muted);
+    text-align: center;
+}
+
+.empty-quick-messages svg {
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+.empty-quick-messages p {
+    margin: 4px 0;
+    font-size: 14px;
+}
+
+.empty-hint {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* ========== 分类标题 ========== */
+.quick-message-category {
+    margin-bottom: 20px;
+}
+
+.category-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--md-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-bottom: var(--border);
+}
+
+/* ========== 消息项 ========== */
+.quick-message-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: var(--md-surface);
+    border: var(--border);
+}
+
+.quick-message-item:hover {
+    background: var(--md-cream);
+    transform: var(--hover-offset);
+    box-shadow: var(--shadow-sm);
+}
+
+/* WCAG 2.4.7 Focus Visible (Level AA) - 键盘焦点样式 */
+.quick-message-item:focus-visible {
+    outline: 3px solid var(--md-blue);
+    outline-offset: 2px;
+    background: var(--md-cream);
+}
+
+.qm-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.qm-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.qm-item-preview {
+    font-size: 12px;
+    color: var(--md-muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ========== 操作按钮 ========== */
+.qm-item-actions {
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.quick-message-item:hover .qm-item-actions {
+    opacity: 1;
+}
+
+.qm-action-btn {
+    /* WCAG 2.5.5 Target Size (Level AAA) - 最小 44x44px */
+    width: 44px;
+    height: 44px;
+    background: var(--md-white);
+    border: var(--border);
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qm-action-btn:hover {
+    background: var(--md-blue);
+    transform: translateY(-2px);
+}
+
+.qm-action-btn:hover svg {
+    stroke: white;
+}
+
+.qm-action-btn.delete:hover {
+    background: var(--md-coral);
+}
+
+/* ========== 编辑模态框（第二层） ========== */
+#edit-quick-message-modal .modal-content {
+    width: 500px;
+}
+
+#edit-quick-message-modal .form-group {
+    margin-bottom: 20px;
+}
+
+#edit-quick-message-modal label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-text);
+    margin-bottom: 8px;
+}
+
+#edit-quick-message-modal input[type="text"],
+#edit-quick-message-modal textarea,
+#edit-quick-message-modal select {
+    width: 100%;
+    padding: 10px 14px;
+    border: var(--border);
+    border-radius: 8px;
+    background: var(--md-bg);
+    color: var(--md-text);
+    font-size: 14px;
+    font-family: var(--font-sans);
+    transition: border-color 0.2s;
+}
+
+#edit-quick-message-modal input:focus,
+#edit-quick-message-modal textarea:focus,
+#edit-quick-message-modal select:focus {
+    outline: none;
+    border-color: var(--md-blue);
+    background: var(--md-white);
+}
+
+#edit-quick-message-modal textarea {
+    resize: vertical;
+    font-family: var(--font-mono);
+    min-height: 120px;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+    .quick-messages-modal-content {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    #edit-quick-message-modal .modal-content {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+    }
+
+    .qm-item-actions {
+        opacity: 1; /* 移动端始终显示 */
+    }
+}

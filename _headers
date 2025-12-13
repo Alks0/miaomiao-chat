@@ -1,0 +1,13 @@
+# JavaScript 模块 MIME 类型
+/js/*
+  Content-Type: application/javascript; charset=utf-8
+
+# CSS 文件
+/styles/*
+  Content-Type: text/css; charset=utf-8
+
+# 安全 headers
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block

@@ -1,0 +1,111 @@
+/* ========== 模型参数配置 ========== */
+.model-params-details {
+    margin-top: 12px;
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-surface);
+}
+
+.model-params-summary {
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--md-charcoal);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.model-params-summary:hover {
+    background: var(--md-bg);
+}
+
+.model-params-summary .hint {
+    font-weight: 400;
+    color: var(--md-muted);
+    font-size: 11px;
+}
+
+.model-params-details[open] .model-params-summary {
+    border-bottom: var(--border);
+}
+
+.model-params-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 12px;
+}
+
+.param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.param-item label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--md-muted);
+    font-family: var(--font-mono);
+}
+
+.param-item input {
+    padding: 6px 8px;
+    border: var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.param-item input:focus {
+    outline: none;
+    border-color: var(--md-blue);
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.param-item input::placeholder {
+    color: var(--md-muted);
+    opacity: 0.7;
+}
+
+/* 暗色主题 */
+.dark-theme .model-params-details {
+    background: var(--md-charcoal);
+    border-color: var(--md-border);
+}
+
+.dark-theme .model-params-summary {
+    color: var(--md-text);
+}
+
+.dark-theme .model-params-summary:hover {
+    background: var(--md-surface);
+}
+
+.dark-theme .model-params-details[open] .model-params-summary {
+    border-bottom-color: var(--md-border);
+}
+
+.dark-theme .param-item input {
+    background: var(--md-surface);
+    color: var(--md-text);
+    border-color: var(--md-border);
+}
+
+.dark-theme .param-item input:focus {
+    border-color: var(--md-green);
+}
+
+/* 响应式 */
+@media (max-width: 480px) {
+    .model-params-grid {
+        grid-template-columns: 1fr;
+    }
+}

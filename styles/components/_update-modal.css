@@ -1,0 +1,293 @@
+/* ========== 更新弹窗 - 像素艺术风格 ========== */
+
+/* 遮罩层 */
+.update-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(56, 56, 56, 0.8);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* 弹窗主体 */
+.update-modal {
+    position: relative;
+    width: 90%;
+    max-width: 450px;
+    background: var(--md-cream);
+    border: 3px solid var(--md-charcoal);
+    box-shadow: var(--shadow-lg);
+    padding: 32px 24px 24px;
+    animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 关闭按钮 */
+.update-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    background: var(--md-coral);
+    border: 2px solid var(--md-charcoal);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.update-modal-close:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: -4px 4px 0px 0px var(--md-charcoal);
+}
+
+.update-modal-close:active {
+    transform: translate(0, 0);
+    box-shadow: var(--shadow-sm);
+}
+
+.update-modal-close svg {
+    color: var(--md-white);
+}
+
+/* 图标 */
+.update-modal-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    background: var(--md-blue);
+    border: 3px solid var(--md-charcoal);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.update-modal-icon svg {
+    color: var(--md-white);
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 标题 */
+.update-modal-title {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--md-charcoal);
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* 版本号 */
+.update-modal-version {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--md-blue);
+    margin: 0 0 12px;
+}
+
+/* 描述 */
+.update-modal-description {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    text-align: center;
+    color: var(--md-muted);
+    margin: 0 0 24px;
+}
+
+/* 按钮组 */
+.update-modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* 按钮基础样式 */
+.update-btn {
+    flex: 1;
+    padding: 12px 16px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: 3px solid var(--md-charcoal);
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.update-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: -7px 7px 0px 0px var(--md-charcoal);
+}
+
+.update-btn:active {
+    transform: translate(0, 0);
+    box-shadow: var(--shadow-md);
+}
+
+/* 主按钮 */
+.update-btn-primary {
+    background: var(--md-blue);
+    color: var(--md-white);
+}
+
+.update-btn-primary:hover {
+    background: var(--md-blue-dark);
+}
+
+/* 次要按钮 */
+.update-btn-secondary {
+    background: var(--md-yellow);
+    color: var(--md-charcoal);
+}
+
+.update-btn-secondary:hover {
+    background: var(--md-orange);
+}
+
+/* 进度条容器 */
+.update-progress-container {
+    margin-top: 16px;
+}
+
+.update-progress-bar {
+    width: 100%;
+    height: 24px;
+    background: var(--md-bg);
+    border: 3px solid var(--md-charcoal);
+    box-shadow: inset -2px 2px 0px 0px rgba(56, 56, 56, 0.2);
+    overflow: hidden;
+}
+
+.update-progress-fill {
+    height: 100%;
+    background: var(--md-teal);
+    transition: width 0.3s ease-out;
+    box-shadow: -2px 0 0 0 var(--md-charcoal);
+}
+
+.update-progress-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: center;
+    color: var(--md-muted);
+    margin: 8px 0 0;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .update-modal {
+        width: 90%;
+        max-width: 90%;
+        padding: 20px;
+        margin: 0 auto;
+    }
+
+    .update-modal-title {
+        font-size: 18px;
+    }
+
+    .update-modal-version {
+        font-size: 13px;
+    }
+
+    .update-modal-notes {
+        font-size: 13px;
+        max-height: 120px;
+    }
+
+    .update-modal-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .update-btn {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .update-modal-icon svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    /* 移动端弹窗居中 */
+    .update-modal-overlay {
+        padding: 16px;
+        align-items: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .update-modal {
+        width: 95%;
+        padding: 16px;
+    }
+
+    .update-modal-title {
+        font-size: 16px;
+    }
+
+    .update-modal-close {
+        width: 28px;
+        height: 28px;
+        top: 8px;
+        right: 8px;
+    }
+
+    .update-btn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}

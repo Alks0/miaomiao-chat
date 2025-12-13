@@ -1,0 +1,547 @@
+/* ========== 消息样式 ========== */
+.message {
+    /* ✅ 使用 CSS Grid 代替 flex，支持操作按钮叠加 */
+    display: grid;
+    grid-template-columns: auto 1fr; /* 头像自动宽度，内容占满剩余空间 */
+    gap: 12px;
+    padding: 16px;
+    border: var(--border);
+    border-radius: 4px 16px 16px 4px;
+    box-shadow: var(--shadow-md);
+    animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+    position: relative; /* 保留给伪元素箭头使用 */
+}
+
+/* 模型信息标签 */
+.message-model-badge {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--md-charcoal);
+    background: var(--md-cream);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--md-border);
+    display: inline-block;
+    margin-bottom: 10px;
+    cursor: help;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.message:hover {
+    transform: translate(3px, -3px);
+    box-shadow: var(--shadow-lg), var(--glow-blue);
+}
+
+/* 用户消息 - 纯色背景 */
+.message.user {
+    background: var(--md-charcoal);
+    color: var(--md-white);
+    margin-left: 48px;
+    animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* 用户消息箭头 */
+.message.user::after {
+    content: '';
+    position: absolute;
+    right: -9px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border: 9px solid transparent;
+    border-left-color: var(--md-charcoal);
+    border-right: 0;
+}
+
+.message.user .message-content {
+    color: var(--md-white);
+}
+
+.message.user .message-avatar {
+    background: var(--md-blue);
+    color: var(--md-white);
+}
+
+/* AI消息 - 纯色背景 */
+.message.assistant {
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    margin-right: 48px;
+    padding-bottom: 48px;
+}
+
+/* AI消息箭头 */
+.message.assistant::after {
+    content: '';
+    position: absolute;
+    left: -9px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border: 9px solid transparent;
+    border-right-color: var(--md-white);
+    border-left: 0;
+}
+
+.message.assistant .message-avatar {
+    background: var(--md-orange);
+    color: var(--md-white);
+}
+
+/* AI 头像脉冲动画（生成时） */
+.message.assistant.generating .message-avatar {
+    animation: avatarPulse 2s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(178, 145, 222, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(178, 145, 222, 0);
+    }
+}
+
+/* 编辑状态高亮 */
+.message.editing {
+    position: relative;
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.05) 0%, rgba(74, 144, 226, 0.02) 100%);
+    border-left: 4px solid var(--md-blue);
+    padding-left: 16px;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1),
+                var(--shadow-md);
+    animation: editingPulse 2s ease-in-out infinite;
+}
+
+@keyframes editingPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1),
+                    var(--shadow-md);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.15),
+                    var(--shadow-lg);
+    }
+}
+
+/* 头像 */
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border: var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 12px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s var(--ease);
+}
+
+/* 头像光晕效果 */
+.message-avatar::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: inherit;
+    filter: blur(8px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+}
+
+.message:hover .message-avatar::before {
+    opacity: 0.5;
+}
+
+/* 消息内容 */
+.message-content-wrapper {
+    flex: 1;
+    min-width: 0;
+}
+
+.message-content {
+    line-height: 1.8;
+    word-wrap: break-word;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+}
+
+/* ========== 编辑模式 - 图片管理 ========== */
+/* ✅ 图片编辑界面样式 */
+.edit-image-manager {
+    margin-bottom: 12px;
+}
+
+.edit-images-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+    background: var(--md-cream);
+    border: var(--border);
+    border-radius: 4px;
+    min-height: 80px;
+}
+
+.edit-image-item {
+    width: 100px;
+    height: 100px;
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-white);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s var(--ease);
+    /* ✅ 使用 CSS Grid 让按钮和图片重叠，不需要 position: absolute */
+    display: grid;
+    grid-template: 1fr / 1fr; /* 单行单列网格 */
+}
+
+.edit-image-item:hover {
+    transform: translate(2px, -2px);
+    box-shadow: var(--shadow-md);
+}
+
+.edit-image-item img {
+    /* ✅ 图片占据网格的第1行第1列 */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.edit-image-remove {
+    /* ✅ 按钮也占据网格的第1行第1列（与图片重叠） */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    /* ✅ 使用 justify-self 和 align-self 定位到右上角 */
+    justify-self: end; /* 右对齐 */
+    align-self: start; /* 上对齐 */
+    margin: 4px; /* 距离边缘的间距 */
+    width: 28px;
+    height: 28px;
+    border: var(--border);
+    border-radius: 50%;
+    background: var(--md-coral);
+    color: var(--md-white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1;
+    /* ✅ 照着 .remove-image 修改：opacity: 0 + transform: scale(0.8) */
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.15s var(--ease);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 1;
+}
+
+.edit-image-item:hover .edit-image-remove {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.edit-image-remove:hover {
+    transform: scale(1.1);
+    background: var(--md-red);
+}
+
+/* ✅ 移动端：始终显示删除按钮（触摸设备没有 hover 状态） */
+@media (hover: none) {
+    .edit-image-remove {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.edit-image-add {
+    width: 100px;
+    height: 100px;
+    border: 2px dashed var(--md-muted);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-muted);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s var(--ease);
+    font-size: 12px;
+    font-family: var(--font-sans);
+}
+
+.edit-image-add:hover {
+    border-color: var(--md-blue);
+    background: var(--md-white);
+    color: var(--md-blue);
+    transform: translate(2px, -2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.edit-image-add svg {
+    flex-shrink: 0;
+}
+
+/* ========== 编辑模式 - 文本编辑区域 ========== */
+.edit-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 16px;
+    margin-bottom: 16px;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--md-charcoal);
+    background: var(--md-white);
+    border: var(--border);
+    border-radius: 4px;
+    resize: vertical;
+    transition: all 0.2s var(--ease);
+    box-shadow: var(--shadow-sm);
+}
+
+.edit-textarea:focus {
+    outline: none;
+    border-color: var(--md-blue);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.edit-textarea::placeholder {
+    color: var(--md-muted);
+    opacity: 0.6;
+}
+
+/* ========== 编辑模式 - 操作按钮 ========== */
+.edit-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.edit-actions .btn-primary,
+.edit-actions .btn-secondary {
+    min-width: 80px;
+    height: 44px;
+    padding: 0 24px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    border: var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-primary {
+    background: var(--md-blue);
+    color: var(--md-white);
+    border-color: var(--md-blue);
+}
+
+.btn-primary:hover {
+    background: #3a7bc8;
+    transform: translate(2px, -2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active {
+    transform: translate(0, 0);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary {
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    border-color: var(--md-muted);
+}
+
+.btn-secondary:hover {
+    background: var(--md-cream);
+    border-color: var(--md-charcoal);
+    transform: translate(2px, -2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary:active {
+    transform: translate(0, 0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ========== LaTeX 数学公式 ========== */
+/* ✅ KaTeX 渲染样式增强 */
+.katex-display-wrapper {
+    margin: 16px 0;
+    padding: 16px;
+    background: var(--md-cream);
+    border: var(--border);
+    border-radius: 4px;
+    overflow-x: auto;
+    text-align: center;
+}
+
+.katex-inline-wrapper {
+    display: inline;
+    padding: 2px 4px;
+    background: var(--md-cream);
+    border-radius: 2px;
+}
+
+/* 公式渲染失败时的降级样式 */
+.latex-error {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--md-coral);
+    color: var(--md-charcoal);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    border-radius: 2px;
+    cursor: help;
+}
+
+.latex-fallback {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--md-muted);
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    border-radius: 2px;
+}
+
+/* KaTeX 颜色调整（适配主题） */
+.katex {
+    color: var(--md-charcoal);
+}
+
+.katex-display {
+    margin: 0;
+}
+
+/* ========== 表格增强 ========== */
+/* ✅ 表格包装器和工具栏 */
+.table-wrapper {
+    margin: 16px 0;
+    border: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--md-white);
+}
+
+.table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--md-cream);
+    border-bottom: var(--border);
+    gap: 8px;
+}
+
+.table-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--md-white);
+    border: var(--border);
+    color: var(--md-charcoal);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s var(--ease);
+}
+
+.table-export-btn:hover {
+    background: var(--md-teal);
+    transform: translate(1px, -1px);
+}
+
+.table-info {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--md-muted);
+}
+
+.table-wrapper table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+    padding: 8px 12px;
+    border: var(--border);
+    text-align: left;
+}
+
+.table-wrapper th {
+    background: var(--md-surface);
+    font-weight: 600;
+}
+
+.table-wrapper tr:hover {
+    background: var(--md-cream);
+}
+
+/* ========== 搜索高亮效果 ========== */
+.message.search-highlighted {
+    animation: searchPulse 0.6s ease-out;
+    box-shadow: 0 0 0 4px var(--md-yellow), var(--shadow-lg);
+    background: rgba(255, 235, 59, 0.1);
+}
+
+@keyframes searchPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 12px rgba(255, 235, 59, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 0 4px var(--md-yellow);
+    }
+}
+

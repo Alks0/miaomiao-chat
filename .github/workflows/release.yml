@@ -1,0 +1,184 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  # Electron 构建（Windows/macOS/Linux）
+  build-electron:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm run dist:win
+
+      - name: Build Electron (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npm run dist:mac
+
+      - name: Build Electron (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run dist:linux
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.deb
+          if-no-files-found: warn
+
+  # Android APK 构建
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Capacitor
+        run: npm run cap:prepare
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Android APK (Debug Signed)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew clean assembleDebug --stacktrace
+
+      - name: Rename debug APK to versioned name
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk \
+               android/app/build/outputs/apk/debug/app-${VERSION}.apk
+            echo "✓ Renamed app-debug.apk to app-${VERSION}.apk"
+            ls -lh android/app/build/outputs/apk/debug/
+          else
+            echo "✗ app-debug.apk not found, listing all APK files:"
+            find android -name "*.apk" -type f -ls
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/debug/app-*.apk
+          if-no-files-found: error
+
+  # 创建 GitHub Release
+  create-release:
+    needs: [build-electron, build-apk]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: ls -R artifacts/
+
+      - name: Prepare release files
+        run: |
+          mkdir release-files
+
+          # 复制 Windows 文件
+          if [ -d "artifacts/electron-windows-latest" ]; then
+            find artifacts/electron-windows-latest -type f \( -name "*.exe" -o -name "*.zip" \) -exec cp {} release-files/ \;
+          fi
+
+          # 复制 macOS 文件
+          if [ -d "artifacts/electron-macos-latest" ]; then
+            find artifacts/electron-macos-latest -type f \( -name "*.dmg" -o -name "*.zip" \) -exec cp {} release-files/ \;
+          fi
+
+          # 复制 Linux 文件
+          if [ -d "artifacts/electron-ubuntu-latest" ]; then
+            find artifacts/electron-ubuntu-latest -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec cp {} release-files/ \;
+          fi
+
+          # 复制 APK（保持原名 app-x.x.x.apk）
+          if [ -d "artifacts/android-apk" ]; then
+            APK_FILE=$(find artifacts/android-apk -name "app-*.apk" -type f | head -n 1)
+            if [ -n "$APK_FILE" ]; then
+              echo "Found APK: $APK_FILE"
+              cp "$APK_FILE" release-files/
+            else
+              echo "Warning: No APK file found"
+            fi
+          fi
+
+          echo "Final release files:"
+          ls -lh release-files/
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd release-files
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-files/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify completion
+        run: |
+          echo "✅ Release created successfully!"
+          echo "Tag: ${GITHUB_REF_NAME}"
+          echo "Files:"
+          ls -lh release-files/

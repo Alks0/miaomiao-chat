@@ -1,0 +1,91 @@
+/* ========== MotherDuck 设计系统 ========== */
+:root {
+    /* 核心颜色 - 像素艺术调色板 */
+    --md-cream: #F4EFEA;
+    --md-charcoal: #383838;
+    --md-white: #FFFFFF;
+
+    /* 主色调 - 去紫色化，采用像素游戏经典配色 */
+    --md-blue: #0EA5E9;        /* 天空蓝 - 主要交互色 */
+    --md-blue-dark: #0284C7;   /* 深蓝 */
+    --md-yellow: #FBBF24;      /* 金黄 - 强调色 */
+    --md-orange: #F97316;      /* 橙色 - 替代紫色 */
+    --md-teal: #14B8A6;        /* 青绿 - 成功色 */
+    --md-green: #22C55E;       /* 绿色 - 编辑/确认色 */
+    --md-coral: #EF4444;       /* 珊瑚红 - 警告色 */
+    --md-lime: #84CC16;        /* 柠檬绿 - 活力色 */
+    --md-pink: #EC4899;        /* 粉红 - 装饰色 */
+
+    /* 功能色 */
+    --md-muted: #888888;
+    --md-border: #383838;
+    --md-surface: #FFFFFF;
+    --md-bg: #F8F8F8;          /* 输入框/编辑区背景 */
+    --md-text: #383838;
+    --text-primary: #383838;
+    --text-secondary: #888888;
+
+    /* 字体 - 现代几何 + 等宽编程 */
+    --font-mono: 'Space Mono', 'JetBrains Mono', 'SF Mono', monospace;
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+
+    /* 像素阴影系统 - 纯像素风格 */
+    --shadow-sm: -3px 3px 0px 0px var(--md-charcoal);
+    --shadow-md: -5px 5px 0px 0px var(--md-charcoal);
+    --shadow-lg: -8px 8px 0px 0px var(--md-charcoal);
+
+    /* 带深度的像素阴影 */
+    --shadow-depth-sm:
+        -2px 2px 0px 0px rgba(56, 56, 56, 0.6),
+        -4px 4px 0px 0px rgba(56, 56, 56, 0.3);
+    --shadow-depth-md:
+        -3px 3px 0px 0px rgba(56, 56, 56, 0.8),
+        -6px 6px 0px 0px rgba(56, 56, 56, 0.4);
+    --shadow-depth-lg:
+        -4px 4px 0px 0px rgba(56, 56, 56, 1),
+        -8px 8px 0px 0px rgba(56, 56, 56, 0.5);
+
+    /* 彩色发光 - 去紫色 */
+    --glow-blue: 0 0 20px rgba(14, 165, 233, 0.5);
+    --glow-orange: 0 0 20px rgba(249, 115, 22, 0.5);
+    --glow-teal: 0 0 20px rgba(20, 184, 166, 0.5);
+    --glow-yellow: 0 0 20px rgba(251, 191, 36, 0.5);
+    --glow-coral: 0 0 20px rgba(239, 68, 68, 0.5);
+
+    /* 边框 - 像素风格统一2px */
+    --border: 2px solid var(--md-charcoal);
+    --border-thick: 3px solid var(--md-charcoal);
+
+    /* 动画 */
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* 统一 hover 偏移 */
+    --hover-offset: translate(3px, -3px);
+    --hover-offset-sm: translate(2px, -2px);
+
+    /* 布局 - 统一内容最大宽度 */
+    --content-max-width: 900px;
+}
+
+/* 暗色主题 */
+.dark-theme {
+    --md-cream: #1a1a1a;
+    --md-charcoal: #E5E5E5;
+    --md-white: #2a2a2a;
+    --md-muted: #999999;
+    --md-border: #E5E5E5;
+    --md-surface: #2a2a2a;
+    --md-bg: #1f1f1f;
+    --md-text: #E5E5E5;
+    --text-primary: #E5E5E5;
+    --text-secondary: #999999;
+}
+
+/* 暗色主题下像素装饰更亮 */
+.dark-theme .pixel-star { opacity: 0.8; }
+.dark-theme .pixel-cloud { opacity: 0.25; }
+.dark-theme .pixel-heart { opacity: 0.7; }
+.dark-theme .pixel-diamond { opacity: 0.6; }
+.dark-theme .pixel-dots { opacity: 0.35; }
+

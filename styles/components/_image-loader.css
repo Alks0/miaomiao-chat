@@ -1,0 +1,136 @@
+/* ========== 图片加载进度 ========== */
+.image-loading-container {
+    /* ✅ 使用 CSS Grid 叠加：进度条和加载内容占据同一网格单元 */
+    display: grid;
+    grid-template: 1fr / 1fr; /* 单行单列网格 */
+    background: var(--md-charcoal);
+    border-radius: 4px;
+    overflow: hidden;
+    min-height: 120px;
+}
+
+/* ✅ 加载内容容器（包含 spinner 和文字） */
+.image-loading-spinner,
+.image-progress-text {
+    grid-row-start: 1;
+    grid-column-start: 1;
+    justify-self: center;  /* 水平居中 */
+    align-self: center;    /* 垂直居中 */
+}
+
+.image-progress {
+    /* ✅ 使用 CSS Grid 叠加定位到底部 */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    justify-self: start;   /* 水平靠左 */
+    align-self: end;       /* 垂直靠下 */
+    height: 4px;
+    background: var(--md-blue);
+    transition: width 0.2s;
+    width: 0;
+    z-index: 1;
+}
+
+.image-progress-text {
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    z-index: 2;
+}
+
+.image-loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--md-muted);
+    border-top-color: var(--md-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 2;
+}
+
+.image-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--md-coral);
+    font-size: 12px;
+    padding: 20px;
+}
+
+.image-error-size {
+    color: var(--md-muted);
+    font-size: 11px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.config-manager {
+    display: flex;
+    gap: 8px;
+}
+
+/* 导出导入控制区 */
+.export-import-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.export-import-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border: var(--border);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+}
+
+.export-import-btn:hover {
+    background: var(--md-teal);
+    transform: translate(2px, -2px);
+    box-shadow: -2px 2px 0 var(--md-charcoal);
+}
+
+.export-import-btn.import {
+    grid-column: 1 / -1;
+    background: var(--md-lime);
+}
+
+.export-import-btn.import:hover {
+    background: var(--md-teal);
+}
+
+.export-import-btn svg {
+    flex-shrink: 0;
+}
+
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(56, 56, 56, 0.6);
+    z-index: 100; /* 在设置面板(101)之下，确保不遮挡面板 */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none; /* 默认不可点击 */
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.settings-panel.open ~ .settings-overlay {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto; /* 打开时可点击 */
+}
+

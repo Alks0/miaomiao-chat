@@ -1,0 +1,58 @@
+/* ========== 图片查看器模态框 ========== */
+.image-viewer-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    /* ✅ 使用 CSS Grid 叠加：图片和关闭按钮占据同一网格单元 */
+    display: none;
+    cursor: zoom-out;
+}
+
+.image-viewer-modal.open {
+    display: grid;
+    grid-template: 1fr / 1fr; /* 单行单列网格 */
+}
+
+.image-viewer-modal img {
+    /* ✅ 图片占据网格第1行第1列，居中显示 */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    justify-self: center;
+    align-self: center;
+    max-width: 95vw;
+    max-height: 95vh;
+    object-fit: contain;
+    border: 4px solid var(--md-white);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+    cursor: default;
+}
+
+.image-viewer-close {
+    /* ✅ 使用 CSS Grid 叠加定位到右上角 */
+    grid-row-start: 1;
+    grid-column-start: 1;
+    justify-self: end;     /* 水平靠右 */
+    align-self: start;     /* 垂直靠上 */
+    margin: 20px;
+    width: 48px;
+    height: 48px;
+    background: var(--md-coral);
+    border: 3px solid var(--md-charcoal);
+    color: var(--md-charcoal);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.15s ease;
+    z-index: 1;
+}
+
+.image-viewer-close:hover {
+    transform: translate(3px, -3px);
+    box-shadow: none;
+}
+

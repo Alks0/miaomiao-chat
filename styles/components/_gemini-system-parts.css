@@ -1,0 +1,83 @@
+/* ========== Gemini System Parts ========== */
+.gemini-system-parts-manager {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.system-parts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.system-part-item {
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    padding: 8px;
+    background: var(--md-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.system-part-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.system-part-index {
+    font-size: 10px;
+    color: var(--md-muted);
+    font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+.delete-system-part {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--md-coral);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.delete-system-part:hover {
+    background: var(--md-coral);
+    color: white;
+    border-radius: 2px;
+}
+
+.system-part-item textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid var(--md-border);
+    border-radius: 2px;
+    font-size: 12px;
+    background: var(--md-bg);
+    color: var(--md-text);
+    resize: vertical;
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+}
+
+.system-part-item textarea:focus {
+    outline: none;
+    border-color: var(--md-green);
+}
+
+.system-parts-controls {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.system-parts-controls textarea {
+    flex: 1;
+}
+

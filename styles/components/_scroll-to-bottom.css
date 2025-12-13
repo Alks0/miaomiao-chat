@@ -1,0 +1,74 @@
+/* ========== 滚动到底部按钮 ========== */
+.scroll-to-bottom-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border: var(--border);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    z-index: 50;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px) scale(0.8);
+    transition: all 0.25s var(--ease);
+}
+
+.scroll-to-bottom-btn.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.scroll-to-bottom-btn:hover {
+    background: var(--md-teal);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: var(--shadow-lg), var(--glow-teal);
+}
+
+.scroll-to-bottom-btn:active {
+    transform: translateY(0) scale(0.95);
+    box-shadow: var(--shadow-sm);
+}
+
+/* 按钮内箭头动画 */
+.scroll-to-bottom-btn svg {
+    transition: transform 0.2s var(--ease);
+}
+
+.scroll-to-bottom-btn:hover svg {
+    animation: bounce-arrow 0.6s ease infinite;
+}
+
+@keyframes bounce-arrow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+/* 暗色主题适配 */
+.dark-theme .scroll-to-bottom-btn {
+    background: var(--md-surface);
+    border-color: var(--md-border);
+}
+
+.dark-theme .scroll-to-bottom-btn:hover {
+    background: var(--md-teal);
+    color: var(--md-charcoal);
+}
+
+/* 移动端调整 */
+@media (max-width: 768px) {
+    .scroll-to-bottom-btn {
+        width: 48px;
+        height: 48px;
+        bottom: 16px;
+        right: 16px;
+    }
+}
+

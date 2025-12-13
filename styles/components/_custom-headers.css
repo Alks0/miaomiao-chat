@@ -1,0 +1,88 @@
+/* ========== 自定义请求头 ========== */
+.custom-headers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.custom-header-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.custom-header-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--md-surface);
+    color: var(--md-text);
+    transition: border-color 0.15s var(--ease);
+}
+
+.custom-header-row input:focus {
+    outline: none;
+    border-color: var(--md-green);
+}
+
+.custom-header-row input::placeholder {
+    color: var(--md-muted);
+}
+
+.custom-header-row .header-key {
+    flex: 0.8;
+}
+
+.custom-header-row .header-value {
+    flex: 1.2;
+}
+
+.remove-header-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    background: var(--md-surface);
+    color: var(--md-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s var(--ease);
+    flex-shrink: 0;
+}
+
+.remove-header-btn:hover {
+    border-color: var(--md-coral);
+    color: var(--md-coral);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.add-header-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px dashed var(--md-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+}
+
+.add-header-btn:hover {
+    border-color: var(--md-green);
+    color: var(--md-green);
+    background: rgba(0, 200, 83, 0.05);
+}
+

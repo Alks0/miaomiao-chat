@@ -1,0 +1,171 @@
+/* ========== 预填充消息配置 ========== */
+.prefill-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    background: var(--md-surface);
+    color: var(--md-text);
+    resize: vertical;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+}
+
+.prefill-textarea:focus {
+    outline: none;
+    border-color: var(--md-green);
+}
+
+.prefill-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--md-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.prefill-preset-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.prefill-preset-row select {
+    flex: 1;
+}
+
+.prefill-vars-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.var-input {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.var-input label {
+    font-size: 11px;
+    color: var(--md-muted);
+    font-family: var(--font-mono);
+}
+
+.var-input input {
+    padding: 6px 8px;
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    font-size: 12px;
+    background: var(--md-surface);
+    color: var(--md-text);
+}
+
+.var-input input:focus {
+    outline: none;
+    border-color: var(--md-green);
+}
+
+/* 动态消息列表 */
+.prefill-messages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.prefill-message-item {
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    padding: 8px;
+    background: var(--md-surface);
+}
+
+.prefill-message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.prefill-message-header select {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    font-size: 11px;
+    border: 2px solid var(--md-border);
+    border-radius: 4px;
+    background: var(--md-bg);
+    color: var(--md-text);
+}
+
+.prefill-message-header .prefill-msg-index {
+    font-size: 10px;
+    color: var(--md-muted);
+    font-weight: 600;
+}
+
+.prefill-message-header .delete-prefill-msg {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--md-coral);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.prefill-message-header .delete-prefill-msg:hover {
+    background: var(--md-coral);
+    color: white;
+    border-radius: 2px;
+}
+
+.prefill-message-item textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid var(--md-border);
+    border-radius: 2px;
+    font-size: 12px;
+    background: var(--md-bg);
+    color: var(--md-text);
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.prefill-message-item textarea:focus {
+    outline: none;
+    border-color: var(--md-green);
+}
+
+.prefill-add-btn {
+    width: 100%;
+    padding: 8px;
+    border: 2px dashed var(--md-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-muted);
+    cursor: pointer;
+    font-size: 12px;
+    margin-bottom: 12px;
+    font-family: var(--font-mono);
+}
+
+.prefill-add-btn:hover {
+    border-color: var(--md-green);
+    color: var(--md-green);
+}
+
+/* 禁用时半透明 */
+.prefill-config.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+

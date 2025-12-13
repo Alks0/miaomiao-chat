@@ -1,0 +1,409 @@
+/* ========== 左侧会话侧边栏 ========== */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    min-width: 240px;
+    max-width: 500px;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--md-white);
+    border-right: 3px solid var(--md-charcoal);
+    z-index: 100; /* 高于遮罩层(99)，低于设置面板(101) */
+    transform: translateX(-100%);
+    transition: transform 0.25s ease-out;
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+/* 侧边栏调整大小手柄 */
+.sidebar-resize-handle {
+    position: absolute;
+    right: -8px; /* 向外延伸以增大触控区域 */
+    top: 0;
+    width: 16px; /* 增大触控区域 */
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 10;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+    background: var(--md-orange);
+}
+
+.sidebar-resize-handle::before {
+    content: '';
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 40px;
+    background: var(--md-muted);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.sidebar-resize-handle:hover::before,
+.sidebar-resize-handle.resizing::before {
+    opacity: 1;
+}
+
+.sidebar.open {
+    transform: translateX(0);
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: var(--md-lime);
+    border-bottom: var(--border);
+}
+
+.sidebar-header h2 {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-charcoal);
+}
+
+.new-session-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: var(--border);
+    background: var(--md-teal);
+    color: var(--md-charcoal);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s var(--ease);
+}
+
+.new-session-btn:hover {
+    transform: translate(3px, -3px);
+    box-shadow: none;
+}
+
+.sidebar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.close-sidebar-btn {
+    width: 44px;  /* WCAG触摸目标最小尺寸 */
+    height: 44px;
+    border: var(--border);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s var(--ease);
+}
+
+.close-sidebar-btn:hover {
+    background: var(--md-coral);
+}
+
+.session-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--md-cream);
+}
+
+/* 空状态 */
+.session-list-empty {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--md-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.session-list-empty svg {
+    opacity: 0.3;
+    margin: 0 auto;
+}
+
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border: var(--border);
+    background: var(--md-white);
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+}
+
+.session-item:hover {
+    background: var(--md-cream);
+    transform: translateX(4px);
+}
+
+.session-item:active {
+    transform: translateX(2px) scale(0.98);
+}
+
+.session-item.active {
+    background: var(--md-blue);
+}
+
+.session-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.session-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-generating {
+    font-size: 10px;
+    color: var(--md-teal);
+    animation: pulse 1.5s var(--ease) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.session-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.session-item:hover .session-actions,
+.session-item:focus-within .session-actions {
+    opacity: 1;
+}
+
+/* 移动端：始终显示操作按钮（触摸设备无hover） */
+@media (max-width: 768px) {
+    .session-actions {
+        opacity: 1;
+    }
+}
+
+.session-action-btn {
+    width: 44px;  /* WCAG触摸目标最小尺寸 */
+    height: 44px;
+    border: 1px solid var(--md-charcoal);
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s var(--ease);
+}
+
+.session-action-btn:hover {
+    background: var(--md-yellow);
+}
+
+.session-action-btn.delete:hover {
+    background: var(--md-coral);
+}
+
+.background-tasks-indicator {
+    padding: 10px 12px;
+    border-top: var(--border);
+    background: var(--md-yellow);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.bg-task-icon {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(56, 56, 56, 0.6);
+    z-index: 99; /* 在侧边栏(100)之下，确保不遮挡面板 */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none; /* 默认不可点击 */
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.sidebar.open ~ .sidebar-overlay {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto; /* 打开时可点击 */
+}
+
+/* ========== 会话搜索栏 ========== */
+.session-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--md-cream);
+    border-bottom: var(--border);
+    flex-shrink: 0;
+}
+
+.session-search-bar .search-icon {
+    flex-shrink: 0;
+    color: var(--md-muted);
+}
+
+#session-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--md-text);
+    outline: none;
+}
+
+#session-search-input::placeholder {
+    color: var(--md-muted);
+    opacity: 0.7;
+}
+
+.search-clear-btn {
+    /* WCAG 2.5.5 Target Size (Level AAA) - 最小 44x44px */
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: var(--border);
+    background: var(--md-white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.search-clear-btn:hover {
+    background: var(--md-coral);
+    transform: translateY(-1px);
+}
+
+.search-clear-btn:hover svg {
+    stroke: white;
+}
+
+/* 搜索结果提示 */
+.session-search-hint {
+    padding: 8px 16px;
+    background: var(--md-yellow);
+    border-bottom: var(--border);
+    font-size: 11px;
+    text-align: center;
+    color: var(--md-charcoal);
+    font-weight: 600;
+}
+
+/* 高亮匹配文本 */
+.session-name mark {
+    background: var(--md-yellow);
+    color: var(--md-charcoal);
+    font-weight: 700;
+    padding: 0 2px;
+}
+
+/* ========== 匹配消息预览 ========== */
+.matched-messages-preview {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 235, 59, 0.1);
+    border-left: 3px solid var(--md-yellow);
+    border-radius: 4px;
+}
+
+.matched-message-item {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    align-items: flex-start;
+}
+
+.matched-message-item:hover {
+    background: rgba(255, 235, 59, 0.2);
+    transform: translateX(2px);
+}
+
+.message-role {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.message-role.role-user {
+    background: var(--md-blue);
+    color: white;
+}
+
+.message-role.role-assistant {
+    background: var(--md-green);
+    color: white;
+}
+
+.message-preview-text {
+    flex: 1;
+    line-height: 1.4;
+    color: var(--md-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.message-preview-text mark {
+    background: var(--md-yellow);
+    color: var(--md-charcoal);
+    font-weight: 700;
+    padding: 0 2px;
+}
+

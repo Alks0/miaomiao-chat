@@ -1,0 +1,88 @@
+/* ========== 减少动画 ========== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    /* 完全隐藏装饰性动画元素 */
+    .pixel-decorations {
+        display: none !important;
+    }
+
+    /* 保留功能性动画（如loading）但缩短 */
+    .loading-indicator,
+    .loading-dot,
+    .image-loading,
+    .bg-task-icon,
+    .settings-icon-btn.loading::after,
+    .icon-button.loading::after {
+        animation-duration: 0.5s !important;
+    }
+
+    /* 移除背景动画 */
+    .welcome-message::before {
+        animation: none !important;
+    }
+}
+
+/* ========== 兼容旧类名（隐藏旧输入区）========== */
+.glass {}
+.input-container { display: none !important; }
+.input-area { display: none !important; }
+.input-wrapper { display: none !important; }
+.input-wrapper .text-input { display: none !important; } /* 只隐藏旧输入区的 text-input，不影响对话框 */
+.input-actions { display: none !important; }
+.input-footer { display: none !important; }
+.model-selector { display: none !important; }
+.model-dropdown { display: none !important; }
+/* 旧版 UI 元素隐藏（已迁移到设置面板） */
+.config-dropdown { display: none !important; }
+.image-size-dropdown { display: none !important; }
+.reply-count-dropdown { display: none !important; }
+.refresh-button { display: none !important; }
+.api-format-row { display: none !important; }
+.reply-count-config { display: none !important; }
+.config-btn { display: none !important; }
+.api-input { display: none !important; }
+.image-preview-container { display: none !important; }
+.message-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+    max-width: 480px;
+}
+
+.message-images img {
+    width: 100%;
+    height: 120px;
+    border: var(--border);
+    border-radius: 4px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.message-images img:hover {
+    transform: scale(1.03);
+    box-shadow: var(--shadow-md);
+    z-index: 1;
+}
+
+/* 单张图片 */
+.message-images:has(img:only-child) {
+    grid-template-columns: 1fr;
+}
+
+.message-images:has(img:only-child) img {
+    max-width: 320px;
+    max-height: 240px;
+    height: auto;
+    justify-self: start;
+}
+

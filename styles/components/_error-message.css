@@ -1,0 +1,93 @@
+/* ========== 人性化错误消息 ========== */
+.error-humanized {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: #fef2f2;
+    border: 2px solid var(--md-coral);
+    border-radius: 4px;
+    box-shadow: var(--shadow-sm);
+}
+
+.error-icon {
+    flex-shrink: 0;
+    color: var(--md-coral);
+}
+
+.error-humanized-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.error-humanized-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-coral);
+    margin-bottom: 4px;
+}
+
+.error-humanized-hint {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.error-technical {
+    margin-top: 12px;
+    border-top: 1px dashed var(--md-border);
+    padding-top: 8px;
+}
+
+.error-technical summary {
+    font-size: 11px;
+    color: var(--md-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.error-technical summary:hover {
+    color: var(--md-charcoal);
+}
+
+.error-technical .details-hint {
+    font-size: 10px;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.error-technical[open] .details-hint {
+    display: none;
+}
+
+.error-technical pre {
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--md-bg);
+    border: 1px solid var(--md-border);
+    border-radius: 2px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--md-text); /* 确保文字颜色正确 */
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+/* 暗色主题 */
+.dark-theme .error-humanized {
+    background: rgba(255, 107, 107, 0.1);
+}
+
+.dark-theme .error-humanized-hint {
+    color: var(--md-muted);
+}
+
+.dark-theme .error-technical pre {
+    background: #333333;
+    border-color: var(--md-border);
+    color: #E5E5E5;
+}
+

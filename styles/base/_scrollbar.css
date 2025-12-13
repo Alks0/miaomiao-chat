@@ -1,0 +1,85 @@
+/* ========== 滚动条 - 像素风格 ========== */
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--md-blue) var(--md-cream);
+}
+
+/* 设置面板滚动条始终可见 */
+.settings-content {
+    scrollbar-width: auto;
+    scrollbar-color: var(--md-orange) rgba(56, 56, 56, 0.05);
+}
+
+/* Webkit浏览器 - 纯色像素风格 */
+::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--md-cream);
+    border: 2px solid var(--md-charcoal);
+    margin: 4px;
+}
+
+/* 像素风格滚动条thumb - 纯直角 */
+::-webkit-scrollbar-thumb {
+    background: var(--md-blue);
+    border: 2px solid var(--md-charcoal);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+    border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--md-orange);
+    box-shadow: var(--shadow-md);
+    transform: translateX(-2px);
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: var(--md-teal);
+    box-shadow: var(--shadow-sm);
+}
+
+/* 设置面板滚动条 - 纯橙色 */
+.settings-content::-webkit-scrollbar {
+    width: 16px;
+}
+
+.settings-content::-webkit-scrollbar-track {
+    background: rgba(249, 115, 22, 0.08);
+    border: 2px solid var(--md-charcoal);
+    margin: 8px 0;
+}
+
+.settings-content::-webkit-scrollbar-thumb {
+    background: var(--md-orange);
+    border: 3px solid var(--md-cream);
+    box-shadow: var(--shadow-sm);
+}
+
+.settings-content::-webkit-scrollbar-thumb:hover {
+    background: var(--md-blue);
+    box-shadow: var(--shadow-md);
+}
+
+/* 消息区域滚动条 - 纯青绿色 */
+.messages-container::-webkit-scrollbar-thumb {
+    background: var(--md-teal);
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    background: var(--md-lime);
+}
+
+/* 侧边栏滚动条 - 纯珊瑚色 */
+.session-list::-webkit-scrollbar-thumb {
+    background: var(--md-coral);
+}
+
+.session-list::-webkit-scrollbar-thumb:hover {
+    background: var(--md-pink);
+}
+

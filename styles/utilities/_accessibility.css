@@ -1,0 +1,138 @@
+/* ========== 辅助功能 - 仅屏幕阅读器可见 ========== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* ========== 键盘焦点可访问性 ========== */
+/* 为所有可交互元素添加明显的焦点指示器 */
+
+/* 按钮焦点样式 */
+.icon-button:focus,
+.send-btn:focus,
+.cancel-btn:focus,
+.cancel-edit-btn:focus,
+.close-settings-btn:focus,
+.close-sidebar-btn:focus,
+.new-session-btn:focus,
+.format-btn:focus,
+.settings-icon-btn:focus,
+.session-action-btn:focus,
+.retry-button:focus,
+.edit-button:focus,
+.input-icon-btn:focus,
+.reply-tab:focus,
+.download-image-btn:focus,
+.msg-action-btn:focus,
+.edit-save-btn:focus,
+.edit-cancel-btn:focus,
+.edit-send-btn:focus,
+.quick-toggle-btn:focus,
+.remove-image:focus,
+.quote-preview-close:focus,
+.password-toggle:focus,
+.scroll-to-bottom-btn:focus,
+.image-viewer-close:focus,
+.strength-btn:focus,
+.table-export-btn:focus,
+.add-header-btn:focus,
+.remove-header-btn:focus,
+.prefill-add-btn:focus,
+.delete-prefill-msg:focus,
+.delete-system-part:focus,
+.notification-close:focus,
+.export-import-btn:focus {
+    outline: 3px solid var(--md-blue);
+    outline-offset: 2px;
+}
+
+/* 输入框焦点样式已在各自的定义中 */
+.input-textarea:focus {
+    outline: 3px solid var(--md-blue);
+    outline-offset: 2px;
+}
+
+/* 会话列表项焦点样式 */
+.session-item:focus {
+    outline: 3px solid var(--md-orange);
+    outline-offset: -3px;
+}
+
+/* 暗色主题下使用高对比度颜色 */
+.dark-theme .icon-button:focus,
+.dark-theme .send-btn:focus,
+.dark-theme .settings-select:focus,
+.dark-theme .settings-input:focus,
+.dark-theme .input-textarea:focus {
+    outline-color: var(--md-teal);
+}
+
+/* 确保焦点环在所有元素之上 */
+*:focus {
+    position: relative;
+    z-index: 1;
+}
+
+/* 移除默认的 focus-visible 在不支持的浏览器 */
+*:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* 对于支持 focus-visible 的浏览器，只在键盘导航时显示焦点环 */
+*:focus-visible {
+    outline: 3px solid var(--md-blue);
+    outline-offset: 2px;
+}
+
+/* ========== 按钮禁用状态（:disabled）========== */
+/* 为所有按钮添加统一的禁用样式 */
+button:disabled,
+.btn:disabled,
+[class*="btn"]:disabled,
+[class*="button"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* ========== 按钮按下状态（:active）========== */
+/* 为所有缺少:active状态的按钮添加统一的按下反馈 */
+.close-settings-btn:active,
+.close-sidebar-btn:active,
+.new-session-btn:active,
+.session-action-btn:active,
+.retry-button:active,
+.edit-button:active,
+.msg-action-btn:active,
+.edit-save-btn:active,
+.edit-cancel-btn:active,
+.edit-send-btn:active,
+.input-icon-btn:active,
+.cancel-edit-btn:active,
+.quick-toggle-btn:active,
+.remove-image:active,
+.reply-tab:active,
+.image-viewer-close:active,
+.strength-btn:active,
+.add-header-btn:active,
+.remove-header-btn:active,
+.prefill-add-btn:active,
+.password-toggle:active,
+.scroll-to-bottom-btn:active,
+.table-export-btn:active,
+.export-import-btn:active,
+.delete-prefill-msg:active,
+.delete-system-part:active,
+.notification-close:active {
+    transform: translate(1px, 1px) scale(0.98);
+}
+
