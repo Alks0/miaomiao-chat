@@ -1,6 +1,6 @@
 {
-  "name": "webchat",
-  "version": "1.0.0",
+  "name": "miaomiao-chat",
+  "version": "1.1.0",
   "description": "Web Chat Application with Electron",
   "main": "electron/main.js",
   "scripts": {
@@ -20,10 +20,14 @@
     "ai"
   ],
   "author": {
-    "name": "odysseiaDev",
-    "email": "dev@odysseia.example"
+    "name": "Alks0",
+    "email": "2636777314@qq.com"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Alks0/miaomiao-chat.git"
+  },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "electron": "^28.0.0",
@@ -31,6 +35,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/filesystem": "^8.0.0",
@@ -38,8 +43,8 @@
     "electron-updater": "^6.1.7"
   },
   "build": {
-    "appId": "com.webchat.app",
-    "productName": "Webchat",
+    "appId": "com.miaomiao.chat",
+    "productName": "Miaomiao Chat",
     "directories": {
       "output": "dist"
     },
@@ -80,7 +85,8 @@
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Webchat",
+      "shortcutName": "Miaomiao Chat",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "differentialPackage": false
     },
     "compression": "normal",
@@ -100,6 +106,10 @@
       "icon": "assets/icon.png",
       "category": "Utility"
     },
-    "publish": null
+    "publish": {
+      "provider": "github",
+      "owner": "Alks0",
+      "repo": "miaomiao-chat"
+    }
   }
 }

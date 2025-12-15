@@ -136,6 +136,11 @@
     animation: editingPulse 2s ease-in-out infinite;
 }
 
+/* ✅ 编辑状态下用户消息文字颜色修正（避免白字配浅背景） */
+.message.user.editing .message-content {
+    color: var(--text-primary);
+}
+
 @keyframes editingPulse {
     0%, 100% {
         box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1),
@@ -162,7 +167,7 @@
     font-size: 12px;
     position: relative;
     overflow: hidden;
-    transition: all 0.3s var(--ease);
+    transition: opacity 0.3s var(--ease);
 }
 
 /* 头像光晕效果 */
@@ -332,7 +337,9 @@
     border: var(--border);
     border-radius: 4px;
     resize: vertical;
-    transition: all 0.2s var(--ease);
+    transition: border-color 0.2s var(--ease),
+                box-shadow 0.2s var(--ease);
+    will-change: height;
     box-shadow: var(--shadow-sm);
 }
 
@@ -366,7 +373,8 @@
     border: var(--border);
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.15s var(--ease);
+    transition: background-color 0.15s var(--ease),
+                transform 0.15s var(--ease);
     box-shadow: var(--shadow-sm);
     display: flex;
     align-items: center;
@@ -543,5 +551,60 @@
     100% {
         box-shadow: 0 0 0 4px var(--md-yellow);
     }
+}
+
+/* ========== 思维链编辑区域 ========== */
+.edit-thinking-section {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(251, 191, 36, 0.1);
+    border: 2px dashed var(--md-yellow);
+    border-radius: 4px;
+}
+
+.edit-thinking-section label {
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-charcoal);
+}
+
+.edit-thinking-section .hint {
+    font-weight: 400;
+    font-size: 12px;
+    color: var(--md-muted);
+    opacity: 0.8;
+}
+
+.edit-thinking-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--md-charcoal);
+    background: var(--md-white);
+    border: var(--border);
+    border-radius: 4px;
+    resize: vertical;
+    /* ✅ 使用优化后的transition，与 .edit-textarea 一致 */
+    transition: border-color 0.2s var(--ease),
+                box-shadow 0.2s var(--ease);
+    will-change: height;
+    box-shadow: var(--shadow-sm);
+}
+
+.edit-thinking-textarea:focus {
+    outline: none;
+    border-color: var(--md-yellow);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+}
+
+.edit-thinking-textarea::placeholder {
+    color: var(--md-muted);
+    opacity: 0.6;
 }
 

@@ -256,11 +256,29 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
 
         state.lastUserMessage = null;
         state.messageHistory = [];
+
+        // ✅ 退出编辑模式（清理 DOM 状态）
+        if (state.editingElement) {
+            state.editingElement.classList.remove('editing');
+        }
         state.editingIndex = null;
         state.editingElement = null;
+
+        // ✅ 清空输入框
+        if (elements && elements.userInput) {
+            elements.userInput.value = '';
+            elements.userInput.style.height = 'auto';
+        }
+
+        // ✅ 通知 UI 更新编辑按钮状态
+        eventBus.emit('editor:mode-changed', { isEditing: false });
+
         state.currentReplies = [];
         state.selectedReplyIndex = 0;
         state.uploadedImages = [];
+
+        // ✅ 更新图片预览（清空）
+        eventBus.emit('ui:update-image-preview');
 
         // ✅ 将当前会话的生成任务移到后台（如果正在生成）
         if (oldSessionId && state.isLoading && state.currentAbortController) {

@@ -3,13 +3,17 @@
  * 解析 Claude SSE 流式响应
  */
 
-import { recordFirstToken, recordTokens, finalizeStreamStats, getCurrentStreamStatsData, appendStreamStats } from './stats.js';
+import { recordFirstToken, recordTokens, recalculateStreamTokenCount, finalizeStreamStats, getCurrentStreamStatsData, getPartialStreamStatsData, appendStreamStats } from './stats.js';
 import { updateStreamingMessage, renderFinalTextWithThinking, renderFinalContentWithThinking, cleanupAllIncompleteImages } from './helpers.js';
 import { saveAssistantMessage } from '../messages/sync.js';
 import { setCurrentMessageIndex } from '../messages/dom-sync.js';  // ✅ Bug 2 修复：导入索引设置函数
 import { eventBus } from '../core/events.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { parseStreamingMarkdownImages } from '../utils/markdown-image-parser.js';
+import { handleToolCallStream } from './tool-call-handler.js';
+import { XMLStreamAccumulator } from '../tools/xml-formatter.js';  // ✅ XML 工具调用解析
+import { state } from '../core/state.js';  // ✅ 访问 xmlToolCallingEnabled 配置
+import { ThinkTagParser } from './think-tag-parser.js';  // ✅ <think> 标签解析器
 
 // ✅ 响应长度限制（防止内存溢出）
 const MAX_RESPONSE_LENGTH = 200000; // 20万字符
@@ -25,11 +29,20 @@ export async function parseClaudeStream(reader, sessionId = null) {
     let textContent = '';
     let thinkingBlocks = [];  // 存储多个独立的思考块
     let currentThinkingBlock = '';  // 当前正在接收的思考块
+    let thinkingSignatures = [];  // ✅ 存储每个思考块的 signature
+    let currentSignature = '';  // ✅ 当前思考块的 signature
     let currentBlockType = null;
     let blockIndex = 0;
     let totalReceived = 0; // ✅ 追踪总接收字符数
     let markdownBuffer = ''; // ✅ Markdown 图片缓冲区
     let contentParts = []; // ✅ 内容部分（用于支持图片）
+
+    // ⭐ 工具调用相关状态
+    let toolCalls = new Map();  // Map<index, {id, name, input: string}>
+    const xmlToolCallAccumulator = new XMLStreamAccumulator();  // ✅ XML 工具调用累积器
+    let hasNativeToolCalls = false;  // ✅ 标记是否检测到原生格式
+    let stopReason = null;  // 停止原因
+    const thinkTagParser = new ThinkTagParser();  // ✅ <think> 标签解析器
 
     try {
         while (true) {
@@ -86,14 +99,31 @@ export async function parseClaudeStream(reader, sessionId = null) {
                             case 'content_block_start':
                                 currentBlockType = event.content_block?.type;
                                 blockIndex = event.index;
-                                // 如果是新的思考块，初始化
-                                if (currentBlockType === 'thinking') {
+
+                                // ✅ 检测原生工具调用 (Claude 格式，仅在非 XML 模式)
+                                if (currentBlockType === 'tool_use' && !state.xmlToolCallingEnabled) {
+                                    hasNativeToolCalls = true;  // ✅ 标记为原生格式
+                                    const block = event.content_block;
+                                    toolCalls.set(blockIndex, {
+                                        id: block.id,
+                                        name: block.name,
+                                        input: ''  // 将通过 delta 事件拼接
+                                    });
+                                    console.log('[Claude] 检测到原生工具调用:', block.name);
+                                } else if (currentBlockType === 'thinking') {
+                                    // 如果是新的思考块，初始化
                                     currentThinkingBlock = '';
                                 }
                                 break;
 
                             case 'content_block_delta':
-                                if (event.delta?.type === 'thinking_delta') {
+                                // ⭐ 累积工具调用参数 (Claude 格式)
+                                if (event.delta?.type === 'input_json_delta') {
+                                    const toolCall = toolCalls.get(event.index);
+                                    if (toolCall) {
+                                        toolCall.input += event.delta.partial_json;
+                                    }
+                                } else if (event.delta?.type === 'thinking_delta') {
                                     recordFirstToken();
                                     recordTokens(event.delta.thinking);
                                     currentThinkingBlock += event.delta.thinking;
@@ -101,12 +131,47 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                     // 实时更新显示（合并所有已完成的思考块 + 当前思考块）
                                     const allThinking = [...thinkingBlocks, currentThinkingBlock].join('\n\n---\n\n');
                                     updateStreamingMessage(textContent, allThinking);
+                                } else if (event.delta?.type === 'signature_delta') {
+                                    // ✅ 累积思考块的签名
+                                    currentSignature += event.delta.signature;
+                                    console.log('[Claude] 接收 signature_delta，当前长度:', currentSignature.length);
                                 } else if (event.delta?.type === 'text_delta') {
                                     recordFirstToken();
                                     recordTokens(event.delta.text);
 
-                                    // ✅ 解析 markdown 图片格式
-                                    const { parts, newBuffer } = parseStreamingMarkdownImages(event.delta.text, markdownBuffer);
+                                    // ✅ 优先处理 XML 检测（仅在 XML 模式）
+                                    let deltaText = event.delta.text;
+                                    if (state.xmlToolCallingEnabled) {
+                                        try {
+                                            const result = xmlToolCallAccumulator.processDelta(event.delta.text);
+                                            const { hasToolCalls: hasXML, displayText, error } = result;
+
+                                            if (error) {
+                                                console.error('[Claude Parser] ⚠️ XML 解析错误:', error);
+                                                // 回退：将当前内容当作普通文本处理
+                                            } else if (hasXML) {
+                                                // 更新展示文本（去除 XML 标签）
+                                                deltaText = displayText.substring(textContent.length);
+                                                console.log('[Claude Parser] 🔧 检测到 XML 工具调用');
+                                            }
+                                        } catch (xmlError) {
+                                            // ✅ P0: 顶层错误保护 - XML 解析崩溃时不影响正常流式输出
+                                            console.error('[Claude Parser] ❌ XML 累积器异常:', xmlError);
+                                            // 禁用 XML 模式，回退到纯文本
+                                            hasNativeToolCalls = true;
+                                        }
+                                    }
+
+                                    // ✅ 解析 <think> 标签
+                                    const { displayText: thinkParsedText, thinkingDelta } = thinkTagParser.processDelta(deltaText);
+                                    if (thinkingDelta) {
+                                        // 将 <think> 内容添加到当前思考块
+                                        currentThinkingBlock += thinkingDelta;
+                                        totalReceived += thinkingDelta.length;
+                                    }
+
+                                    // ✅ 解析 markdown 图片格式（使用 <think> 解析后的文本）
+                                    const { parts, newBuffer } = parseStreamingMarkdownImages(thinkParsedText, markdownBuffer);
                                     markdownBuffer = newBuffer;
 
                                     for (const part of parts) {
@@ -127,7 +192,8 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                         }
                                     }
 
-                                    const allThinking = thinkingBlocks.join('\n\n---\n\n');
+                                    // ✅ 合并原生思考块和 <think> 标签提取的内容
+                                    const allThinking = [...thinkingBlocks, currentThinkingBlock].filter(Boolean).join('\n\n---\n\n');
                                     updateStreamingMessage(textContent, allThinking);
                                 }
 
@@ -140,7 +206,8 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                     });
                                     await reader.cancel();
                                     const finalThinking = thinkingBlocks.join('\n\n---\n\n');
-                                    finalizeClaudeStream(textContent, finalThinking, contentParts, sessionId);
+                                    const finalSignature = thinkingSignatures.join('\n\n---\n\n');
+                                    finalizeClaudeStream(textContent, finalThinking, finalSignature, contentParts, sessionId);
                                     return;
                                 }
                                 break;
@@ -149,15 +216,106 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                 // 如果当前块是思考块，将其保存到数组
                                 if (currentBlockType === 'thinking' && currentThinkingBlock) {
                                     thinkingBlocks.push(currentThinkingBlock);
+                                    // ✅ 保存对应的签名
+                                    thinkingSignatures.push(currentSignature);
+                                    console.log('[Claude] 思考块完成，签名长度:', currentSignature.length);
                                     currentThinkingBlock = '';
+                                    currentSignature = '';
                                 }
                                 currentBlockType = null;
                                 break;
 
+                            case 'message_delta':
+                                // ⭐ 捕获停止原因
+                                if (event.delta?.stop_reason) {
+                                    stopReason = event.delta.stop_reason;
+                                }
+                                break;
+
                             case 'message_stop':
+                                // ⭐ 检查是否有工具调用
+                                let completedCalls = [];
+
+                                if (state.xmlToolCallingEnabled) {
+                                    // ✅ XML 模式：使用 XML 工具调用
+                                    const xmlCalls = xmlToolCallAccumulator.getCompletedCalls();
+                                    if (xmlCalls.length > 0) {
+                                        completedCalls = xmlCalls;
+                                        console.log(`[Claude] 流结束，检测到 ${xmlCalls.length} 个 XML 工具调用`);
+                                    }
+                                } else {
+                                    // ✅ 原生模式：使用原生工具调用
+                                    if (stopReason === 'tool_use' && toolCalls.size > 0) {
+                                        console.log(`[Claude] 流结束，检测到 ${toolCalls.size} 个原生工具调用`);
+
+                                        // 解析所有原生工具调用
+                                        for (const [index, call] of toolCalls) {
+                                            try {
+                                                const args = JSON.parse(call.input);
+                                                completedCalls.push({
+                                                    id: call.id,
+                                                    name: call.name,
+                                                    arguments: args
+                                                });
+                                            } catch (e) {
+                                                console.error('[Claude] 解析工具参数失败:', call.name, e);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ✅ 执行工具调用（如果有）
+                                if (completedCalls.length > 0) {
+
+                                    // ✅ 注意：工具调用时不结束统计，让统计在 continuation 完成后才最终确定
+                                    // finalizeStreamStats() 会在 continuation 完成时调用
+
+                                    // 合并思维链
+                                    const finalThinking = thinkingBlocks.join('\n\n---\n\n');
+                                    // ✅ 合并所有签名（使用相同的分隔符）
+                                    const finalSignature = thinkingSignatures.join('\n\n---\n\n');
+
+                                    // ✅ 关键修复：先渲染思维链到 DOM，然后再保存消息
+                                    if (contentParts.length > 0) {
+                                        renderFinalContentWithThinking(contentParts, finalThinking);
+                                    } else if (textContent || finalThinking) {
+                                        renderFinalTextWithThinking(textContent, finalThinking);
+                                    }
+
+                                    // ✅ 工具调用时不添加统计 HTML，等 continuation 完成后再添加
+                                    // appendStreamStats() 会在 continuation 完成时调用
+
+                                    // ✅ 保存助手消息（包含工具调用）- 保存部分统计（TTFT 和当前 token 数）
+                                    const messageIndex = saveAssistantMessage({
+                                        textContent: textContent || '(调用工具)',
+                                        thinkingContent: finalThinking,
+                                        thinkingSignature: finalSignature,
+                                        contentParts,
+                                        toolCalls: completedCalls,
+                                        streamStats: getPartialStreamStatsData(),  // ✅ 修复：保存部分统计，供 continuation 聚合
+                                        sessionId
+                                    });
+
+                                    // 设置消息索引
+                                    setCurrentMessageIndex(messageIndex);
+
+                                    // ✅ 标记工具调用进行中，阻止 finally 块重置状态
+                                    state.isToolCallPending = true;
+
+                                    // 执行工具调用（异步）
+                                    handleToolCallStream(completedCalls, {
+                                        endpoint: state.endpoint,
+                                        apiKey: state.apiKey,
+                                        model: state.model
+                                    });
+
+                                    return; // 退出流处理
+                                }
+
                                 // 合并所有思考块（用分隔线分隔）
                                 const finalThinking = thinkingBlocks.join('\n\n---\n\n');
-                                finalizeClaudeStream(textContent, finalThinking, contentParts, sessionId);
+                                const finalSignature = thinkingSignatures.join('\n\n---\n\n');
+                                finalizeClaudeStream(textContent, finalThinking, finalSignature, contentParts, sessionId);
                                 return;
                         }
                     } catch (e) {
@@ -167,9 +325,30 @@ export async function parseClaudeStream(reader, sessionId = null) {
             }
         }
 
+        // ✅ 流结束前刷新 <think> 解析器缓冲区
+        const { displayText: finalDisplayText, thinkingDelta: finalThinkingDelta } = thinkTagParser.flush();
+        if (finalThinkingDelta) {
+            currentThinkingBlock += finalThinkingDelta;
+        }
+        if (finalDisplayText) {
+            textContent += finalDisplayText;
+            const lastPart = contentParts[contentParts.length - 1];
+            if (lastPart && lastPart.type === 'text') {
+                lastPart.text += finalDisplayText;
+            } else {
+                contentParts.push({ type: 'text', text: finalDisplayText });
+            }
+        }
+
+        // ✅ 如果有未保存的 <think> 内容，添加到 thinkingBlocks
+        if (currentThinkingBlock) {
+            thinkingBlocks.push(currentThinkingBlock);
+        }
+
         // 流结束
         const finalThinking = thinkingBlocks.join('\n\n---\n\n');
-        finalizeClaudeStream(textContent, finalThinking, contentParts, sessionId);
+        const finalSignature = thinkingSignatures.join('\n\n---\n\n');
+        finalizeClaudeStream(textContent, finalThinking, finalSignature, contentParts, sessionId);
     } finally {
         // ✅ 关键修复：释放 reader 锁，防止资源泄漏
         try {
@@ -185,10 +364,11 @@ export async function parseClaudeStream(reader, sessionId = null) {
  * 完成 Claude 流处理
  * @param {string} textContent - 文本内容
  * @param {string} thinkingContent - 思维链内容
+ * @param {string} thinkingSignature - 思维链签名
  * @param {Array} contentParts - 内容部分数组
  * @param {string} sessionId - 会话ID
  */
-function finalizeClaudeStream(textContent, thinkingContent, contentParts, sessionId) {
+function finalizeClaudeStream(textContent, thinkingContent, thinkingSignature, contentParts, sessionId) {
     // 完成统计
     finalizeStreamStats();
 
@@ -202,6 +382,9 @@ function finalizeClaudeStream(textContent, thinkingContent, contentParts, sessio
         renderFinalTextWithThinking(textContent, thinkingContent);
     }
 
+    // ✅ 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
+    recalculateStreamTokenCount({ textContent, thinkingContent, contentParts });
+
     // 添加统计信息
     appendStreamStats();
 
@@ -209,6 +392,7 @@ function finalizeClaudeStream(textContent, thinkingContent, contentParts, sessio
     const messageIndex = saveAssistantMessage({
         textContent,
         thinkingContent,
+        thinkingSignature,
         contentParts,
         streamStats: getCurrentStreamStatsData(),
         sessionId: sessionId, // 🔒 传递会话ID防止串消息
@@ -263,6 +447,9 @@ function finalizeClaudeStreamWithError(textContent, thinkingContent, contentPart
             contentDiv.insertAdjacentHTML('beforeend', errorHtml);
         }
     }
+
+    // ✅ 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
+    recalculateStreamTokenCount({ textContent: finalText, thinkingContent, contentParts });
 
     // 添加统计信息
     appendStreamStats();

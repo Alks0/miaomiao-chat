@@ -48,16 +48,16 @@
 访问 [GitHub Releases](https://github.com/Alks0/miaomiao-chat/releases) 下载最新版本：
 
 **Windows**:
-- `Webchat Setup 1.0.0.exe` - 安装版（推荐）
-- `Webchat 1.0.0.exe` - 便携版
+- `Miaomiao Chat Setup 1.0.0.exe` - 安装版（推荐）
+- `Miaomiao Chat 1.0.0.exe` - 便携版
 
 **macOS**:
-- `Webchat-1.0.0.dmg` - DMG 安装包
-- `Webchat-1.0.0-mac.zip` - 压缩包
+- `Miaomiao Chat-1.0.0.dmg` - DMG 安装包
+- `Miaomiao Chat-1.0.0-mac.zip` - 压缩包
 
 **Linux**:
-- `Webchat-1.0.0.AppImage` - AppImage（推荐）
-- `Webchat-1.0.0.deb` - Debian/Ubuntu 包
+- `Miaomiao Chat-1.0.0.AppImage` - AppImage（推荐）
+- `Miaomiao Chat-1.0.0.deb` - Debian/Ubuntu 包
 
 **Android**:
 - `app-1.0.0.apk` - Android 安装包（调试签名，支持所有设备）

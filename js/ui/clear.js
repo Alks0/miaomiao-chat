@@ -7,6 +7,7 @@ import { state } from '../core/state.js';
 import { elements } from '../core/elements.js';
 import { saveCurrentSessionMessages } from '../state/sessions.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
+import { clearIdMappings } from '../api/format-converter.js';  // ✅ P0: 清理 ID 映射表
 
 /**
  * 处理清空当前会话
@@ -22,6 +23,9 @@ export async function handleClear() {
     state.messages = [];
     state.geminiContents = [];
     state.claudeContents = [];
+
+    // ✅ P0: 清理工具调用 ID 映射表（防止内存泄漏）
+    clearIdMappings();
 
     // 重置相关状态
     state.lastUserMessage = null;

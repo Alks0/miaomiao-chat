@@ -179,15 +179,44 @@ async function initUpdateSettings() {
     const currentVersionNumber = document.getElementById('current-version-number');
 
     // 显示当前版本号
-    if (isElectron() && window.electronAPI && window.electronAPI.getVersion) {
-        const version = window.electronAPI.getVersion();
-        if (currentVersionNumber) {
-            currentVersionNumber.textContent = version;
+    if (window.electronAPI && window.electronAPI.getVersion) {
+        // Electron 环境
+        try {
+            const version = await window.electronAPI.getVersion();
+            if (currentVersionNumber) {
+                currentVersionNumber.textContent = version;
+            }
+        } catch (error) {
+            console.warn('[Settings] 获取 Electron 版本号失败:', error);
+            if (currentVersionNumber) {
+                currentVersionNumber.textContent = '1.1.1';
+            }
         }
     } else if (window.Capacitor) {
-        // Capacitor/APK 平台
+        // Capacitor/APK 平台 - 使用 App 插件获取版本号
+        try {
+            if (window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+                const { App } = window.Capacitor.Plugins;
+                const info = await App.getInfo();
+                if (currentVersionNumber) {
+                    currentVersionNumber.textContent = info.version;
+                }
+            } else {
+                console.warn('[Settings] Capacitor App 插件未加载');
+                if (currentVersionNumber) {
+                    currentVersionNumber.textContent = '未知';
+                }
+            }
+        } catch (error) {
+            console.warn('[Settings] 获取 Capacitor 版本号失败:', error);
+            if (currentVersionNumber) {
+                currentVersionNumber.textContent = '未知';
+            }
+        }
+    } else {
+        // Web 浏览器环境 - 显示未知
         if (currentVersionNumber) {
-            currentVersionNumber.textContent = '1.0.0'; // 从 package.json 读取
+            currentVersionNumber.textContent = '未知';
         }
     }
 

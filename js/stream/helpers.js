@@ -6,7 +6,7 @@
 import { state, elements } from '../core/state.js';
 import { safeMarkedParse } from '../utils/markdown.js';
 import { escapeHtml } from '../utils/helpers.js';
-import { renderThinkingBlock, enhanceCodeBlocks } from '../messages/renderer.js';
+import { renderThinkingBlock, enhanceCodeBlocks, enhanceThinkingBlocks } from '../messages/renderer.js';
 
 // ✅ 性能优化：防抖渲染（避免每个 token 都触发重绘）
 let renderDebounceTimer = null;
@@ -31,22 +31,102 @@ function scrollToBottom() {
 function doRender(textContent, thinkingContent) {
     if (!state.currentAssistantMessage) return;
 
-    let html = '';
+    // ✅ 检测是否是 continuation 模式（有工具调用 UI 或持久标记）
+    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-call-container');
+    const hasContinuationLoading = state.currentAssistantMessage.querySelector('.continuation-loading');
+    const isContinuation = state.currentAssistantMessage.dataset.isContinuation === 'true';
 
-    // 渲染思维链（流式中显示）
-    if (thinkingContent) {
-        html += renderThinkingBlock(thinkingContent, true);
+    if (hasToolCallUI || hasContinuationLoading || isContinuation) {
+        // ✅ Continuation 模式：只更新 continuation 部分
+        console.log('[doRender] Continuation 流式模式：更新追加内容');
+
+        // 移除之前的 continuation-content（如果存在）
+        const oldContinuation = state.currentAssistantMessage.querySelector('.continuation-content');
+        if (oldContinuation) {
+            oldContinuation.remove();
+        }
+
+        // 移除 continuation-loading 提示
+        if (hasContinuationLoading) {
+            hasContinuationLoading.remove();
+        }
+
+        // 创建 continuation 容器
+        const continuationDiv = document.createElement('div');
+        continuationDiv.className = 'continuation-content';
+
+        let html = '';
+
+        // 渲染思维链（流式中显示）
+        if (thinkingContent) {
+            html += renderThinkingBlock(thinkingContent, true);
+        }
+
+        // 渲染文本内容
+        if (textContent) {
+            html += safeMarkedParse(textContent);
+        }
+
+        // 添加打字光标
+        html += '<span class="typing-cursor"></span>';
+
+        continuationDiv.innerHTML = html;
+        state.currentAssistantMessage.appendChild(continuationDiv);
+
+        // ✅ 重新绑定思维链事件监听器
+        if (thinkingContent) {
+            enhanceThinkingBlocks(state.currentAssistantMessage.parentElement);
+        }
+    } else {
+        // ✅ 正常模式：覆盖整个内容
+        // ✅ 保存思维链展开状态（innerHTML 会重置状态）
+        const expandedStates = [];
+        if (thinkingContent) {
+            const existingBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
+            existingBlocks.forEach((block, index) => {
+                expandedStates[index] = !block.classList.contains('collapsed');
+            });
+        }
+
+        let html = '';
+
+        // 渲染思维链（流式中显示）
+        if (thinkingContent) {
+            html += renderThinkingBlock(thinkingContent, true);
+        }
+
+        // 渲染文本内容
+        if (textContent) {
+            html += safeMarkedParse(textContent);
+        }
+
+        // 添加打字光标
+        html += '<span class="typing-cursor"></span>';
+
+        state.currentAssistantMessage.innerHTML = html;
+
+        // ✅ 重新绑定思维链事件监听器（innerHTML 会销毁原有监听器）
+        if (thinkingContent) {
+            enhanceThinkingBlocks(state.currentAssistantMessage.parentElement);
+
+            // ✅ 恢复展开状态
+            const newBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
+            newBlocks.forEach((block, index) => {
+                if (expandedStates[index]) {
+                    block.classList.remove('collapsed');
+                    const header = block.querySelector('.thinking-header');
+                    if (header) {
+                        header.setAttribute('aria-expanded', 'true');
+                        const icon = header.querySelector('.thinking-toggle-icon');
+                        if (icon) {
+                            icon.textContent = '▼';
+                        }
+                    }
+                }
+            });
+        }
     }
 
-    // 渲染文本内容
-    if (textContent) {
-        html += safeMarkedParse(textContent);
-    }
-
-    // 添加打字光标
-    html += '<span class="typing-cursor"></span>';
-
-    state.currentAssistantMessage.innerHTML = html;
     scrollToBottom();
 }
 
@@ -89,21 +169,77 @@ export function updateStreamingMessage(textContent, thinkingContent) {
 export function renderFinalTextWithThinking(textContent, thinkingContent, groundingMetadata = null) {
     if (!state.currentAssistantMessage) return;
 
-    let html = '';
+    // ✅ 检测是否是 continuation 模式（有工具调用 UI 或持久标记）
+    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-call-container');
+    const hasContinuationLoading = state.currentAssistantMessage.querySelector('.continuation-loading');
+    const isContinuation = state.currentAssistantMessage.dataset.isContinuation === 'true';
 
-    if (thinkingContent) {
-        html += renderThinkingBlock(thinkingContent, false);
+    if (hasToolCallUI || hasContinuationLoading || isContinuation) {
+        // ✅ Continuation 模式：追加新内容，保留现有内容
+        console.log('[renderFinalTextWithThinking] Continuation 模式：追加内容');
+
+        // 移除 continuation-loading 提示
+        if (hasContinuationLoading) {
+            hasContinuationLoading.remove();
+        }
+
+        // 移除流式 continuation 容器（如果存在）
+        const continuationContent = state.currentAssistantMessage.querySelector('.continuation-content');
+        if (continuationContent) {
+            continuationContent.remove();
+        }
+
+        // ✅ 修复：获取之前保存的思维链（从DOM或state中恢复）
+        // 检查是否已有思维链块
+        const existingThinkingBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
+
+        let html = '';
+
+        // ✅ 只有当没有现有思维链时，才渲染新的思维链
+        // 或者，如果有新的思维链，则追加为新的阶段
+        if (thinkingContent) {
+            if (existingThinkingBlocks.length > 0) {
+                // 已有思维链，追加新的思维链为新阶段
+                console.log('[renderFinalTextWithThinking] 检测到已有思维链，追加新阶段');
+                html += renderThinkingBlock(thinkingContent, false);
+            } else {
+                // 没有现有思维链，正常渲染
+                html += renderThinkingBlock(thinkingContent, false);
+            }
+        }
+
+        if (textContent) {
+            html += safeMarkedParse(textContent);
+        }
+
+        if (groundingMetadata) {
+            html += renderSearchGrounding(groundingMetadata);
+        }
+
+        // ✅ 使用 insertAdjacentHTML 追加内容（而不是覆盖）
+        state.currentAssistantMessage.insertAdjacentHTML('beforeend', html);
+
+        // ✅ 清除 continuation 标记
+        delete state.currentAssistantMessage.dataset.isContinuation;
+    } else {
+        // ✅ 正常模式：覆盖整个内容
+        let html = '';
+
+        if (thinkingContent) {
+            html += renderThinkingBlock(thinkingContent, false);
+        }
+
+        if (textContent) {
+            html += safeMarkedParse(textContent);
+        }
+
+        if (groundingMetadata) {
+            html += renderSearchGrounding(groundingMetadata);
+        }
+
+        state.currentAssistantMessage.innerHTML = html;
     }
 
-    if (textContent) {
-        html += safeMarkedParse(textContent);
-    }
-
-    if (groundingMetadata) {
-        html += renderSearchGrounding(groundingMetadata);
-    }
-
-    state.currentAssistantMessage.innerHTML = html;
     enhanceCodeBlocks();
     scrollToBottom();
 }
@@ -116,6 +252,11 @@ export function renderFinalTextWithThinking(textContent, thinkingContent, ground
  */
 export function renderFinalContentWithThinking(contentParts, thinkingContent, groundingMetadata = null) {
     if (!state.currentAssistantMessage) return;
+
+    // ✅ 检测是否是 continuation 模式（有工具调用 UI 或持久标记）
+    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-call-container');
+    const hasContinuationLoading = state.currentAssistantMessage.querySelector('.continuation-loading');
+    const isContinuation = state.currentAssistantMessage.dataset.isContinuation === 'true';
 
     let html = '';
 
@@ -143,9 +284,20 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
             }
         }
     } else {
+        // ✅ 检查是否已有思维链块（continuation 模式下）
+        const existingThinkingBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
+
         // ✅ 旧模式（向后兼容）：thinking 在顶部，然后是 contentParts
+        // 但是在 continuation 模式下，只有当没有现有思维链时才渲染新的
         if (thinkingContent) {
-            html += renderThinkingBlock(thinkingContent, false);
+            if (hasToolCallUI && existingThinkingBlocks.length > 0) {
+                // Continuation 模式且已有思维链，追加新的思维链为新阶段
+                console.log('[renderFinalContentWithThinking] 检测到已有思维链，追加新阶段');
+                html += renderThinkingBlock(thinkingContent, false);
+            } else {
+                // 正常模式或没有现有思维链
+                html += renderThinkingBlock(thinkingContent, false);
+            }
         }
 
         for (const part of contentParts) {
@@ -170,7 +322,31 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
         html += renderSearchGrounding(groundingMetadata);
     }
 
-    state.currentAssistantMessage.innerHTML = html;
+    if (hasToolCallUI || hasContinuationLoading || isContinuation) {
+        // ✅ Continuation 模式：追加新内容，保留现有内容
+        console.log('[renderFinalContentWithThinking] Continuation 模式：追加内容');
+
+        // 移除 continuation-loading 提示
+        if (hasContinuationLoading) {
+            hasContinuationLoading.remove();
+        }
+
+        // 移除流式 continuation 容器（如果存在）
+        const continuationContent = state.currentAssistantMessage.querySelector('.continuation-content');
+        if (continuationContent) {
+            continuationContent.remove();
+        }
+
+        // ✅ 使用 insertAdjacentHTML 追加内容（而不是覆盖）
+        state.currentAssistantMessage.insertAdjacentHTML('beforeend', html);
+
+        // ✅ 清除 continuation 标记
+        delete state.currentAssistantMessage.dataset.isContinuation;
+    } else {
+        // ✅ 正常模式：覆盖整个内容
+        state.currentAssistantMessage.innerHTML = html;
+    }
+
     enhanceCodeBlocks();
     scrollToBottom();
 }

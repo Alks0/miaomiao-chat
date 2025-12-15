@@ -6,6 +6,19 @@
 import { state } from '../core/state.js';
 
 /**
+ * 估算 token 数（与 recordTokens 使用相同的粗略规则）
+ * @param {string} text
+ * @returns {number}
+ */
+function estimateTokenCount(text) {
+    if (!text) return 0;
+    const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+    const otherText = text.replace(/[\u4e00-\u9fff]/g, ' ');
+    const words = otherText.split(/\s+/).filter(w => w.length > 0).length;
+    return chineseChars + words;
+}
+
+/**
  * 重置流统计
  */
 export function resetStreamStats() {
@@ -35,11 +48,39 @@ export function recordFirstToken() {
 export function recordTokens(text) {
     // 简单估算：按空格和标点分词，中文按字符计数
     if (!text) return;
-    // 粗略估计 token 数：英文按空格分词，中文按字符
-    const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-    const otherText = text.replace(/[\u4e00-\u9fff]/g, ' ');
-    const words = otherText.split(/\s+/).filter(w => w.length > 0).length;
-    state.streamStats.tokenCount += chineseChars + words;
+    state.streamStats.tokenCount += estimateTokenCount(text);
+}
+
+/**
+ * 在流结束时根据最终内容重算 token 数，避免因解析分支漏记导致 token 统计停在工具调用前
+ * @param {Object} params
+ * @param {string} params.textContent
+ * @param {string} params.thinkingContent
+ * @param {Array} params.contentParts
+ * @returns {number} 重算后的 token 数
+ */
+export function recalculateStreamTokenCount({ textContent = '', thinkingContent = '', contentParts = [] } = {}) {
+    const TOOL_PLACEHOLDER = '(调用工具)';
+
+    // 优先用文本变量（避免与 contentParts 里的 thinking/text 重复）
+    let combinedText = [thinkingContent, textContent]
+        .filter(Boolean)
+        .join('\n');
+
+    if (combinedText === TOOL_PLACEHOLDER) {
+        combinedText = '';
+    }
+
+    // 回退：如果变量为空但 contentParts 有内容，从 contentParts 提取文本
+    if (!combinedText && Array.isArray(contentParts) && contentParts.length > 0) {
+        combinedText = contentParts
+            .filter(p => (p?.type === 'text' || p?.type === 'thinking') && typeof p.text === 'string' && p.text && p.text !== TOOL_PLACEHOLDER)
+            .map(p => p.text)
+            .join('\n');
+    }
+
+    state.streamStats.tokenCount = estimateTokenCount(combinedText);
+    return state.streamStats.tokenCount;
 }
 
 /**
@@ -65,6 +106,28 @@ export function getCurrentStreamStatsData() {
         : '-';
 
     return { ttft, totalTime, tokens, tps };
+}
+
+/**
+ * ✅ 获取部分流统计数据（用于工具调用时保存，不结束统计）
+ * 与 getCurrentStreamStatsData 的区别：不需要 endTime，返回当前进行中的统计
+ * @returns {Object|null} 部分统计数据
+ */
+export function getPartialStreamStatsData() {
+    const stats = state.streamStats;
+    if (!stats.requestStartTime) return null;
+
+    const ttft = stats.firstTokenTime ? ((stats.firstTokenTime - stats.requestStartTime) / 1000).toFixed(2) : '-';
+    const tokens = stats.tokenCount || 0;
+
+    // 部分统计：totalTime 和 tps 暂时为 '-'，等待 continuation 完成后更新
+    return {
+        ttft,
+        totalTime: '-',  // 工具调用进行中，总时间待定
+        tokens,
+        tps: '-',        // 工具调用进行中，TPS 待定
+        isPartial: true  // ✅ 标记为部分统计，供 continuation 聚合时识别
+    };
 }
 
 /**
@@ -150,18 +213,33 @@ export function getStreamStatsHTML() {
 
 /**
  * 将统计信息追加到消息末尾
+ * ✅ 修复：支持多种获取消息容器的方式，防止 state.currentAssistantMessage 被清空时失败
  */
 export function appendStreamStats() {
-    if (!state.currentAssistantMessage) return;
     const statsHTML = getStreamStatsHTML();
-    if (statsHTML) {
-        // 找到消息容器并添加统计
-        const wrapper = state.currentAssistantMessage.closest('.message-content-wrapper');
-        if (wrapper) {
-            // 移除旧的统计（如果有）
-            const oldStats = wrapper.querySelector('.stream-stats');
-            if (oldStats) oldStats.remove();
-            wrapper.insertAdjacentHTML('beforeend', statsHTML);
+    if (!statsHTML) return;
+
+    // ✅ 尝试多种方式获取消息容器
+    let wrapper = null;
+
+    // 方式1：使用 state.currentAssistantMessage
+    if (state.currentAssistantMessage) {
+        wrapper = state.currentAssistantMessage.closest('.message-content-wrapper');
+    }
+
+    // 方式2：如果方式1失败，找到 DOM 中最后一条助手消息
+    if (!wrapper) {
+        const allAssistantMsgs = document.querySelectorAll('.message.assistant');
+        if (allAssistantMsgs.length > 0) {
+            const lastAssistantMsg = allAssistantMsgs[allAssistantMsgs.length - 1];
+            wrapper = lastAssistantMsg.querySelector('.message-content-wrapper');
         }
+    }
+
+    if (wrapper) {
+        // 移除旧的统计（如果有）
+        const oldStats = wrapper.querySelector('.stream-stats');
+        if (oldStats) oldStats.remove();
+        wrapper.insertAdjacentHTML('beforeend', statsHTML);
     }
 }

@@ -1,0 +1,444 @@
+/**
+ * 工具调用 UI 样式（Pixel Art 主题）
+ */
+
+/* ========== 工具调用容器 ========== */
+
+.tool-call-container {
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-white);
+    box-shadow: var(--shadow-md);
+    margin: 12px 0;
+    padding: 12px;
+    font-family: var(--font-sans);
+    transition: all 0.2s var(--ease);
+}
+
+.tool-call-container:hover {
+    transform: var(--hover-offset-sm);
+}
+
+/* 状态颜色 */
+.tool-call-container[data-status="executing"] {
+    border-left: 3px solid var(--md-yellow);
+    box-shadow: var(--shadow-md), var(--glow-yellow);
+}
+
+.tool-call-container[data-status="completed"] {
+    border-left: 3px solid var(--md-teal);
+    box-shadow: var(--shadow-md), var(--glow-teal);
+}
+
+.tool-call-container[data-status="failed"] {
+    border-left: 3px solid var(--md-coral);
+    box-shadow: var(--shadow-md), var(--glow-coral);
+}
+
+/* 成功闪烁动画 */
+@keyframes successFlash {
+    0%, 100% { background: var(--md-white); }
+    50% { background: rgba(20, 184, 166, 0.1); }
+}
+
+.tool-call-container.success-flash {
+    animation: successFlash 0.5s ease-in-out;
+}
+
+/* ========== Header ========== */
+
+.tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.tool-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.tool-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tool-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.tool-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.tool-timestamp {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+/* ========== 参数折叠面板 ========== */
+
+.tool-params {
+    margin: 8px 0;
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-bg);
+}
+
+.tool-params summary {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s var(--ease);
+}
+
+.tool-params summary:hover {
+    background: rgba(56, 56, 56, 0.05);
+}
+
+.tool-params[open] summary {
+    border-bottom: var(--border);
+}
+
+.params-content {
+    padding: 12px;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    overflow-x: auto;
+    background: var(--md-bg);
+}
+
+.params-content code {
+    font-family: inherit;
+}
+
+/* ========== 执行状态 ========== */
+
+.tool-execution-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--md-bg);
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+.status-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--md-yellow);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.status-text {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.status-duration {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+/* ========== 结果显示 ========== */
+
+.tool-result {
+    margin-top: 12px;
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-bg);
+    padding: 12px;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--md-teal);
+}
+
+.result-icon {
+    font-size: 18px;
+}
+
+.result-label {
+    font-weight: 700;
+    color: var(--md-teal);
+    font-size: 13px;
+}
+
+.result-content {
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.result-json {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: var(--md-white);
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0;
+}
+
+.empty-result {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 12px 0;
+    margin: 0;
+}
+
+/* 结果列表（搜索结果等） */
+.result-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.result-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px;
+    background: var(--md-white);
+    border: var(--border);
+    border-radius: 4px;
+    transition: all 0.15s var(--ease);
+}
+
+.result-item:hover {
+    transform: var(--hover-offset-sm);
+    box-shadow: var(--shadow-sm);
+}
+
+.result-item-number {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--md-blue);
+    color: var(--md-white);
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.result-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.result-item-title {
+    font-weight: 600;
+    color: var(--md-blue);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color 0.15s var(--ease);
+}
+
+.result-item-title:hover {
+    color: var(--md-blue-dark);
+    text-decoration: underline;
+}
+
+.result-item-snippet {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.result-more {
+    padding: 8px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* ========== 错误显示 ========== */
+
+.tool-error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px solid var(--md-coral);
+    border-radius: 4px;
+    margin-top: 12px;
+}
+
+.error-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.error-message {
+    flex: 1;
+    font-size: 13px;
+    color: var(--md-coral);
+    font-weight: 600;
+}
+
+.retry-button {
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-white);
+    color: var(--md-charcoal);
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 12px;
+    padding: 6px 12px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s var(--ease-bounce);
+    cursor: pointer;
+}
+
+.retry-button:hover {
+    transform: var(--hover-offset-sm);
+    box-shadow: var(--shadow-md);
+    background: var(--md-orange);
+    color: var(--md-white);
+}
+
+.retry-button:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+}
+
+/* ========== 移动端优化 ========== */
+
+@media (max-width: 768px) {
+    .tool-call-container {
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    .tool-call-header {
+        gap: 8px;
+    }
+
+    .tool-icon {
+        font-size: 20px;
+    }
+
+    .tool-name {
+        font-size: 13px;
+    }
+
+    .result-item {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .result-item-number {
+        align-self: flex-start;
+    }
+}
+
+/* ========== 撤销按钮 ========== */
+
+.tool-undo-container {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: var(--border);
+}
+
+.tool-undo-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--md-cream);
+    border: var(--border);
+    border-radius: 4px;
+    color: var(--md-charcoal);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    box-shadow: var(--shadow-sm);
+    width: 100%;
+    justify-content: center;
+}
+
+.tool-undo-button:hover:not(:disabled) {
+    background: var(--md-soft-yellow);
+    transform: var(--hover-offset-sm);
+    box-shadow: var(--shadow-md);
+}
+
+.tool-undo-button:active:not(:disabled) {
+    transform: translate(0, 0);
+    box-shadow: none;
+}
+
+.tool-undo-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tool-undo-button svg {
+    flex-shrink: 0;
+}
+
+.tool-undo-button span {
+    white-space: nowrap;
+}
+
+/* 撤销按钮在失败状态下显示 */
+.tool-call-container[data-status="failed"] .tool-undo-container {
+    border-top-color: var(--md-red);
+}
+
+.tool-call-container[data-status="failed"] .tool-undo-button {
+    background: var(--md-soft-yellow);
+    border-color: var(--md-red);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .tool-undo-button {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .tool-undo-button svg {
+        width: 12px;
+        height: 12px;
+    }
+}

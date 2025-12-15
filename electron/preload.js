@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * 立即安装更新并重启应用
+     */
+    installUpdateAndRestart: () => {
+        ipcRenderer.send('install-update');
+    },
+
+    /**
      * 监听通知消息
      * @param {Function} callback - 回调函数，接收通知数据
      */
@@ -76,10 +83,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * 获取应用版本号
-     * @returns {string} 版本号
+     * @returns {Promise<string>} 版本号
      */
     getVersion: () => {
-        return require('../package.json').version;
+        return ipcRenderer.invoke('get-app-version');
     },
 
     /**
@@ -88,5 +95,66 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     isElectron: () => {
         return true;
+    }
+});
+
+/**
+ * 暴露 electron 对象（用于 MCP 客户端）
+ * 提供对 IPC 的访问
+ */
+contextBridge.exposeInMainWorld('electron', {
+    /**
+     * ipcRenderer 封装
+     */
+    ipcRenderer: {
+        /**
+         * 调用主进程方法
+         * @param {string} channel - IPC 通道
+         * @param {any} data - 数据
+         * @returns {Promise<any>}
+         */
+        invoke: (channel, data) => {
+            // 白名单：只允许特定的 MCP 通道
+            const allowedChannels = [
+                'mcp:connect',
+                'mcp:disconnect',
+                'mcp:list-tools',
+                'mcp:call-tool',
+                'mcp:status'
+            ];
+
+            if (allowedChannels.includes(channel)) {
+                return ipcRenderer.invoke(channel, data);
+            } else {
+                return Promise.reject(new Error(`不允许的 IPC 通道: ${channel}`));
+            }
+        },
+
+        /**
+         * 监听主进程事件
+         * @param {string} channel - IPC 通道
+         * @param {Function} callback - 回调函数
+         */
+        on: (channel, callback) => {
+            const allowedChannels = [
+                'mcp:server-started',
+                'mcp:server-stopped',
+                'mcp:server-error',
+                'mcp:notification'
+            ];
+
+            if (allowedChannels.includes(channel)) {
+                ipcRenderer.on(channel, (event, ...args) => callback(...args));
+            }
+        },
+
+        /**
+         * 移除事件监听器
+         * @param {string} channel - IPC 通道
+         * @param {Function} callback - 回调函数
+         */
+        removeListener: (channel, callback) => {
+            ipcRenderer.removeListener(channel, callback);
+        }
     }
 });

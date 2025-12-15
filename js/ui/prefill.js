@@ -10,6 +10,19 @@ import { escapeHtml } from '../utils/helpers.js';
 import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
 
 /**
+ * ✅ 自动调整文本框高度（通用函数）
+ * @param {HTMLTextAreaElement} textarea - 文本框元素
+ * @param {number} minHeight - 最小高度（默认 60px）
+ * @param {number} maxHeight - 最大高度（默认 300px）
+ */
+function autoResizeTextareaGeneric(textarea, minHeight = 60, maxHeight = 300) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const newHeight = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight));
+    textarea.style.height = newHeight + 'px';
+}
+
+/**
  * 渲染预填充消息列表
  */
 export function renderPrefillMessagesList() {
@@ -41,11 +54,16 @@ export function renderPrefillMessagesList() {
     });
 
     container.querySelectorAll('.prefill-msg-content').forEach(textarea => {
+        // ✅ 初始化时自动调整高度
+        autoResizeTextareaGeneric(textarea);
+
         textarea.addEventListener('input', (e) => {
             const idx = parseInt(e.target.dataset.index);
             state.prefillMessages[idx].content = e.target.value;
             state.currentPrefillPresetName = '';
             saveCurrentConfig();
+            // ✅ 输入时自动调整高度
+            autoResizeTextareaGeneric(e.target);
         });
     });
 
@@ -170,11 +188,18 @@ export function initPrefillControls() {
     });
 
     // System Prompt
-    document.getElementById('system-prompt-input')?.addEventListener('input', (e) => {
-        state.systemPrompt = e.target.value;
-        state.currentPrefillPresetName = '';
-        saveCurrentConfig();
-    });
+    const systemPromptInput = document.getElementById('system-prompt-input');
+    if (systemPromptInput) {
+        // ✅ 初始化时同步 state 到 UI（防止首次加载时 UI 和 state 不同步）
+        systemPromptInput.value = state.systemPrompt || '';
+
+        systemPromptInput.addEventListener('input', (e) => {
+            state.systemPrompt = e.target.value;
+            state.currentPrefillPresetName = '';
+            console.log('[Prefill] System Prompt 已更新:', state.systemPrompt.substring(0, 50) + '...');
+            saveCurrentConfig();
+        });
+    }
 
     // 变量
     document.getElementById('char-name')?.addEventListener('input', (e) => {
@@ -230,10 +255,15 @@ function renderGeminiSystemPartsList() {
 
     // 绑定事件
     container.querySelectorAll('.system-part-content').forEach(textarea => {
+        // ✅ 初始化时自动调整高度
+        autoResizeTextareaGeneric(textarea);
+
         textarea.addEventListener('input', (e) => {
             const idx = parseInt(e.target.dataset.index);
             state.geminiSystemParts[idx].text = e.target.value;
             saveCurrentConfig();
+            // ✅ 输入时自动调整高度
+            autoResizeTextareaGeneric(e.target);
         });
     });
 

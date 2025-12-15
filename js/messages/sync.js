@@ -9,7 +9,7 @@ import { eventBus } from '../core/events.js';
 import { toOpenAIMessage, toGeminiMessage, toClaudeMessage } from './converters.js';
 import { generateMessageId } from '../utils/helpers.js';
 import { pushMessage, rebuildMessageIdMap } from '../core/state-mutations.js';
-import { getCurrentProvider } from '../providers/manager.js';
+import { getCurrentProvider, getModelDisplayName } from '../providers/manager.js';
 
 /**
  * 同步添加消息到所有三种格式
@@ -37,11 +37,13 @@ export function syncPushMessage(role, content, images = null) {
  * 无论什么模式（流式/非流式、单回复/多回复）都通过这个函数保存
  * @param {Object} options - 消息选项
  * @param {string} options.sessionId - 可选：请求发起时的会话ID，用于防止消息串到其他会话
+ * @param {boolean} options.isContinuation - 可选：是否是工具调用的 continuation
  */
 export function saveAssistantMessage(options) {
     const {
         textContent = '',
         thinkingContent = null,
+        thinkingSignature = null,  // ✅ Claude thinking block 签名
         thoughtSignature = null,
         groundingMetadata = null,
         streamStats = null,
@@ -50,14 +52,16 @@ export function saveAssistantMessage(options) {
         contentParts = [],
         geminiParts = null,  // 用于 Gemini 流式处理，保留原始 parts
         sessionId = null,    // 🔒 请求发起时的会话ID
+        isContinuation = false,  // ✅ 是否是工具调用的 continuation
     } = options;
 
     // 🔑 生成唯一消息ID
     const messageId = generateMessageId();
 
     // 🏷️ 记录当前使用的模型和提供商信息
-    const modelName = state.selectedModel || 'unknown';
     const provider = getCurrentProvider();
+    const modelId = state.selectedModel || '';
+    const modelName = getModelDisplayName(modelId, provider); // 使用友好显示名称而不是模型 ID
     const providerName = provider?.name || 'Unknown';
 
     // 检测是否有图片
@@ -65,8 +69,8 @@ export function saveAssistantMessage(options) {
 
     // 1. 构建 OpenAI 格式
     const openaiMsg = buildOpenAIAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thinkingContent,
-        streamStats, allReplies, selectedReplyIndex, modelName, providerName
+        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName
     });
 
     // 2. 构建 Gemini 格式
@@ -77,7 +81,7 @@ export function saveAssistantMessage(options) {
 
     // 3. 构建 Claude 格式
     const claudeMsg = buildClaudeAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thinkingContent,
+        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
         streamStats, allReplies, selectedReplyIndex, modelName, providerName
     });
 
@@ -109,6 +113,286 @@ export function saveAssistantMessage(options) {
             console.error(`❌ 未找到会话 ${sessionId}，消息丢失！`);
         }
         return; // 不保存到当前会话
+    }
+
+    // ✅ Continuation 模式：更新上一条助手消息而不是创建新的
+    // 可以通过参数传入，或者检查 state.isSavingContinuation 标志
+    const shouldMerge = isContinuation || state.isSavingContinuation;
+
+    // 清除标志（使用后立即清除）
+    if (state.isSavingContinuation) {
+        state.isSavingContinuation = false;
+    }
+
+    if (shouldMerge) {
+        // Continuation 模式：优先使用 DOM 的 messageIndex，避免 tool_calls helper 消息截胡更新目标
+        let lastAssistantIndex = -1;
+
+        const domMessageEl = state.currentAssistantMessage?.closest?.('.message');
+        const domIndexStr = domMessageEl?.dataset?.messageIndex;
+        if (domIndexStr !== undefined) {
+            const domIdx = parseInt(domIndexStr, 10);
+            if (!Number.isNaN(domIdx) &&
+                domIdx >= 0 &&
+                domIdx < state.messages.length &&
+                state.messages[domIdx]?.role === 'assistant') {
+                lastAssistantIndex = domIdx;
+            }
+        }
+
+        // Fallback：从后向前找最后一条“真实”assistant 消息（跳过仅用于 API continuation 的 tool_calls 占位消息）
+        if (lastAssistantIndex < 0) {
+            for (let i = state.messages.length - 1; i >= 0; i--) {
+                const msg = state.messages[i];
+                if (!msg || msg.role !== 'assistant') continue;
+
+                const hasContentParts = Array.isArray(msg.contentParts) && msg.contentParts.length > 0;
+                const hasThinking = !!msg.thinkingContent || !!msg.thinkingSignature || !!msg.thoughtSignature;
+                const hasStreamStats = !!msg.streamStats;
+                const hasReplies = Array.isArray(msg.allReplies) && msg.allReplies.length > 0;
+
+                const hasTextContent = typeof msg.content === 'string'
+                    ? msg.content.trim().length > 0
+                    : Array.isArray(msg.content)
+                        ? msg.content.some(p => p?.type === 'text' && (p.text || '').trim().length > 0)
+                        : false;
+
+                const isToolCallsOnly = Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0 &&
+                    !hasTextContent && !hasContentParts && !hasThinking && !hasStreamStats && !hasReplies;
+
+                if (isToolCallsOnly) continue;
+
+                lastAssistantIndex = i;
+                break;
+            }
+        }
+
+        if (lastAssistantIndex >= 0) {
+            console.log(`[saveAssistantMessage] Continuation 模式：更新消息 #${lastAssistantIndex}`);
+
+            const prevOpenai = state.messages[lastAssistantIndex];
+            const prevGemini = state.geminiContents[lastAssistantIndex];
+            const prevClaude = state.claudeContents[lastAssistantIndex];
+
+            // 合并 thinkingContent
+            const mergedThinking = [prevOpenai.thinkingContent, thinkingContent]
+                .filter(Boolean)
+                .join('\n\n---\n\n');
+
+            // 合并 textContent（原有的 + 新的）
+            const prevText = typeof prevOpenai.content === 'string'
+                ? prevOpenai.content
+                : (prevOpenai.content?.find(p => p.type === 'text')?.text || '');
+            const mergedText = prevText === '(调用工具)'
+                ? textContent
+                : [prevText, textContent].filter(Boolean).join('\n\n');
+
+            // ✅ 修复：合并 contentParts，正确处理占位符和空 contentParts
+            const prevContentParts = prevOpenai.contentParts || [];
+
+            // 检查原有内容是否包含占位符
+            const hasPlaceholder = prevContentParts.some(p =>
+                p.type === 'text' && p.text === '(调用工具)'
+            );
+
+            let mergedContentParts;
+
+            // ✅ 关键修复：检查新 contentParts 是否为空
+            if (contentParts.length > 0) {
+                if (hasPlaceholder) {
+                    // ✅ 替换模式：过滤掉占位符，然后追加新内容
+                    mergedContentParts = prevContentParts
+                        .filter(p => !(p.type === 'text' && p.text === '(调用工具)'))
+                        .concat(contentParts);
+                } else {
+                    // 追加模式：正常追加新内容
+                    mergedContentParts = [...prevContentParts, ...contentParts];
+                }
+            } else {
+                // ✅ 新 contentParts 为空时，保留原有内容（去掉占位符）
+                // 但如果有 textContent，则用 textContent 创建新的 contentParts
+                if (textContent && textContent !== '(调用工具)') {
+                    mergedContentParts = prevContentParts
+                        .filter(p => !(p.type === 'text' && p.text === '(调用工具)'));
+                    // 添加新的文本内容
+                    mergedContentParts.push({ type: 'text', text: textContent });
+                } else {
+                    // 保留原有的非占位符内容
+                    mergedContentParts = prevContentParts.filter(p =>
+                        !(p.type === 'text' && p.text === '(调用工具)')
+                    );
+                }
+            }
+
+            // ✅ 最终过滤：移除所有占位符，确保不会残留
+            mergedContentParts = mergedContentParts.filter(p =>
+                !(p.type === 'text' && p.text === '(调用工具)')
+            );
+
+            console.log('[saveAssistantMessage] Continuation contentParts 合并:', {
+                prevCount: prevContentParts.length,
+                newCount: contentParts.length,
+                mergedCount: mergedContentParts.length,
+                hasPlaceholder,
+                textContent: textContent?.substring(0, 50)
+            });
+
+            // ✅ 修复：确保 content 和 contentParts 保持同步
+            // 1. 先更新 contentParts
+            if (mergedContentParts.length > 0) {
+                prevOpenai.contentParts = mergedContentParts;
+            } else if (mergedText && mergedText !== '(调用工具)') {
+                // contentParts 为空但有有效文本，自动生成
+                prevOpenai.contentParts = [{ type: 'text', text: mergedText }];
+            }
+
+            // 2. 从 contentParts 中提取最终的 textContent（确保同步）
+            let finalTextContent = mergedText;
+            if (!finalTextContent || finalTextContent === '(调用工具)') {
+                // 如果 mergedText 无效，从 contentParts 中提取文本
+                const textParts = (prevOpenai.contentParts || [])
+                    .filter(p => p.type === 'text' && p.text && p.text !== '(调用工具)')
+                    .map(p => p.text);
+                if (textParts.length > 0) {
+                    finalTextContent = textParts.join('\n\n');
+                }
+            }
+
+            // 3. 更新 content
+            if (finalTextContent && finalTextContent !== '(调用工具)') {
+                prevOpenai.content = finalTextContent;
+            }
+
+            // 4. 更新 thinkingContent
+            if (mergedThinking) {
+                prevOpenai.thinkingContent = mergedThinking;
+            }
+
+            // 更新 Gemini 格式 - 从 contentParts 重建 parts
+            // ✅ 使用 prevOpenai.contentParts（已经过滤和处理过）
+            const finalContentParts = prevOpenai.contentParts || [];
+            if (prevGemini) {
+                if (finalContentParts.length > 0) {
+                    // ✅ 从 contentParts 重建 parts（确保内容一致性）
+                    const newParts = [];
+                    finalContentParts.forEach(p => {
+                        if (p.type === 'thinking') {
+                            newParts.push({ text: p.text, thought: true });
+                        } else if (p.type === 'text' && p.text && p.text !== '(调用工具)') {
+                            newParts.push({ text: p.text });
+                        } else if (p.type === 'image_url' && p.complete) {
+                            const match = p.url?.match(/^data:([^;]+);base64,(.+)$/);
+                            if (match) {
+                                newParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                            }
+                        }
+                    });
+                    if (newParts.length > 0) {
+                        prevGemini.parts = newParts;
+                    } else if (finalTextContent && finalTextContent !== '(调用工具)') {
+                        // newParts 为空（可能只有 thinking），使用 finalTextContent
+                        prevGemini.parts = [{ text: finalTextContent }];
+                    }
+                    prevGemini.contentParts = finalContentParts;
+                } else if (finalTextContent && finalTextContent !== '(调用工具)') {
+                    // 回退：只有文本，没有 contentParts
+                    prevGemini.parts = [{ text: finalTextContent }];
+                }
+            }
+
+            // 更新 Claude 格式 - 从 contentParts 重建 content
+            if (prevClaude) {
+                if (finalContentParts.length > 0) {
+                    // ✅ 从 contentParts 重建 content（确保内容一致性）
+                    const newContent = [];
+                    finalContentParts.forEach(p => {
+                        if (p.type === 'text' && p.text && p.text !== '(调用工具)') {
+                            newContent.push({ type: 'text', text: p.text });
+                        } else if (p.type === 'image_url' && p.complete) {
+                            const match = p.url?.match(/^data:([^;]+);base64,(.+)$/);
+                            if (match) {
+                                newContent.push({
+                                    type: 'image',
+                                    source: { type: 'base64', media_type: match[1], data: match[2] }
+                                });
+                            }
+                        }
+                    });
+                    if (newContent.length > 0) {
+                        prevClaude.content = newContent;
+                    } else if (finalTextContent && finalTextContent !== '(调用工具)') {
+                        // newContent 为空，使用 finalTextContent
+                        prevClaude.content = [{ type: 'text', text: finalTextContent }];
+                    }
+                    prevClaude.contentParts = finalContentParts;
+                } else if (finalTextContent && finalTextContent !== '(调用工具)') {
+                    // 回退：只有文本，没有 contentParts
+                    prevClaude.content = [{ type: 'text', text: finalTextContent }];
+                }
+                if (mergedThinking) {
+                    prevClaude.thinkingContent = mergedThinking;
+                }
+            }
+
+            // ✅ 更新 streamStats（优先使用最终统计，避免 continuation 时重复累加 token）
+            if (streamStats) {
+                const prevStats = prevOpenai.streamStats;
+                let finalStats = streamStats;
+
+                // ✅ 如果之前保存了部分统计：通常 continuation 不会重置 stats，此时 streamStats.tokens 已是累计值，直接覆盖即可
+                if (prevStats && prevStats.isPartial) {
+                    const prevTokens = parseInt(prevStats.tokens, 10) || 0;
+                    const currentTokens = parseInt(streamStats.tokens, 10) || 0;
+
+                    if (currentTokens < prevTokens) {
+                        // 少见：如果 continuation 开始时重置了统计，则 tokens 是增量，需要进行聚合
+                        const totalTokens = prevTokens + currentTokens;
+                        const ttft = (prevStats.ttft && prevStats.ttft !== '-') ? prevStats.ttft : streamStats.ttft;
+
+                        const totalTimeNum = parseFloat(streamStats.totalTime);
+                        const ttftNum = parseFloat(ttft);
+                        const genTime = (Number.isFinite(totalTimeNum) && Number.isFinite(ttftNum))
+                            ? (totalTimeNum - ttftNum)
+                            : NaN;
+
+                        finalStats = {
+                            ...streamStats,
+                            ttft,
+                            tokens: totalTokens,
+                            tps: Number.isFinite(genTime) && genTime > 0
+                                ? (totalTokens / genTime).toFixed(1)
+                                : streamStats.tps
+                        };
+                    } else {
+                        // 通常情况：统计未重置，streamStats 已包含全期间
+                        finalStats = {
+                            ...streamStats,
+                            ttft: (streamStats.ttft && streamStats.ttft !== '-') ? streamStats.ttft : prevStats.ttft
+                        };
+                    }
+                } else if (prevStats?.ttft && prevStats.ttft !== '-' && (!streamStats.ttft || streamStats.ttft === '-')) {
+                    // 回退：保留之前的 TTFT
+                    finalStats = { ...streamStats, ttft: prevStats.ttft };
+                }
+
+                // ✅ 移除 isPartial 标记（完整消息不再是部分统计）
+                if (finalStats && finalStats.isPartial) {
+                    delete finalStats.isPartial;
+                }
+
+                prevOpenai.streamStats = finalStats;
+                if (prevGemini) prevGemini.streamStats = finalStats;
+                if (prevClaude) prevClaude.streamStats = finalStats;
+            }
+
+            // 发出更新事件
+            eventBus.emit('messages:changed', {
+                action: 'assistant_updated',
+                index: lastAssistantIndex
+            });
+
+            return lastAssistantIndex;
+        }
     }
 
     // ✅ 使用安全的状态更新函数
@@ -163,6 +447,7 @@ export function saveAssistantMessageToSession(session, options) {
     const {
         textContent = '',
         thinkingContent = null,
+        thinkingSignature = null,  // ✅ Claude thinking block 签名
         thoughtSignature = null,
         groundingMetadata = null,
         streamStats = null,
@@ -176,16 +461,17 @@ export function saveAssistantMessageToSession(session, options) {
     const messageId = generateMessageId();
 
     // 🏷️ 记录当前使用的模型和提供商信息
-    const modelName = state.selectedModel || 'unknown';
     const provider = getCurrentProvider();
+    const modelId = state.selectedModel || '';
+    const modelName = getModelDisplayName(modelId, provider); // 使用友好显示名称而不是模型 ID
     const providerName = provider?.name || 'Unknown';
 
     const hasImages = contentParts?.some(p => p.type === 'image_url' && p.complete);
 
     // 构建并添加到会话
     const openaiMsg = buildOpenAIAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thinkingContent,
-        streamStats, allReplies, selectedReplyIndex, modelName, providerName
+        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName
     });
     session.messages.push(openaiMsg);
 
@@ -196,7 +482,7 @@ export function saveAssistantMessageToSession(session, options) {
     session.geminiContents.push(geminiMsg);
 
     const claudeMsg = buildClaudeAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thinkingContent,
+        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
         streamStats, allReplies, selectedReplyIndex, modelName, providerName
     });
     session.claudeContents.push(claudeMsg);
@@ -268,8 +554,8 @@ export function saveErrorMessage(errorData, httpStatus = null, renderHumanizedEr
  */
 function buildOpenAIAssistantMessage(opts) {
     const {
-        messageId, textContent, contentParts, hasImages, thinkingContent,
-        streamStats, allReplies, selectedReplyIndex, modelName, providerName
+        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName
     } = opts;
 
     const msg = { role: 'assistant' };
@@ -298,6 +584,8 @@ function buildOpenAIAssistantMessage(opts) {
 
     // 添加元数据
     if (thinkingContent) msg.thinkingContent = thinkingContent;
+    if (thinkingSignature) msg.thinkingSignature = thinkingSignature;  // ✅ Claude 签名
+    if (thoughtSignature) msg.thoughtSignature = thoughtSignature;  // ✅ Gemini 签名（P0 修复）
     if (streamStats) msg.streamStats = streamStats;
     if (allReplies && allReplies.length > 0) {
         msg.allReplies = allReplies;
@@ -380,7 +668,7 @@ function buildGeminiAssistantMessage(opts) {
  */
 function buildClaudeAssistantMessage(opts) {
     const {
-        messageId, textContent, contentParts, hasImages, thinkingContent,
+        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
         streamStats, modelName, providerName
     } = opts;
 
@@ -417,6 +705,7 @@ function buildClaudeAssistantMessage(opts) {
 
     // 添加元数据
     if (thinkingContent) msg.thinkingContent = thinkingContent;
+    if (thinkingSignature) msg.thinkingSignature = thinkingSignature;  // ✅ Claude 签名
     if (streamStats) msg.streamStats = streamStats;
 
     // ✅ 保存原始 contentParts（用于会话恢复时的完整渲染）
@@ -435,6 +724,7 @@ export function copyMessageMetadata(source, target) {
     const metadataKeys = [
         'allReplies',         // 多回复数据
         'thinkingContent',    // 思维链内容
+        'thinkingSignature',  // ✅ 思维链签名（Claude 专有）
         'selectedReplyIndex', // 选中的回复索引
         'groundingMetadata',  // 搜索引用（Gemini 专有）
         'streamStats',        // 流统计数据
@@ -444,7 +734,8 @@ export function copyMessageMetadata(source, target) {
         'errorHtml',          // 错误 HTML
         'id',                 // 消息唯一ID
         'modelName',          // 🏷️ 模型名称
-        'providerName'        // 🏷️ 提供商名称
+        'providerName',       // 🏷️ 提供商名称
+        'contentParts'        // ✅ 原始内容部分（用于会话恢复）
     ];
     metadataKeys.forEach(key => {
         if (source[key] !== undefined) {
@@ -466,6 +757,10 @@ export function convertFromOpenAI() {
         const images = extractImages(msg.content);
         const geminiMsg = copyMessageMetadata(msg, toGeminiMessage(msg.role, content, images));
         const claudeMsg = copyMessageMetadata(msg, toClaudeMessage(msg.role, content, images));
+
+        // ❌ 移除 P1 修复：不在存储时删除签名，避免格式往返丢失
+        // 改为在发送请求时过滤（见 api/gemini.js 和 api/claude.js）
+
         state.geminiContents.push(geminiMsg);
         state.claudeContents.push(claudeMsg);
     });
@@ -487,6 +782,9 @@ export function convertFromGemini() {
 
         const openaiMsg = copyMessageMetadata(msg, toOpenAIMessage(role, content, images.length > 0 ? images : null));
         const claudeMsg = copyMessageMetadata(msg, toClaudeMessage(role, content, images.length > 0 ? images : null));
+
+        // ❌ 移除 P1 修复：保留所有签名，避免格式往返丢失
+
         state.messages.push(openaiMsg);
         state.claudeContents.push(claudeMsg);
     });
@@ -517,6 +815,9 @@ export function convertFromClaude() {
 
         const openaiMsg = copyMessageMetadata(msg, toOpenAIMessage(msg.role, content, images.length > 0 ? images : null));
         const geminiMsg = copyMessageMetadata(msg, toGeminiMessage(msg.role, content, images.length > 0 ? images : null));
+
+        // ❌ 移除 P1 修复：保留所有签名，避免格式往返丢失
+
         state.messages.push(openaiMsg);
         state.geminiContents.push(geminiMsg);
     });

@@ -5,6 +5,7 @@
 
 import { state, elements } from '../core/state.js';
 import { createMessageElement, renderThinkingBlock, renderReplyWithSelector, enhanceCodeBlocks, renderContentParts, bindImageClickEvents } from './renderer.js';
+import { safeMarkedParse } from '../utils/markdown.js';
 import { renderStreamStatsFromData } from '../stream/stats.js';
 import { generateMessageId } from '../utils/helpers.js';
 import { rebuildMessageIdMap } from '../core/state-mutations.js';
@@ -249,18 +250,81 @@ export function renderSessionMessages() {
 function enhanceAssistantMessage(messageEl, msg, openaiMsg) {
     const contentDiv = messageEl.querySelector('.message-content');
 
-    // ✅ 优先恢复 contentParts（包含图片和思维链的完整顺序）
-    if (openaiMsg && openaiMsg.contentParts && openaiMsg.contentParts.length > 0) {
-        if (contentDiv) {
-            // 使用 renderContentParts 完整渲染（包含 thinking, text, image）
-            contentDiv.innerHTML = renderContentParts(openaiMsg.contentParts);
+    // ✅ 恢复消息内容（思维链 + 文本/图片）
+    if (contentDiv && openaiMsg) {
+        let html = '';
+        let contentRendered = false;  // ✅ 跟踪是否成功渲染了内容
+
+        // 1. 先渲染思维链（如果有）
+        if (openaiMsg.thinkingContent) {
+            html += renderThinkingBlock(openaiMsg.thinkingContent);
+        }
+
+        // 2. 优先渲染 contentParts（text, image）
+        if (openaiMsg.contentParts && openaiMsg.contentParts.length > 0) {
+            // ✅ 过滤掉占位符和 thinking 类型（thinking 已经在上面单独渲染过了）
+            const validContentParts = openaiMsg.contentParts.filter(
+                p => !(p.type === 'text' && p.text === '(调用工具)') && p.type !== 'thinking'
+            );
+
+            if (validContentParts.length > 0) {
+                const renderedContent = renderContentParts(validContentParts);
+                if (renderedContent && renderedContent.trim()) {
+                    html += renderedContent;
+                    contentRendered = true;
+                }
+            }
+        }
+
+        // 3. 如果 contentParts 没有渲染出内容，回退到 openaiMsg.content
+        if (!contentRendered && openaiMsg.content) {
+            // 获取原始文本内容
+            let textContent = '';
+            if (typeof openaiMsg.content === 'string') {
+                textContent = openaiMsg.content;
+            } else if (Array.isArray(openaiMsg.content)) {
+                textContent = openaiMsg.content
+                    .filter(p => p.type === 'text')
+                    .map(p => p.text)
+                    .join('');
+            }
+            // 如果不是占位符，渲染它
+            if (textContent && textContent !== '(调用工具)') {
+                html += safeMarkedParse(textContent);
+                contentRendered = true;
+            }
+        }
+
+        // ✅ 4. 最后的回退：尝试从 Gemini parts 获取内容
+        if (!contentRendered && msg && msg.parts && Array.isArray(msg.parts)) {
+            const textFromParts = msg.parts
+                .filter(p => p.text && !p.thought)  // 排除思维链
+                .map(p => p.text)
+                .join('');
+            if (textFromParts && textFromParts !== '(调用工具)') {
+                html += safeMarkedParse(textFromParts);
+                contentRendered = true;
+            }
+        }
+
+        // 5. 如果有内容，更新 DOM
+        if (html) {
+            contentDiv.innerHTML = html;
+        }
+
+        // ✅ 日志记录未渲染的情况
+        if (!contentRendered && !openaiMsg.thinkingContent) {
+            console.warn('[Restore] 消息无法渲染内容:', {
+                index: messageEl.dataset.messageIndex,
+                contentParts: openaiMsg.contentParts?.length,
+                content: typeof openaiMsg.content,
+                parts: msg?.parts?.length
+            });
         }
     }
-    // 回退：恢复思维链（旧格式，只有 thinkingContent）
-    else if (openaiMsg && openaiMsg.thinkingContent) {
-        if (contentDiv) {
-            contentDiv.innerHTML = renderThinkingBlock(openaiMsg.thinkingContent) + contentDiv.innerHTML;
-        }
+    // 回退：旧格式只有 thinkingContent（无 contentParts）
+    else if (openaiMsg && openaiMsg.thinkingContent && contentDiv) {
+        contentDiv.innerHTML = renderThinkingBlock(openaiMsg.thinkingContent) + contentDiv.innerHTML;
     }
 
     // 恢复流统计信息

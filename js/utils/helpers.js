@@ -103,6 +103,15 @@ export function generateMessageId() {
 }
 
 /**
+ * 生成通用的唯一 ID
+ * @param {string} prefix - ID 前缀 (可选)
+ * @returns {string} 唯一 ID
+ */
+export function generateId(prefix = 'id') {
+    return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
  * 智能生成会话名称
  * @param {string} content - 会话内容
  * @param {number} maxLength - 最大长度

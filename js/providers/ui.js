@@ -16,6 +16,7 @@ import {
 } from './manager.js';
 import { renderCapabilityBadges } from '../utils/capability-badges.js';
 import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
+import { showNotification } from '../ui/notifications.js';
 
 // 当前选中的提供商ID
 let selectedProviderId = null;
@@ -464,12 +465,12 @@ function saveProviderForm(providerId) {
     const enabled = document.getElementById('detail-provider-enabled')?.checked ?? true; // 新建默认启用
 
     if (!name) {
-        alert('请输入提供商名称');
+        showNotification('请输入提供商名称', 'error');
         return;
     }
 
     if (!apiFormat) {
-        alert('请选择API格式');
+        showNotification('请选择API格式', 'error');
         return;
     }
 
@@ -971,7 +972,7 @@ function saveEditedModel() {
     const imageOutput = document.getElementById('edit-model-image-output').checked;
 
     if (!newName) {
-        alert('请输入模型名称');
+        showNotification('请输入模型名称', 'error');
         return;
     }
 

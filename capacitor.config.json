@@ -1,6 +1,6 @@
 {
-  "appId": "com.webchat.app",
-  "appName": "Webchat",
+  "appId": "com.miaomiao.chat",
+  "appName": "Miaomiao Chat",
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {

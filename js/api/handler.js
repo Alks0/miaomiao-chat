@@ -244,6 +244,31 @@ async function handleNonStreamResponse(response, assistantMessageEl, sessionId) 
         } else {
             const reply = parseApiResponse(data, responseFormat);
             if (reply) {
+                // ⭐ 检测工具调用
+                if (reply.hasToolCalls && reply.toolCalls) {
+                    console.log('[NonStream] 检测到工具调用:', reply.toolCalls);
+
+                    // 保存助手消息（包含工具调用）
+                    const messageIndex = saveAssistantMessage({
+                        textContent: reply.content || '(调用工具)',
+                        toolCalls: reply.toolCalls,
+                        streamStats: getCurrentStreamStatsData(),
+                        sessionId: sessionId
+                    });
+
+                    setCurrentMessageIndex(messageIndex);
+
+                    // 执行工具调用
+                    const { handleToolCallStream } = await import('../stream/tool-call-handler.js');
+                    await handleToolCallStream(reply.toolCalls, {
+                        endpoint: getCurrentEndpoint(),
+                        apiKey: getCurrentApiKey(),
+                        model: getCurrentModel()
+                    });
+
+                    return; // 退出非流式处理
+                }
+
                 allReplies.push(reply);
             }
         }
@@ -462,13 +487,45 @@ async function sendToAPI() {
         welcomeMessage.remove();
     }
 
-    // 创建助手消息占位符
-    const assistantMessageEl = createAssistantMessagePlaceholder();
-    elements.messagesArea.appendChild(assistantMessageEl);
-    state.currentAssistantMessage = assistantMessageEl.querySelector('.message-content');
+    // 创建助手消息占位符（或复用现有的工具调用continuation）
+    let assistantMessageEl;
+    let isContinuationMode = false;  // ✅ 保存 continuation 状态用于后续判断
+    if (state.isToolCallContinuation && state.toolCallContinuationElement) {
+        // ✅ 工具调用后的continuation - 复用保存的消息元素
+        isContinuationMode = true;
+        assistantMessageEl = state.toolCallContinuationElement;
+        state.currentAssistantMessage = assistantMessageEl.querySelector('.message-content');
+        console.log('[Handler] 复用工具调用后的消息元素');
 
-    // 初始化流统计
-    resetStreamStats();
+        // 在现有内容后添加加载提示（不删除工具调用UI）
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'thinking-dots continuation-loading';
+        loadingIndicator.innerHTML = '<span></span><span></span><span></span>';
+        state.currentAssistantMessage.appendChild(loadingIndicator);
+
+        // ✅ 添加持久标记：标识这是 continuation 模式
+        // 这个标记不会被流式渲染移除，用于 finalRender 检测
+        state.currentAssistantMessage.dataset.isContinuation = 'true';
+
+        // ✅ 设置 state 标志用于 saveAssistantMessage 检测
+        state.isSavingContinuation = true;
+
+        // 重置continuation标志和引用
+        state.isToolCallContinuation = false;
+        state.toolCallContinuationElement = null;
+    } else {
+        // 创建新的消息元素
+        assistantMessageEl = createAssistantMessagePlaceholder();
+        elements.messagesArea.appendChild(assistantMessageEl);
+        state.currentAssistantMessage = assistantMessageEl.querySelector('.message-content');
+    }
+
+    // ✅ 初始化流统计（continuation 模式下不重置，让统计继续累积）
+    if (!isContinuationMode) {
+        resetStreamStats();
+    } else {
+        console.log('[Handler] Continuation 模式，保留原有统计数据');
+    }
 
     try {
         // ✅ 流式多回复模式
@@ -543,7 +600,8 @@ async function sendToAPI() {
         }
 
         // ✅ 只有当前会话还是这个会话时，才重置状态
-        if (state.currentSessionId === sessionId) {
+        // ⚠️ 但如果有工具调用进行中，跳过重置（等待 continuation 完成）
+        if (state.currentSessionId === sessionId && !state.isToolCallPending) {
             state.isLoading = false;
             state.isSending = false;
             elements.sendButton.disabled = false;
@@ -557,6 +615,8 @@ async function sendToAPI() {
             if (elements.sendButton) {
                 elements.sendButton.style.display = 'inline-flex';
             }
+        } else if (state.isToolCallPending) {
+            console.log('[Handler] 工具调用进行中，保持 loading 状态');
         } else {
             // ✅ 如果是后台会话完成，也要清理可能遗留的发送锁
             console.log(`[handler.js] 后台会话 ${sessionId} 的请求已完成（当前会话: ${state.currentSessionId}）`);
@@ -585,6 +645,71 @@ export function cancelCurrentRequest() {
     }
     console.warn('没有正在进行的请求可以取消');
     return false;
+}
+
+/**
+ * ⭐ 发送包含工具结果的请求（工具调用第二轮）
+ * @param {Array} toolResultMessages - 工具结果消息
+ * @param {Object} apiConfig - API 配置
+ * @param {HTMLElement} assistantMessageEl - 要复用的助手消息元素
+ */
+export async function resendWithToolResults(toolResultMessages, apiConfig, assistantMessageEl = null) {
+    console.log('[Handler] 🔄 发送工具结果消息...');
+
+    // ✅ 保存当前会话 ID
+    const sessionId = state.currentSessionId;
+
+    // ✅ 修复：不过滤错误消息，保持索引一致性
+    // 合并原有消息和工具结果
+    const newMessages = [
+        ...state.messages,  // 不过滤，保持索引一致
+        ...toolResultMessages
+    ];
+
+    // ✅ 记录原消息数组的引用
+    const originalMessages = state.messages;
+
+    // 临时覆盖 state.messages（仅用于此次请求）
+    state.messages = newMessages;
+
+    // ✅ 标记这是工具调用的continuation，复用现有消息元素
+    state.isToolCallContinuation = true;
+    state.toolCallContinuationElement = assistantMessageEl;
+
+    try {
+        // 发送请求
+        await sendToAPI();
+
+        console.log('[Handler] ✅ Continuation 请求完成');
+    } finally {
+        // ✅ 修复：将 continuation 的更新同步回原消息数组
+        // saveAssistantMessage 在 continuation 模式下会更新 newMessages 中的消息
+        // 由于浅拷贝，原数组中的对象也会被更新
+        // 但我们需要确保原数组引用被恢复
+        state.messages = originalMessages;
+
+        // ✅ 清除工具调用标志
+        state.isToolCallPending = false;
+
+        // ✅ 修复：重置按钮状态（因为 sendToAPI 的 finally 跳过了重置）
+        if (state.currentSessionId === sessionId) {
+            state.isLoading = false;
+            state.isSending = false;
+            elements.sendButton.disabled = false;
+            state.currentAssistantMessage = null;
+            state.currentAbortController = null;
+
+            // 恢复按钮显示
+            if (elements.cancelRequestButton) {
+                elements.cancelRequestButton.style.display = 'none';
+            }
+            if (elements.sendButton) {
+                elements.sendButton.style.display = 'inline-flex';
+            }
+
+            console.log('[Handler] ✅ Continuation 完成，按钮状态已重置');
+        }
+    }
 }
 
 /**

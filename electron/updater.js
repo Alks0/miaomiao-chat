@@ -24,10 +24,9 @@ function initUpdater(win, options = {}) {
     log.transports.file.level = 'info';
     autoUpdater.logger = log;
 
-    // 配置更新服务器（如果有自定义）
-    if (updateServerUrl) {
-        autoUpdater.setFeedURL(updateServerUrl);
-    }
+    // ✅ electron-updater 会自动使用 package.json 中的 publish 配置
+    // 公开仓库无需额外配置，直接访问 GitHub Releases
+    log.info('[Updater] 使用 GitHub 公开仓库自动更新');
 
     // 禁用自动下载，手动控制下载流程
     autoUpdater.autoDownload = false;
@@ -202,8 +201,22 @@ function sendNotification(data) {
     }
 }
 
+/**
+ * ✅ 立即安装更新并重启应用
+ * 必须在 update-downloaded 事件触发后调用
+ */
+function quitAndInstall() {
+    log.info('[Updater] 立即安装更新并重启应用');
+    // isSilent: false - 显示安装窗口
+    // isForceRunAfter: true - 安装后自动启动新版本
+    setImmediate(() => {
+        autoUpdater.quitAndInstall(false, true);
+    });
+}
+
 module.exports = {
     initUpdater,
     checkForUpdatesManually,
-    setSilentUpdate  // ✅ 新增导出
+    setSilentUpdate,  // ✅ 新增导出
+    quitAndInstall    // ✅ 新增导出
 };

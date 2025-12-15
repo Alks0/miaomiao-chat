@@ -12,7 +12,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 10000;
+    z-index: 20000;  /* ✅ 修复：提高 z-index，确保始终在其他模态框（如工具管理）之上 */
     align-items: center;
     justify-content: center;
 }

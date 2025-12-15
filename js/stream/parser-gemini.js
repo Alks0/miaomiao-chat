@@ -3,13 +3,17 @@
  * 解析 Gemini SSE 流式响应
  */
 
-import { recordFirstToken, recordTokens, finalizeStreamStats, getCurrentStreamStatsData, appendStreamStats } from './stats.js';
+import { recordFirstToken, recordTokens, recalculateStreamTokenCount, finalizeStreamStats, getCurrentStreamStatsData, getPartialStreamStatsData, appendStreamStats } from './stats.js';
 import { updateStreamingMessage, renderFinalTextWithThinking, renderFinalContentWithThinking, cleanupAllIncompleteImages } from './helpers.js';
 import { saveAssistantMessage } from '../messages/sync.js';
 import { setCurrentMessageIndex } from '../messages/dom-sync.js';  // ✅ Bug 2 修复：导入索引设置函数
 import { eventBus } from '../core/events.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { parseStreamingMarkdownImages } from '../utils/markdown-image-parser.js';
+import { handleToolCallStream } from './tool-call-handler.js';
+import { XMLStreamAccumulator } from '../tools/xml-formatter.js';  // ✅ XML 工具调用解析
+import { state } from '../core/state.js';  // ✅ 访问 xmlToolCallingEnabled 配置
+import { ThinkTagParser } from './think-tag-parser.js';  // ✅ <think> 标签解析器
 
 // ✅ 响应长度限制（防止内存溢出）
 const MAX_RESPONSE_LENGTH = 200000; // 20万字符
@@ -29,6 +33,10 @@ export async function parseGeminiStream(reader, sessionId = null) {
     let contentParts = [];
     let totalReceived = 0; // ✅ 追踪总接收字符数
     let markdownBuffer = ''; // ✅ Markdown 图片缓冲区
+    let toolCalls = []; // ⭐ 工具调用数组
+    const xmlToolCallAccumulator = new XMLStreamAccumulator();  // ✅ XML 工具调用累积器
+    let hasNativeToolCalls = false;  // ✅ 标记是否检测到原生格式
+    const thinkTagParser = new ThinkTagParser();  // ✅ <think> 标签解析器
 
     try {
         while (true) {
@@ -105,9 +113,28 @@ export async function parseGeminiStream(reader, sessionId = null) {
                     const parts = parsed.candidates?.[0]?.content?.parts || [];
 
                     for (const part of parts) {
-                        // 提取 thoughtSignature
+                        // 提取 thoughtSignature（在检测工具调用前）
                         if (part.thoughtSignature) {
                             thoughtSignature = part.thoughtSignature;
+                            console.log('[Gemini] 🧠 检测到 thoughtSignature');
+                        }
+
+                        // ⭐ 检测工具调用 (Gemini 格式，仅在非 XML 模式)
+                        if (part.functionCall && !state.xmlToolCallingEnabled) {
+                            hasNativeToolCalls = true;  // ✅ 标记为原生格式
+                            const fc = part.functionCall;
+                            toolCalls.push({
+                                id: fc.id || null,  // ✅ 可选字段（非标准）
+                                name: fc.name,
+                                arguments: fc.args,  // 已经是对象，不需要 JSON.parse
+                                // ✅ P1: 保存 thoughtSignature（如果存在）
+                                thoughtSignature: thoughtSignature || null
+                            });
+                            console.log('[Gemini] 检测到原生工具调用:', {
+                                name: fc.name,
+                                hasThoughtSignature: !!thoughtSignature
+                            });
+                            continue;  // 工具调用不需要渲染
                         }
 
                         if (part.thought) {
@@ -128,8 +155,46 @@ export async function parseGeminiStream(reader, sessionId = null) {
                             recordFirstToken();
                             recordTokens(part.text);
 
-                            // ✅ 解析 markdown 图片格式
-                            const { parts: parsedParts, newBuffer } = parseStreamingMarkdownImages(part.text, markdownBuffer);
+                            // ✅ 优先处理 XML 检测（仅在 XML 模式）
+                            let deltaText = part.text;
+                            if (state.xmlToolCallingEnabled) {
+                                try {
+                                    const result = xmlToolCallAccumulator.processDelta(part.text);
+                                    const { hasToolCalls: hasXML, displayText, error } = result;
+
+                                    if (error) {
+                                        console.error('[Gemini Parser] ⚠️ XML 解析错误:', error);
+                                        // 回退：将当前内容当作普通文本处理
+                                    } else if (hasXML) {
+                                        // 更新展示文本（去除 XML 标签）
+                                        deltaText = displayText.substring(textContent.length);
+                                        console.log('[Gemini Parser] 🔧 检测到 XML 工具调用');
+                                    }
+                                } catch (xmlError) {
+                                    // ✅ P0: 顶层错误保护 - XML 解析崩溃时不影响正常流式输出
+                                    console.error('[Gemini Parser] ❌ XML 累积器异常:', xmlError);
+                                    // 禁用 XML 模式，回退到纯文本
+                                    hasNativeToolCalls = true;
+                                }
+                            }
+
+                            // ✅ 解析 <think> 标签
+                            const { displayText: thinkParsedText, thinkingDelta } = thinkTagParser.processDelta(deltaText);
+                            if (thinkingDelta) {
+                                thinkingContent += thinkingDelta;
+                                totalReceived += thinkingDelta.length;
+
+                                // 合并连续的 thinking parts
+                                const lastThinkPart = contentParts[contentParts.length - 1];
+                                if (lastThinkPart && lastThinkPart.type === 'thinking') {
+                                    lastThinkPart.text += thinkingDelta;
+                                } else {
+                                    contentParts.push({ type: 'thinking', text: thinkingDelta });
+                                }
+                            }
+
+                            // ✅ 解析 markdown 图片格式（使用 <think> 解析后的文本）
+                            const { parts: parsedParts, newBuffer } = parseStreamingMarkdownImages(thinkParsedText, markdownBuffer);
                             markdownBuffer = newBuffer;
 
                             for (const parsedPart of parsedParts) {
@@ -205,6 +270,92 @@ export async function parseGeminiStream(reader, sessionId = null) {
             }
         }
 
+        // ⭐ 流结束，检查是否有工具调用
+        let finalToolCalls = [];
+
+        if (state.xmlToolCallingEnabled) {
+            // ✅ XML 模式：使用 XML 工具调用
+            const xmlCalls = xmlToolCallAccumulator.getCompletedCalls();
+            if (xmlCalls.length > 0) {
+                // ✅ 修复：为 XML 工具调用添加 thoughtSignature（Gemini 2.5+ thinking 模式要求）
+                finalToolCalls = xmlCalls.map(tc => ({
+                    ...tc,
+                    thoughtSignature: thoughtSignature || null
+                }));
+                console.log(`[Gemini] 流结束，检测到 ${xmlCalls.length} 个 XML 工具调用, hasThoughtSignature: ${!!thoughtSignature}`);
+            }
+        } else {
+            // ✅ 原生模式：使用原生工具调用
+            if (toolCalls.length > 0) {
+                finalToolCalls = toolCalls;
+                console.log(`[Gemini] 流结束，检测到 ${finalToolCalls.length} 个原生工具调用`);
+            }
+        }
+
+        // ✅ 执行工具调用（如果有）
+        if (finalToolCalls.length > 0) {
+
+            // ✅ 注意：工具调用时不结束统计，让统计在 continuation 完成后才最终确定
+            // finalizeStreamStats() 会在 continuation 完成时调用
+
+            // ✅ 关键修复：先渲染思维链到 DOM，然后再保存消息
+            if (contentParts.length > 0) {
+                renderFinalContentWithThinking(contentParts, thinkingContent);
+            } else if (textContent || thinkingContent) {
+                renderFinalTextWithThinking(textContent, thinkingContent);
+            }
+
+            // ✅ 工具调用时不添加统计 HTML，等 continuation 完成后再添加
+            // appendStreamStats() 会在 continuation 完成时调用
+
+            // ✅ 保存助手消息（包含工具调用）- 保存部分统计（TTFT 和当前 token 数）
+            const messageIndex = saveAssistantMessage({
+                textContent: textContent || '(调用工具)',
+                thinkingContent,
+                thoughtSignature,
+                contentParts,
+                toolCalls: finalToolCalls,
+                streamStats: getPartialStreamStatsData(),  // ✅ 修复：保存部分统计，供 continuation 聚合
+                sessionId
+            });
+
+            // 设置消息索引
+            setCurrentMessageIndex(messageIndex);
+
+            // ✅ 标记工具调用进行中，阻止 finally 块重置状态
+            state.isToolCallPending = true;
+
+            // 执行工具调用（异步）
+            handleToolCallStream(finalToolCalls, {
+                endpoint: state.endpoint,
+                apiKey: state.apiKey,
+                model: state.model
+            });
+
+            return; // 退出流处理
+        }
+
+        // ✅ 流结束前刷新 <think> 解析器缓冲区
+        const { displayText: finalDisplayText, thinkingDelta: finalThinkingDelta } = thinkTagParser.flush();
+        if (finalThinkingDelta) {
+            thinkingContent += finalThinkingDelta;
+            const lastThinkPart = contentParts[contentParts.length - 1];
+            if (lastThinkPart && lastThinkPart.type === 'thinking') {
+                lastThinkPart.text += finalThinkingDelta;
+            } else {
+                contentParts.push({ type: 'thinking', text: finalThinkingDelta });
+            }
+        }
+        if (finalDisplayText) {
+            textContent += finalDisplayText;
+            const lastPart = contentParts[contentParts.length - 1];
+            if (lastPart && lastPart.type === 'text') {
+                lastPart.text += finalDisplayText;
+            } else {
+                contentParts.push({ type: 'text', text: finalDisplayText });
+            }
+        }
+
         // 流结束，保存消息和签名
         finalizeGeminiStream(textContent, thinkingContent, thoughtSignature, groundingMetadata, contentParts, sessionId);
     } finally {
@@ -240,6 +391,9 @@ function finalizeGeminiStream(textContent, thinkingContent, thoughtSignature, gr
     } else {
         renderFinalTextWithThinking(textContent, thinkingContent, groundingMetadata);
     }
+
+    // ✅ 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
+    recalculateStreamTokenCount({ textContent, thinkingContent, contentParts });
 
     // 添加统计信息
     appendStreamStats();
@@ -307,6 +461,9 @@ function finalizeGeminiStreamWithError(textContent, thinkingContent, thoughtSign
             contentDiv.insertAdjacentHTML('beforeend', errorHtml);
         }
     }
+
+    // ✅ 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
+    recalculateStreamTokenCount({ textContent: finalText, thinkingContent, contentParts });
 
     // 添加统计信息
     appendStreamStats();

@@ -148,6 +148,48 @@ export function getCurrentProvider() {
 }
 
 /**
+ * 获取模型的友好显示名称
+ * @param {string} modelId - 模型 ID
+ * @param {Object} provider - 提供商对象（可选）
+ * @returns {string} 模型显示名称
+ */
+export function getModelDisplayName(modelId, provider = null) {
+    if (!modelId) return 'unknown';
+
+    // 如果没有指定提供商，尝试获取当前提供商
+    const targetProvider = provider || getCurrentProvider();
+
+    if (!targetProvider || !targetProvider.models) {
+        // 没有提供商信息，直接返回模型 ID
+        return modelId;
+    }
+
+    // 查找模型配置
+    const modelConfig = targetProvider.models.find(m => {
+        if (typeof m === 'string') {
+            return m === modelId;
+        }
+        if (typeof m === 'object' && m.id) {
+            return m.id === modelId;
+        }
+        return false;
+    });
+
+    if (!modelConfig) {
+        // 未找到模型配置，返回模型 ID 本身
+        return modelId;
+    }
+
+    // 如果是对象格式且有 name 字段，返回友好名称
+    if (typeof modelConfig === 'object' && modelConfig.name) {
+        return modelConfig.name;
+    }
+
+    // 否则返回模型 ID
+    return modelId;
+}
+
+/**
  * 获取当前选中模型的能力配置
  * @returns {Object|null} 能力配置对象 {imageInput: boolean, imageOutput: boolean}
  */

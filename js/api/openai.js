@@ -41,18 +41,18 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
         });
     }
 
-    // 预填充消息在前
+    // ✅ System Prompt 独立于预填充开关（总是生效）
+    if (state.systemPrompt) {
+        messages.unshift({
+            role: 'system',
+            content: processVariables(state.systemPrompt)
+        });
+    }
+
+    // ✅ 预填充消息追加到末尾（用户最新消息之后）
     if (state.prefillEnabled) {
         const prefill = getPrefillMessages();
-        messages = [...prefill, ...messages];
-
-        // System Prompt 最前面
-        if (state.systemPrompt) {
-            messages.unshift({
-                role: 'system',
-                content: processVariables(state.systemPrompt)
-            });
-        }
+        messages.push(...prefill);
     }
 
     const requestBody = {
@@ -80,9 +80,12 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     const verbosityConfig = buildVerbosityConfig();
     if (verbosityConfig) Object.assign(requestBody, verbosityConfig);
 
-    // 添加网络搜索工具 (Function Calling)
+    // ⭐ 添加工具调用支持 (Function Calling)
+    const tools = [];
+
+    // 保留原有的 web_search（用户要求保持不变）
     if (state.webSearchEnabled) {
-        requestBody.tools = [{
+        tools.push({
             type: "function",
             function: {
                 name: "web_search",
@@ -95,8 +98,37 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
                     required: ["query"]
                 }
             }
-        }];
-        requestBody.tool_choice = "auto";
+        });
+    }
+
+    // 添加工具系统中的工具
+    try {
+        const { getToolsForAPI } = await import('../tools/manager.js');
+        const systemTools = getToolsForAPI('openai');
+        tools.push(...systemTools);
+    } catch (error) {
+        console.warn('[OpenAI] 工具系统未加载:', error);
+    }
+
+    if (tools.length > 0) {
+        if (state.xmlToolCallingEnabled) {
+            // ✅ XML 模式：只注入 XML 到 system prompt，不使用原生 tools 字段
+            const { injectToolsToOpenAI, getXMLInjectionStats } = await import('../tools/tool-injection.js');
+            injectToolsToOpenAI(messages, tools);
+
+            // ✅ P1: 性能监控 - 记录 token 消耗
+            const stats = getXMLInjectionStats(tools);
+            console.log('[OpenAI] 📊 XML 模式启用，注入统计:', stats);
+            if (stats.estimatedTokens > 2000) {
+                console.warn('[OpenAI] ⚠️ XML 描述过长，预计消耗', stats.estimatedTokens, 'tokens');
+            }
+        } else {
+            // ✅ 原生模式：使用标准 tools 字段
+            requestBody.tools = tools;
+            requestBody.tool_choice = "auto";
+            requestBody.parallel_tool_calls = true;
+            console.log('[OpenAI] 📊 原生 tools 模式，工具数量:', tools.length);
+        }
     }
 
     console.log(`Sending ${isResponsesFormat ? 'Responses API' : 'Chat Completions'} request:`, JSON.stringify(requestBody, null, 2));
@@ -112,4 +144,31 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     };
     if (signal) options.signal = signal;
     return await fetch(apiEndpoint, options);
+}
+
+/**
+ * 构建工具结果消息数组
+ * @param {Array} toolCalls - 工具调用列表
+ * @param {Array} toolResults - 工具结果列表
+ * @returns {Array} 包含工具结果的消息数组
+ */
+export function buildToolResultMessages(toolCalls, toolResults) {
+    const messages = [
+        // 1. 添加助手消息（包含工具调用）
+        {
+            role: 'assistant',
+            tool_calls: toolCalls.map(tc => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                    name: tc.name,
+                    arguments: JSON.stringify(tc.arguments)
+                }
+            }))
+        },
+        // 2. 添加工具结果消息
+        ...toolResults
+    ];
+
+    return messages;
 }

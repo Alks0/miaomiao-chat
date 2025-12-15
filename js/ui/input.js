@@ -51,11 +51,18 @@ function handleKeyDown(e) {
 
 /**
  * 自动调整文本框高度
+ * ✅ 最大高度为视口高度的 50%，最小 168px，最大 500px
  */
 export function autoResizeTextarea() {
     const textarea = elements.userInput;
+    if (!textarea) return;
+
+    // 动态计算最大高度：视口高度的 50%，但限制在 168-500px 之间
+    const viewportHeight = window.innerHeight;
+    const maxHeight = Math.max(168, Math.min(viewportHeight * 0.5, 500));
+
     textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 168) + 'px';
+    textarea.style.height = Math.min(textarea.scrollHeight, maxHeight) + 'px';
 }
 
 /**
@@ -631,6 +638,71 @@ export async function handleSend() {
 }
 
 /**
+ * 处理粘贴事件（支持粘贴图片）
+ * @param {ClipboardEvent} e - 粘贴事件
+ */
+async function handlePaste(e) {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    // 检查是否有图片
+    const items = Array.from(clipboardData.items);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+
+    if (imageItems.length === 0) return; // 没有图片，使用默认粘贴行为
+
+    // 阻止默认粘贴行为（避免粘贴图片 URL 或文件名）
+    e.preventDefault();
+
+    // 检查是否已达到图片数量限制
+    if (state.uploadedImages.length >= MAX_IMAGES) {
+        showNotification(`最多只能添加 ${MAX_IMAGES} 张图片`, 'error');
+        return;
+    }
+
+    const remaining = MAX_IMAGES - state.uploadedImages.length;
+    const itemsToProcess = imageItems.slice(0, remaining);
+
+    if (imageItems.length > remaining) {
+        showNotification(`只能再添加 ${remaining} 张图片`, 'warning');
+    }
+
+    for (const item of itemsToProcess) {
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        try {
+            const base64 = await fileToBase64(file);
+
+            // 生成压缩版本（512px，用于 API 请求和显示）
+            const { compressImage } = await import('../utils/images.js');
+            const base64Data = base64.split(',')[1];
+            const compressed = await compressImage(base64Data, file.type, 512);
+            const compressedDataUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
+
+            // 生成文件名（粘贴的图片通常没有文件名）
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const fileName = `pasted-image-${timestamp}.${file.type.split('/')[1] || 'png'}`;
+
+            state.uploadedImages.push({
+                name: fileName,
+                type: file.type,
+                data: base64,
+                compressed: compressedDataUrl,
+            });
+
+            console.log(`[Input] 已粘贴图片: ${fileName}`);
+        } catch (error) {
+            console.error('[Input] 处理粘贴图片失败:', error);
+            showNotification('粘贴图片失败', 'error');
+        }
+    }
+
+    updateImagePreview();
+    showNotification(`已粘贴 ${itemsToProcess.length} 张图片`, 'success');
+}
+
+/**
  * 初始化输入处理器
  */
 export function initInputHandlers() {
@@ -639,6 +711,9 @@ export function initInputHandlers() {
     elements.userInput?.addEventListener('keydown', handleKeyDown);
     elements.userInput?.addEventListener('input', autoResizeTextarea);
     elements.attachFile?.addEventListener('click', handleAttachFile);
+
+    // ✅ 支持粘贴图片
+    elements.userInput?.addEventListener('paste', handlePaste);
 
     // ✅ 绑定取消请求按钮
     elements.cancelRequestButton?.addEventListener('click', () => {
@@ -723,6 +798,13 @@ export function initInputHandlers() {
         if (elements.cancelRequestButton) {
             elements.cancelRequestButton.style.display = 'inline-flex';
         }
+    });
+
+    // ✅ 监听更新图片预览事件（切换会话时清空）
+    eventBus.on('ui:update-image-preview', () => {
+        updateImagePreview();
+        // 同时清除引用消息
+        clearQuotedMessage();
     });
 
     // 暴露到全局作用域（用于 HTML onclick）

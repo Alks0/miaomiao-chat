@@ -10,6 +10,7 @@ import { eventBus } from '../core/events.js';
 import { syncQuickToggles } from './quick-toggles.js';
 import { showNotification } from './notifications.js';
 import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
+import { getIcon } from '../utils/icons.js';
 
 /**
  * 初始化三格式端点输入监听
@@ -58,6 +59,27 @@ export function initEndpointInputListeners() {
 }
 
 /**
+ * 通用参数映射表（填一次，同步到所有格式）
+ */
+const UNIVERSAL_PARAMS = {
+    'temperature': {
+        openai: 'temperature',
+        gemini: 'temperature',
+        claude: 'temperature'
+    },
+    'max_tokens': {
+        openai: 'max_tokens',
+        gemini: 'maxOutputTokens',
+        claude: 'max_tokens'
+    },
+    'top_p': {
+        openai: 'top_p',
+        gemini: 'topP',
+        claude: 'top_p'
+    }
+};
+
+/**
  * 初始化模型参数监听
  */
 function initModelParamsListeners() {
@@ -83,9 +105,51 @@ function initModelParamsListeners() {
         'claude-top-k': 'top_k'
     };
 
+    // ✅ 初始化时同步通用参数值（确保所有格式一致）
+    const wasSynced = syncUniversalParams();
+
+    // 如果发生了同步（说明之前数据不一致），保存一次
+    if (wasSynced) {
+        saveCurrentConfig();
+    }
+
     setupParamListeners('openai', openaiParams);
     setupParamListeners('gemini', geminiParams);
     setupParamListeners('claude', claudeParams);
+}
+
+/**
+ * 同步通用参数值（取第一个非空值）
+ * @returns {boolean} 是否发生了同步
+ */
+function syncUniversalParams() {
+    let synced = false;
+
+    Object.entries(UNIVERSAL_PARAMS).forEach(([paramName, mapping]) => {
+        // 查找第一个非空值
+        const value = state.modelParams.openai[mapping.openai]
+            ?? state.modelParams.gemini[mapping.gemini]
+            ?? state.modelParams.claude[mapping.claude];
+
+        if (value !== null && value !== undefined) {
+            // 检查是否需要同步
+            const needsSync =
+                state.modelParams.openai[mapping.openai] !== value ||
+                state.modelParams.gemini[mapping.gemini] !== value ||
+                state.modelParams.claude[mapping.claude] !== value;
+
+            if (needsSync) {
+                // 同步到所有格式
+                state.modelParams.openai[mapping.openai] = value;
+                state.modelParams.gemini[mapping.gemini] = value;
+                state.modelParams.claude[mapping.claude] = value;
+                synced = true;
+                console.log(`[Config] 初始化时同步通用参数 ${paramName}: ${value}`);
+            }
+        }
+    });
+
+    return synced;
 }
 
 function setupParamListeners(format, paramsMap) {
@@ -100,14 +164,31 @@ function setupParamListeners(format, paramsMap) {
 
             input.addEventListener('input', (e) => {
                 const value = e.target.value.trim();
-                if (value === '') {
-                    state.modelParams[format][paramKey] = null;
-                } else {
-                    const numValue = parseFloat(value);
-                    if (!isNaN(numValue)) {
-                        state.modelParams[format][paramKey] = numValue;
-                    }
+                const numValue = value === '' ? null : parseFloat(value);
+
+                if (value !== '' && isNaN(numValue)) {
+                    return; // 非法数值，忽略
                 }
+
+                // ✅ 检查是否为通用参数（需要同步到所有格式）
+                const universalParam = Object.keys(UNIVERSAL_PARAMS).find(
+                    key => UNIVERSAL_PARAMS[key][format] === paramKey
+                );
+
+                if (universalParam) {
+                    // 🔄 通用参数：同步更新所有格式
+                    const mapping = UNIVERSAL_PARAMS[universalParam];
+                    state.modelParams.openai[mapping.openai] = numValue;
+                    state.modelParams.gemini[mapping.gemini] = numValue;
+                    state.modelParams.claude[mapping.claude] = numValue;
+
+                    console.log(`[Config] 通用参数 ${universalParam} 已同步到所有格式: ${numValue}`);
+                } else {
+                    // 📌 特殊参数：仅更新当前格式
+                    state.modelParams[format][paramKey] = numValue;
+                    console.log(`[Config] ${format} 特殊参数 ${paramKey} 已更新: ${numValue}`);
+                }
+
                 saveCurrentConfig();
             });
         }
@@ -396,9 +477,49 @@ export function initOtherConfigInputs() {
         });
     }
 
+    // XML 工具调用兜底
+    const xmlToolCalling = document.getElementById('xml-tool-calling-enabled');
+    if (xmlToolCalling) {
+        xmlToolCalling.checked = state.xmlToolCallingEnabled || false;
+        xmlToolCalling.addEventListener('change', (e) => {
+            state.xmlToolCallingEnabled = e.target.checked;
+            saveCurrentConfig();
+
+            // 提示用户
+            if (e.target.checked) {
+                console.log('[Config] ✅ XML 工具调用兜底已启用，将在 system prompt 中注入工具描述');
+            }
+        });
+    }
+
     // 多回复数量
-    elements.replyCountSelect?.addEventListener('change', (e) => {
-        state.replyCount = parseInt(e.target.value, 10);
+    elements.replyCountSelect?.addEventListener('change', async (e) => {
+        const newCount = parseInt(e.target.value, 10);
+
+        // ⭐ 检测多回复与工具调用互斥
+        if (newCount > 1) {
+            try {
+                const { getToolStats } = await import('../tools/manager.js');
+                const stats = getToolStats();
+
+                if (stats.enabled > 0) {
+                    // 有启用的工具，阻止设置多回复
+                    eventBus.emit('ui:notification', {
+                        message: `${getIcon('xCircle', { size: 14 })} 多回复模式与工具调用功能互斥\n\n当前有 ${stats.enabled} 个工具已启用，请先禁用所有工具后再开启多回复模式。`,
+                        type: 'error',
+                        duration: 6000
+                    });
+
+                    // 恢复原值
+                    e.target.value = state.replyCount;
+                    return;
+                }
+            } catch (error) {
+                console.warn('[ConfigHelpers] 工具系统未加载:', error);
+            }
+        }
+
+        state.replyCount = newCount;
         saveCurrentConfig();
     });
 
@@ -435,6 +556,25 @@ export function initOtherConfigInputs() {
             saveCurrentConfig();
         });
     }
+
+    // ⭐ 监听工具启用/禁用事件，检测与多回复模式的互斥
+    eventBus.on('tool:enabled:changed', ({ toolId, enabled }) => {
+        if (enabled && state.replyCount > 1) {
+            // 尝试启用工具时发现多回复模式已开启
+            eventBus.emit('ui:notification', {
+                message: `${getIcon('xCircle', { size: 14 })} 多回复模式与工具调用功能互斥\n\n当前多回复数量为 ${state.replyCount}，请先将其设为 1 后再启用工具。\n\n工具 "${toolId}" 已自动禁用。`,
+                type: 'error',
+                duration: 6000
+            });
+
+            // 自动禁用该工具
+            import('../tools/manager.js').then(({ setToolEnabled }) => {
+                setToolEnabled(toolId, false);
+            }).catch(err => {
+                console.error('[ConfigHelpers] 禁用工具失败:', err);
+            });
+        }
+    });
 
     console.log('Other config inputs initialized');
 }

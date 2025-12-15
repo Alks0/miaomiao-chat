@@ -12,13 +12,30 @@ async function loadEruda() {
         script.src = 'libs/eruda/eruda.js';
         script.onload = () => {
             if (window.eruda) {
-                window.eruda.init();
+                // 初始化 Eruda 并显示悬浮窗
+                window.eruda.init({
+                    tool: ['console', 'elements', 'network', 'resources', 'info', 'snippets', 'sources'],
+                    useShadowDom: true,
+                    autoScale: true,
+                    defaults: {
+                        displaySize: 40,
+                        transparency: 0.9,
+                        theme: 'dark'
+                    }
+                });
+
+                // ✅ 显式显示 Eruda 悬浮窗（确保在所有设备上都能看到）
+                window.eruda.show();
+
                 console.log('🔧 Eruda 调试工具已启动（Android 专用）');
+                console.log('📱 Eruda 版本:', window.eruda.version);
+            } else {
+                console.error('❌ window.eruda 未定义');
             }
             resolve();
         };
-        script.onerror = () => {
-            console.warn('⚠️ Eruda 加载失败');
+        script.onerror = (error) => {
+            console.error('⚠️ Eruda 加载失败:', error);
             resolve(); // 不阻塞应用启动
         };
         document.head.appendChild(script);
@@ -43,7 +60,7 @@ import { loadTheme, initTheming } from './ui/theming.js';
 import './ui/notifications.js';
 
 // ========== State Layer ==========
-import { initDB, loadPreference, isIndexedDBAvailable, isLocalStorageAvailable } from './state/storage.js';
+import { initDB, loadPreference, isIndexedDBAvailable, isLocalStorageAvailable, migrateMCPServersFromLocalStorage, loadAllMCPServers } from './state/storage.js';
 import { loadConfig, saveCurrentConfigImmediate } from './state/config.js';
 import { loadSessions, switchToSession } from './state/sessions.js';
 import { initExportImport } from './state/export-import.js';
@@ -84,6 +101,11 @@ import './stream/helpers.js';
 import './stream/parser-openai.js';
 import './stream/parser-claude.js';
 import './stream/parser-gemini.js';
+import './stream/tool-call-handler.js';
+
+// ========== Tools Layer (第10层) ==========
+import { initTools } from './tools/init.js';
+import './tools/message-compat.js';
 
 // ========== UI Layer (Interactive) ==========
 import { initInputHandlers } from './ui/input.js';
@@ -102,6 +124,9 @@ import { initPrefillControls, initGeminiSystemParts } from './ui/prefill.js';
 import { initPasswordToggles, initCustomHeaders, initRippleEffects } from './ui/enhancements.js';
 import { initQuickMessagesUI } from './ui/quick-messages.js';
 import { initSessionSearch } from './ui/session-search.js';
+import { initMCPSettings } from './ui/mcp-settings.js';
+import { initToolManager } from './ui/tool-manager.js';
+import { initToolsQuickSelector } from './ui/tools-quick-selector.js';
 
 // ========== Update Layer ==========
 import { initUpdateModal } from './update/update-modal.js';
@@ -237,13 +262,56 @@ async function init() {
         console.log('💬 Step 5.5/9: Loading quick messages...');
         await initQuickMessages();
 
+        // ✅ 加载 MCP 配置（在 IndexedDB 初始化后）
+        console.log('🔌 Step 5.6/9: Loading MCP configuration...');
+        if (state.storageMode !== 'localStorage') {
+            try {
+                // 执行迁移（仅首次运行或需要时）
+                const migratedCount = await migrateMCPServersFromLocalStorage();
+                if (migratedCount > 0) {
+                    console.log(`[Main] ✅ 迁移 ${migratedCount} 个 MCP 服务器`);
+                }
+
+                // 加载 MCP 服务器配置
+                state.mcpServers = await loadAllMCPServers();
+                console.log(`[Main] ✅ 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+            } catch (error) {
+                console.error('[Main] ❌ 加载 MCP 配置失败:', error);
+                // 降级：从 localStorage 读取
+                try {
+                    const saved = localStorage.getItem('mcpServers');
+                    if (saved) {
+                        state.mcpServers = JSON.parse(saved);
+                        console.log(`[Main] ⚠️ 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                    }
+                } catch (fallbackError) {
+                    console.error('[Main] ❌ 从 localStorage 加载失败:', fallbackError);
+                }
+            }
+        } else {
+            // 使用 localStorage 模式
+            try {
+                const saved = localStorage.getItem('mcpServers');
+                if (saved) {
+                    state.mcpServers = JSON.parse(saved);
+                    console.log(`[Main] ✅ 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                }
+            } catch (error) {
+                console.error('[Main] ❌ 从 localStorage 加载 MCP 配置失败:', error);
+            }
+        }
+
         // 4. API 层
         console.log('🌐 Step 6/9: Initializing API handler...');
         initAPIHandler();
         initReplySelector();
 
         // 5. UI 层（同步，绑定事件）
-        console.log('🖱️  Step 7/9: Initializing UI handlers...');
+        // ⭐ Step 7.5/9: 初始化工具系统
+        console.log('🔧 Step 7.5/9: Initializing tools system...');
+        initTools();
+
+        console.log('🖱️  Step 8/9: Initializing UI handlers...');
 
         // 基础UI
         initTheming();
@@ -292,6 +360,9 @@ async function init() {
         initImageViewer();
         initScrollControl();
         initProvidersUI();
+        initMCPSettings();
+        initToolManager();
+        initToolsQuickSelector();
 
         // 高级功能
         initPrefillControls();

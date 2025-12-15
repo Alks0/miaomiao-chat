@@ -47,6 +47,10 @@
 @import "styles/components/_capability-badges.css";
 @import "styles/components/_dialogs.css";
 @import "styles/components/_update-modal.css";
+@import "styles/components/_tool-calls.css";
+@import "styles/components/_mcp-settings.css";
+@import "styles/components/_tool-manager.css";
+@import "styles/components/_tools-quick-selector.css";
 
 /* Utilities */
 @import "styles/utilities/_accessibility.css";

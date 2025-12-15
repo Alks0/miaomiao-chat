@@ -119,6 +119,8 @@ export function buildThinkingConfig(format, model = '') {
             return { thinkingConfig: { thinkingBudget: budget, includeThoughts: true } };
 
         case 'claude':
+            // ✅ 修复：检查是否启用思考链
+            if (!state.thinkingEnabled) return null;
             return { thinking: { type: 'enabled', budget_tokens: budget } };
 
         default:

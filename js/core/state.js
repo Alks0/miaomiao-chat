@@ -179,6 +179,9 @@ export const state = {
     verbosityEnabled: false,  // 是否启用输出详细度控制
     outputVerbosity: 'medium',  // 'low' | 'medium' | 'high'
 
+    // 工具调用兜底
+    xmlToolCallingEnabled: false,  // XML 工具调用兜底（兼容不支持原生 tools 的后端）
+
     // 配置管理
     savedConfigs: [],
     currentConfigName: '',
@@ -194,6 +197,20 @@ export const state = {
     replyCount: 1,
     currentReplies: [],
     selectedReplyIndex: 0,
+
+    // 工具调用历史
+    toolCallHistory: [],           // 工具调用历史记录
+    maxToolHistorySize: 100,       // 最大历史记录数
+    toolHistoryEnabled: true,      // 是否启用历史记录
+
+    // 工具调用权限
+    toolPermissions: {
+        enabled: false,            // 是否启用权限系统
+        mode: 'whitelist',         // 'whitelist' | 'blacklist'
+        whitelist: [],             // 白名单（仅允许列表中的工具）
+        blacklist: [],             // 黑名单（禁止列表中的工具）
+        requireConfirmation: false // 是否需要用户确认
+    },
 
     // 流统计
     streamStats: {
@@ -221,7 +238,11 @@ export const state = {
 
     // 快捷消息
     quickMessages: [],
-    quickMessagesCategories: ['常用', '问候', '告别']
+    quickMessagesCategories: ['常用', '问候', '告别'],
+
+    // MCP 配置（Model Context Protocol）
+    mcpServers: [],      // MCP 服务器列表
+    tools: []            // 工具列表（内置 + MCP + 自定义）
 };
 
 // ✅ 重新导出 elements（便于其他模块导入）

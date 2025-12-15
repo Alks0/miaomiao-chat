@@ -1,0 +1,532 @@
+/**
+ * MCP 服务器管理模态框样式
+ */
+
+/* ========== 模态框容器 ========== */
+#mcp-settings-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+
+#mcp-settings-modal.open {
+    display: flex;
+}
+
+/* ========== 模态框内容 ========== */
+.mcp-settings-content {
+    background: var(--md-cream);
+    border: var(--border);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    height: 80vh;
+    max-height: 800px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+}
+
+/* ========== 头部 ========== */
+.mcp-settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: var(--border);
+    background: var(--md-surface);
+}
+
+.mcp-settings-header h2 {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin: 0;
+    color: var(--md-text);
+}
+
+.close-mcp-settings {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--md-muted);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    transition: color 0.2s;
+}
+
+.close-mcp-settings:hover {
+    color: var(--md-text);
+}
+
+/* ========== 主体 ========== */
+.mcp-settings-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+/* ========== 平台信息 ========== */
+.mcp-platform-info {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem;
+    background: var(--md-surface);
+    border: var(--border);
+    border-radius: 8px;
+}
+
+.platform-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--md-blue);
+    color: white;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.platform-badge.platform-electron {
+    background: var(--md-teal);
+}
+
+.platform-badge.platform-web {
+    background: var(--md-blue);
+}
+
+.platform-badge.platform-android {
+    background: var(--md-orange);
+}
+
+.platform-warning {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    border-left: 3px solid var(--md-yellow);
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--md-text);
+}
+
+/* ========== 服务器列表 ========== */
+.mcp-server-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.mcp-empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--md-muted);
+    border: 2px dashed var(--md-charcoal);
+    border-radius: 8px;
+}
+
+/* ========== 服务器卡片 ========== */
+.mcp-server-card {
+    padding: 1rem;
+    background: var(--md-surface);
+    border: var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s var(--ease);
+}
+
+.mcp-server-card:hover {
+    border-color: var(--md-blue);
+    transform: translate(2px, -2px);
+    box-shadow: var(--shadow-md);
+}
+
+.mcp-server-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.mcp-server-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.mcp-server-title h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--md-text);
+}
+
+.mcp-server-type-badge {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.mcp-server-type-badge.local {
+    background: var(--md-teal);
+    color: white;
+}
+
+.mcp-server-type-badge.remote {
+    background: var(--md-blue);
+    color: white;
+}
+
+.mcp-server-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ========== 状态指示器 ========== */
+.mcp-server-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--md-text);
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.connected {
+    background: var(--md-teal);
+}
+
+.status-indicator.disconnected {
+    background: var(--md-muted);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.mcp-tool-count {
+    color: var(--md-blue);
+    font-weight: bold;
+}
+
+/* ========== 服务器详情 ========== */
+.mcp-server-details {
+    padding: 0.75rem;
+    background: var(--md-bg);
+    border: var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.mcp-server-details div {
+    margin-bottom: 0.25rem;
+    color: var(--md-text);
+}
+
+.mcp-server-details div:last-child {
+    margin-bottom: 0;
+}
+
+.mcp-server-details strong {
+    color: var(--md-muted);
+}
+
+/* ========== 工具列表 ========== */
+.mcp-tools-list {
+    padding: 0.75rem;
+    background: rgba(14, 165, 233, 0.05);
+    border: var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.mcp-tools-list strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--md-blue);
+    position: sticky;
+    top: 0;
+    background: rgba(14, 165, 233, 0.05);
+    padding-bottom: 0.25rem;
+    z-index: 1;
+}
+
+.mcp-tools-list ul {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: var(--md-text);
+}
+
+.mcp-tools-list li {
+    margin-bottom: 0.25rem;
+}
+
+/* ========== 添加按钮容器 ========== */
+.mcp-add-server-container {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* ========== 服务器表单（抽屉式） ========== */
+.mcp-server-form {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100%;
+    background: var(--md-cream);
+    border-left: var(--border);
+    padding: 1.5rem;
+    overflow-y: auto;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.mcp-server-form h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--md-blue);
+}
+
+/* ========== 表单样式 ========== */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: var(--md-text);
+}
+
+.required-indicator {
+    color: var(--md-coral);
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--md-bg);
+    border: var(--border);
+    border-radius: 8px;
+    color: var(--md-text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.15s var(--ease);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--md-blue);
+}
+
+.form-control.error {
+    border-color: var(--md-coral);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.error-message {
+    display: none;
+    color: var(--md-coral);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.error-message:not(:empty) {
+    display: block;
+}
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+}
+
+.text-muted {
+    color: var(--md-muted);
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+/* ========== 按钮样式 ========== */
+.btn {
+    padding: 0.5rem 1rem;
+    border: var(--border);
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    font-family: inherit;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn:hover {
+    transform: translate(3px, -3px);
+    box-shadow: none;
+}
+
+.btn:active {
+    transform: translate(1px, 1px) scale(0.98);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn-primary {
+    background: var(--md-blue);
+    border-color: var(--md-blue);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--md-blue-dark);
+}
+
+.btn-success {
+    background: var(--md-teal);
+    border-color: var(--md-teal);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #10a896;
+}
+
+.btn-warning {
+    background: var(--md-orange);
+    border-color: var(--md-orange);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #ea6b10;
+}
+
+.btn-danger {
+    background: var(--md-coral);
+    border-color: var(--md-coral);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.btn-secondary {
+    background: var(--md-muted);
+    border-color: var(--md-muted);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #777777;
+}
+
+.retry-btn {
+    background: var(--md-orange);
+    border-color: var(--md-orange);
+    color: white;
+}
+
+.retry-btn:hover {
+    background: #ea6b10;
+}
+
+/* ========== 按钮加载状态 ========== */
+.btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+    position: relative;
+    color: transparent !important;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 768px) {
+    .mcp-settings-content {
+        width: 95%;
+        height: 90vh;
+    }
+
+    .mcp-server-form {
+        width: 100%;
+    }
+
+    .mcp-server-header {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .mcp-server-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+}

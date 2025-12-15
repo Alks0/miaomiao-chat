@@ -1,0 +1,344 @@
+/**
+ * 快捷工具选择器样式
+ * 像素风格 - Popover 面板
+ */
+
+/* ========== Popover 面板 ========== */
+
+.tools-quick-selector {
+    position: absolute;
+    bottom: calc(100% + 8px);  /* 在按钮上方 8px */
+    left: 0;
+    min-width: 280px;
+    max-width: 320px;
+    max-height: 400px;
+    z-index: 1000;
+
+    /* 像素风格 */
+    background: var(--md-cream);
+    border: var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+
+    /* 显示/隐藏动画 */
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.15s var(--ease);
+    pointer-events: none;
+    display: none;
+}
+
+.tools-quick-selector.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========== 标题栏 ========== */
+
+.selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: var(--border);
+    background: var(--md-surface);
+}
+
+.selector-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--md-text);
+    font-family: inherit;
+}
+
+.close-selector {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--md-muted);
+    transition: color 0.15s var(--ease);
+}
+
+.close-selector:hover {
+    color: var(--md-text);
+}
+
+/* ========== 搜索框 ========== */
+
+.selector-search {
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-bottom: var(--border);
+    background: var(--md-bg);
+    font-size: 13px;
+    color: var(--md-text);
+    font-family: inherit;
+}
+
+.selector-search:focus {
+    outline: 2px solid var(--md-blue);
+    outline-offset: -2px;
+}
+
+.selector-search::placeholder {
+    color: var(--md-muted);
+}
+
+/* ========== 工具列表容器 ========== */
+
+.tools-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+/* 移动端高度优化：限制在视口 40% 以内，避免遮挡输入框 */
+@media (max-width: 768px) {
+    .tools-list-container {
+        max-height: min(40vh, 300px);
+    }
+}
+
+/* 分组标题 */
+.tools-group {
+    margin-bottom: 12px;
+}
+
+.tools-group:last-child {
+    margin-bottom: 0;
+}
+
+.tools-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--md-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: 'Courier New', monospace;
+}
+
+.group-icon {
+    font-size: 14px;
+}
+
+.group-count {
+    margin-left: auto;
+}
+
+/* ========== 工具复选框项 ========== */
+
+.tool-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    user-select: none;
+}
+
+.tool-checkbox-item:hover {
+    background: var(--md-surface);
+    transform: translate(3px, -3px);
+}
+
+.tool-checkbox-item input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* 自定义复选框 */
+.checkbox-custom {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-bg);
+    position: relative;
+    transition: all 0.15s var(--ease);
+}
+
+input[type="checkbox"]:checked + .checkbox-custom {
+    background: var(--md-blue);
+    border-color: var(--md-blue);
+}
+
+input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+input[type="checkbox"]:focus-visible + .checkbox-custom {
+    outline: 2px solid var(--md-blue);
+    outline-offset: 2px;
+}
+
+/* 工具图标 */
+.tool-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 工具名称 */
+.tool-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--md-text);
+}
+
+/* MCP 标记 */
+.tool-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+    background: var(--md-blue);
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tool-badge.mcp {
+    background: var(--md-teal);
+}
+
+/* ========== 底部操作栏 ========== */
+
+.tools-quick-actions {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-top: var(--border);
+    background: var(--md-surface);
+}
+
+.quick-action-btn {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border: var(--border);
+    border-radius: 6px;
+    background: var(--md-bg);
+    color: var(--md-text);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    font-family: inherit;
+}
+
+.quick-action-btn:hover {
+    transform: translate(3px, -3px);
+    box-shadow: none;
+}
+
+.quick-action-btn:active {
+    transform: translate(1px, 1px) scale(0.98);
+}
+
+.quick-action-btn.primary {
+    background: var(--md-blue);
+    color: white;
+    border-color: var(--md-blue);
+}
+
+/* ========== 工具按钮激活状态 ========== */
+
+#toggle-tools {
+    position: relative;
+}
+
+#toggle-tools.active {
+    background: var(--md-blue);
+    color: white;
+    border-color: var(--md-blue);
+}
+
+/* 激活指示器（小圆点） */
+#toggle-tools.active::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    background: var(--md-teal);
+    border-radius: 50%;
+    border: 1px solid white;
+    box-shadow: 0 0 0 1px var(--md-blue);
+}
+
+/* ========== 空状态 ========== */
+
+.empty-state {
+    padding: 24px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--md-muted);
+}
+
+/* ========== 滚动条样式 ========== */
+
+.tools-list-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.tools-list-container::-webkit-scrollbar-track {
+    background: var(--md-bg);
+}
+
+.tools-list-container::-webkit-scrollbar-thumb {
+    background: var(--md-charcoal);
+    border-radius: 4px;
+}
+
+.tools-list-container::-webkit-scrollbar-thumb:hover {
+    background: var(--md-muted);
+}
+
+/* ========== 响应式设计 ========== */
+
+@media (max-width: 768px) {
+    .tools-quick-selector {
+        max-width: 90vw;
+        left: 50%;
+        transform: translateX(-50%) translateY(8px);
+    }
+
+    .tools-quick-selector.active {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .tools-quick-actions {
+        flex-direction: column;
+    }
+
+    .quick-action-btn {
+        width: 100%;
+    }
+}

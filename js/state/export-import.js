@@ -10,6 +10,7 @@ import { loadSavedConfigs } from './config.js';
 import { loadSessions } from './sessions.js';
 import { showNotification } from '../ui/notifications.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
+import { sanitizeMessageForExport } from '../api/format-converter.js';  // ✅ P1: 过滤私有字段
 
 /**
  * 生成导出文件名
@@ -18,7 +19,7 @@ import { showConfirmDialog } from '../utils/dialogs.js';
  */
 function generateExportFilename(type) {
     const date = new Date().toISOString().slice(0, 10);
-    return `webchat-${type}-${date}.json`;
+    return `miaomiao-chat-${type}-${date}.json`;
 }
 
 /**
@@ -51,6 +52,25 @@ function filterRuntimeState(config) {
 }
 
 /**
+ * ✅ P1: 清理会话中的私有字段
+ * @param {Object} session - 会话对象
+ * @returns {Object} 清理后的会话对象
+ */
+function sanitizeSession(session) {
+    if (!session) return null;
+
+    // 深拷贝会话对象
+    const cleaned = { ...session };
+
+    // 清理 messages 数组
+    if (Array.isArray(cleaned.messages)) {
+        cleaned.messages = cleaned.messages.map(msg => sanitizeMessageForExport(msg));
+    }
+
+    return cleaned;
+}
+
+/**
  * 导出配置
  */
 export async function exportConfig() {
@@ -78,13 +98,25 @@ export async function exportConfig() {
         const filteredCurrentConfig = currentConfig ? filterRuntimeState(currentConfig) : null;
         const filteredSavedConfigs = savedConfigs.map(filterRuntimeState);
 
+        // ✅ 导出工具启用状态
+        let toolsEnabled = null;
+        try {
+            const toolsEnabledJson = await loadPreference('toolsEnabled');
+            if (toolsEnabledJson) {
+                toolsEnabled = JSON.parse(toolsEnabledJson);
+            }
+        } catch (error) {
+            console.warn('[Export] 读取工具状态失败:', error);
+        }
+
         const exportData = {
             type: 'config',
             version: 1,
             exportDate: new Date().toISOString(),
             data: {
                 currentConfig: filteredCurrentConfig,
-                savedConfigs: filteredSavedConfigs
+                savedConfigs: filteredSavedConfigs,
+                toolsEnabled: toolsEnabled  // ✅ 包含工具状态
             }
         };
 
@@ -103,16 +135,19 @@ export async function exportSessions() {
     try {
         const sessions = await loadAllSessionsFromDB();
 
+        // ✅ P1: 清理会话中的私有字段
+        const cleanedSessions = sessions.map(session => sanitizeSession(session));
+
         const exportData = {
             type: 'sessions',
             version: 1,
             exportDate: new Date().toISOString(),
-            totalSessions: sessions.length,
-            sessions: sessions
+            totalSessions: cleanedSessions.length,
+            sessions: cleanedSessions
         };
 
         downloadJSON(exportData, generateExportFilename('sessions'));
-        showNotification(`已导出 ${sessions.length} 个会话`, 'success');
+        showNotification(`已导出 ${cleanedSessions.length} 个会话`, 'success');
     } catch (error) {
         console.error('导出会话失败:', error);
         showNotification('导出会话失败: ' + error.message, 'error');
@@ -148,23 +183,26 @@ export async function exportAllData() {
         const filteredCurrentConfig = currentConfig ? filterRuntimeState(currentConfig) : null;
         const filteredSavedConfigs = savedConfigs.map(filterRuntimeState);
 
+        // ✅ P1: 清理会话中的私有字段
+        const cleanedSessions = sessions.map(session => sanitizeSession(session));
+
         const exportData = {
             type: 'full-backup',
             version: 1,
             exportDate: new Date().toISOString(),
             metadata: {
                 totalConfigs: filteredSavedConfigs.length,
-                totalSessions: sessions.length
+                totalSessions: cleanedSessions.length
             },
             config: {
                 currentConfig: filteredCurrentConfig,
                 savedConfigs: filteredSavedConfigs
             },
-            sessions: sessions
+            sessions: cleanedSessions
         };
 
         downloadJSON(exportData, generateExportFilename('backup'));
-        showNotification(`已导出完整备份（${sessions.length} 个会话）`, 'success');
+        showNotification(`已导出完整备份（${cleanedSessions.length} 个会话）`, 'success');
     } catch (error) {
         console.error('导出失败:', error);
         showNotification('导出失败: ' + error.message, 'error');
@@ -198,6 +236,16 @@ async function importConfig(data) {
                 await saveSavedConfigsToDB(filtered);
             } else {
                 localStorage.setItem('geminiChatConfigs', JSON.stringify(filtered));
+            }
+        }
+
+        // ✅ 导入工具启用状态
+        if (data.data.toolsEnabled) {
+            try {
+                await savePreference('toolsEnabled', JSON.stringify(data.data.toolsEnabled));
+                console.log('[Import] ✅ 工具状态已导入');
+            } catch (error) {
+                console.warn('[Import] 导入工具状态失败:', error);
             }
         }
 

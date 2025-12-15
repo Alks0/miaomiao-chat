@@ -33,14 +33,20 @@ jobs:
       - name: Build Electron (Windows)
         if: matrix.os == 'windows-latest'
         run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Electron (macOS)
         if: matrix.os == 'macos-latest'
         run: npm run dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Electron (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: npm run dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -52,6 +58,7 @@ jobs:
             dist/*.zip
             dist/*.AppImage
             dist/*.deb
+            dist/*.yml
           if-no-files-found: warn
 
   # Android APK 构建
@@ -83,22 +90,25 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build Android APK (Debug Signed)
+      # 注意：使用测试密钥签名（debug.keystore 已提交到仓库）
+      # 虽然是 release 构建，但签名使用 debug.keystore（在 build.gradle 中配置）
+      # 所有版本使用同一个 keystore，确保可以覆盖安装
+      - name: Build Android APK (Release with Test Keystore)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew clean assembleDebug --stacktrace
+          ./gradlew clean assembleRelease --stacktrace
 
-      - name: Rename debug APK to versioned name
+      - name: Rename release APK to versioned name
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-            cp android/app/build/outputs/apk/debug/app-debug.apk \
-               android/app/build/outputs/apk/debug/app-${VERSION}.apk
-            echo "✓ Renamed app-debug.apk to app-${VERSION}.apk"
-            ls -lh android/app/build/outputs/apk/debug/
+          if [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk \
+               android/app/build/outputs/apk/release/app-${VERSION}.apk
+            echo "✓ Renamed app-release.apk to app-${VERSION}.apk"
+            ls -lh android/app/build/outputs/apk/release/
           else
-            echo "✗ app-debug.apk not found, listing all APK files:"
+            echo "✗ app-release.apk not found, listing all APK files:"
             find android -name "*.apk" -type f -ls
             exit 1
           fi
@@ -107,7 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: android/app/build/outputs/apk/debug/app-*.apk
+          path: android/app/build/outputs/apk/release/app-*.apk
           if-no-files-found: error
 
   # 创建 GitHub Release
@@ -131,19 +141,19 @@ jobs:
         run: |
           mkdir release-files
 
-          # 复制 Windows 文件
+          # 复制 Windows 文件（包括 yml）
           if [ -d "artifacts/electron-windows-latest" ]; then
-            find artifacts/electron-windows-latest -type f \( -name "*.exe" -o -name "*.zip" \) -exec cp {} release-files/ \;
+            find artifacts/electron-windows-latest -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.yml" \) -exec cp {} release-files/ \;
           fi
 
-          # 复制 macOS 文件
+          # 复制 macOS 文件（包括 yml）
           if [ -d "artifacts/electron-macos-latest" ]; then
-            find artifacts/electron-macos-latest -type f \( -name "*.dmg" -o -name "*.zip" \) -exec cp {} release-files/ \;
+            find artifacts/electron-macos-latest -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.yml" \) -exec cp {} release-files/ \;
           fi
 
-          # 复制 Linux 文件
+          # 复制 Linux 文件（包括 yml）
           if [ -d "artifacts/electron-ubuntu-latest" ]; then
-            find artifacts/electron-ubuntu-latest -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec cp {} release-files/ \;
+            find artifacts/electron-ubuntu-latest -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.yml" \) -exec cp {} release-files/ \;
           fi
 
           # 复制 APK（保持原名 app-x.x.x.apk）

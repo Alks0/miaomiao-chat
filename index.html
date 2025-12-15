@@ -176,6 +176,33 @@
                 </details>
             </div>
 
+            <!-- Claude 配置 -->
+            <div class="settings-group api-config" id="claude-config">
+                <!-- Claude 模型参数 -->
+                <details class="model-params-details">
+                    <summary class="model-params-summary">模型参数 <span class="hint">(留空使用默认值)</span></summary>
+                    <div class="model-params-grid">
+                        <div class="param-item">
+                            <label for="claude-temperature">Temperature</label>
+                            <input type="number" id="claude-temperature" step="0.1" min="0" max="1" placeholder="0-1">
+                        </div>
+                        <div class="param-item">
+                            <label for="claude-max-tokens">Max Tokens</label>
+                            <input type="number" id="claude-max-tokens" min="1" placeholder="最大输出 (默认 8192)">
+                        </div>
+                        <div class="param-item">
+                            <label for="claude-top-p">Top P</label>
+                            <input type="number" id="claude-top-p" step="0.01" min="0" max="1" placeholder="0-1">
+                        </div>
+                        <div class="param-item">
+                            <label for="claude-top-k">Top K</label>
+                            <input type="number" id="claude-top-k" min="0" placeholder="0+">
+                        </div>
+                    </div>
+                    <p class="settings-hint">⚠️ 启用 Extended Thinking 时，Max Tokens 必须大于思维链预算 (budget_tokens)</p>
+                </details>
+            </div>
+
             <!-- 旧版配置 (隐藏，保持兼容) -->
             <input type="hidden" id="api-endpoint" value="http://localhost:8000/v1/chat/completions">
             <input type="hidden" id="api-key" value="">
@@ -261,6 +288,23 @@
                     <span>启用实时搜索</span>
                 </div>
                 <p class="settings-hint">允许 AI 搜索互联网获取最新信息</p>
+            </div>
+
+            <!-- XML 工具调用兜底 -->
+            <div class="settings-group">
+                <label class="settings-label">XML 工具调用兜底</label>
+                <div class="toggle-row">
+                    <label class="switch">
+                        <input type="checkbox" id="xml-tool-calling-enabled">
+                        <span class="slider"></span>
+                    </label>
+                    <span>启用 XML 工具调用</span>
+                </div>
+                <p class="settings-hint">
+                    当后端不支持官方的 tool 工具时可以打开此按钮，
+                    通过 XML 注入 system prompt 的方式实现调用 MCP 和 tools。
+                    <strong>注意：会增加 token 消耗。</strong>
+                </p>
             </div>
 
             <!-- 回复数量 -->
@@ -561,6 +605,17 @@
                             <path d="M2 12l10 5 10-5"/>
                         </svg>
                     </button>
+                    <button id="tools-manager-toggle" class="icon-button" title="工具调用管理" aria-label="管理工具调用">
+                        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                    </button>
+                    <button id="mcp-settings-toggle" class="icon-button" title="MCP 服务器管理" aria-label="管理 MCP 服务器">
+                        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 1v6m0 6v6M1 12h6m6 0h6"/>
+                        </svg>
+                    </button>
                     <button id="theme-toggle" class="icon-button" title="切换主题" aria-label="切换亮色/暗色主题">
                         <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -689,6 +744,12 @@
                         <path d="M8 10h8M8 14h4"/>
                     </svg>
                     <span>快捷</span>
+                </button>
+                <button id="toggle-tools" class="quick-toggle-btn" title="工具选择">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                    <span>工具</span>
                 </button>
             </div>
         </footer>
@@ -834,7 +895,7 @@
 
             <!-- 搜索框 -->
             <div class="models-search">
-                <input type="text" id="models-search-input" placeholder="🔍 搜索模型..." />
+                <input type="text" id="models-search-input" placeholder="搜索模型..." />
             </div>
 
             <!-- 全选/反选按钮 -->
@@ -954,6 +1015,149 @@
             <div class="modal-footer">
                 <button type="button" id="confirm-dialog-cancel" class="btn-secondary">取消</button>
                 <button type="button" id="confirm-dialog-confirm" class="btn-primary">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工具测试对话框 -->
+    <div id="tool-test-dialog-modal" class="modal" role="dialog" aria-modal="true" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 id="tool-test-dialog-title">测试工具</h2>
+                <button id="close-tool-test-dialog" class="icon-button" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body">
+                <p id="tool-test-description" class="tool-description"></p>
+                <div id="tool-test-form-container"></div>
+                <div id="tool-test-result-container" style="display: none; margin-top: 20px;">
+                    <h3>执行结果</h3>
+                    <div id="tool-test-result-content"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="tool-test-close-btn" class="btn-secondary">关闭</button>
+                <button type="button" id="tool-test-execute-btn" class="btn-primary">执行测试</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工具调用管理界面 -->
+    <div id="tool-manager-modal">
+        <div class="tool-manager-content">
+            <!-- 头部 -->
+            <div class="tool-manager-header">
+                <h2 class="tool-manager-title">工具调用管理</h2>
+                <button class="close-tool-manager" aria-label="关闭">×</button>
+            </div>
+
+            <!-- Tab 导航 -->
+            <div class="tool-manager-tabs">
+                <button class="tab-btn active" data-tab="tools">工具列表</button>
+                <button class="tab-btn" data-tab="permissions">权限管理</button>
+                <button class="tab-btn" data-tab="history">执行历史</button>
+            </div>
+
+            <!-- Tab 内容：工具列表 -->
+            <div class="tab-content active" data-tab="tools">
+            <!-- 主体（左右分栏） -->
+            <div class="tool-manager-body">
+                <!-- 左侧：工具列表 -->
+                <div class="tool-list-panel">
+                    <!-- 搜索框 -->
+                    <div class="tool-search-box">
+                        <input type="search"
+                               id="tool-search-input"
+                               placeholder="搜索工具..."
+                               aria-label="搜索工具">
+                    </div>
+
+                    <!-- 工具列表 -->
+                    <div id="tools-list-container">
+                        <!-- 工具列表将由 JS 动态渲染 -->
+                    </div>
+
+                    <!-- 添加自定义工具按钮 -->
+                    <div class="add-custom-tool-container">
+                        <button id="add-custom-tool-btn">
+                            添加自定义工具
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 右侧：工具详情 -->
+                <div class="tool-detail-panel">
+                    <div id="tool-detail-container">
+                        <!-- 工具详情表单将由 JS 动态渲染 -->
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- Tab 内容：权限管理 -->
+            <div class="tab-content" data-tab="permissions">
+                <div class="permissions-panel">
+                    <div class="permissions-header">
+                        <h3>工具权限设置</h3>
+                        <p class="permissions-description">控制各工具的执行权限和行为</p>
+                    </div>
+                    <div id="permissions-list-container">
+                        <!-- 权限列表将由 JS 动态渲染 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 内容：执行历史 -->
+            <div class="tab-content" data-tab="history">
+                <div class="history-panel">
+                    <div class="history-header">
+                        <h3>工具执行历史</h3>
+                        <div class="history-actions">
+                            <button id="clear-history-btn" class="btn-secondary">清空历史</button>
+                        </div>
+                    </div>
+                    <div id="history-list-container">
+                        <!-- 历史记录列表将由 JS 动态渲染 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP 服务器管理模态框 -->
+    <div id="mcp-settings-modal">
+        <div class="mcp-settings-content">
+            <!-- 头部 -->
+            <div class="mcp-settings-header">
+                <h2>MCP 服务器管理</h2>
+                <button class="close-mcp-settings" aria-label="关闭">×</button>
+            </div>
+
+            <!-- 主体 -->
+            <div class="mcp-settings-body">
+                <!-- 平台信息 -->
+                <div class="mcp-platform-info">
+                    <span class="platform-badge" id="mcp-platform-badge"></span>
+                    <div id="mcp-platform-warning"></div>
+                </div>
+
+                <!-- 服务器列表 -->
+                <div id="mcp-server-list" class="mcp-server-list"></div>
+
+                <!-- 添加按钮 -->
+                <div class="mcp-add-server-container">
+                    <button id="mcp-add-server-btn" class="btn btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        添加服务器
+                    </button>
+                </div>
+            </div>
+
+            <!-- 添加/编辑表单 -->
+            <div id="mcp-server-form" class="mcp-server-form" style="display: none;">
+                <!-- 表单内容将由 JS 动态生成 -->
             </div>
         </div>
     </div>

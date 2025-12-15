@@ -7,7 +7,7 @@ import { eventBus } from '../core/events.js';
 
 // IndexedDB 配置
 const DB_NAME = 'GeminiChatDB';
-const DB_VERSION = 2;  // ✅ 升级到版本 2
+const DB_VERSION = 3;  // ✅ 升级到版本 3（添加 MCP 服务器存储）
 const STORE_NAME = 'sessions';
 
 // ✅ 新增：对象存储名称常量
@@ -15,7 +15,8 @@ const STORES = {
     SESSIONS: 'sessions',
     CONFIG: 'config',
     PREFERENCES: 'preferences',
-    QUICK_MESSAGES: 'quickMessages'
+    QUICK_MESSAGES: 'quickMessages',
+    MCP_SERVERS: 'mcpServers'  // ✅ 版本 3 新增
 };
 
 let db = null;
@@ -210,6 +211,17 @@ export function initDB() {
                     qmStore.createIndex('category', 'category', { unique: false });
                     qmStore.createIndex('updatedAt', 'updatedAt', { unique: false });
                     console.log('✅ 创建对象存储: quickMessages');
+                }
+            }
+
+            // ✅ 版本 3: 创建 MCP 服务器存储
+            if (oldVersion < 3) {
+                if (!database.objectStoreNames.contains(STORES.MCP_SERVERS)) {
+                    const mcpStore = database.createObjectStore(STORES.MCP_SERVERS, { keyPath: 'id' });
+                    mcpStore.createIndex('type', 'type', { unique: false });
+                    mcpStore.createIndex('enabled', 'enabled', { unique: false });
+                    mcpStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                    console.log('✅ 创建对象存储: mcpServers');
                 }
             }
         };
@@ -654,6 +666,287 @@ export async function deleteQuickMessage(id) {
             };
         } catch (error) {
             console.error('删除快捷消息异常:', error);
+            reject(error);
+        }
+    });
+}
+
+// ========================================
+// MCP 服务器存储 API（版本 3 新增）
+// ========================================
+
+/**
+ * 保存单个 MCP 服务器到 IndexedDB
+ * @param {Object} server - MCP 服务器对象
+ * @returns {Promise<void>}
+ */
+export async function saveMCPServer(server) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject(new Error('数据库未初始化'));
+            return;
+        }
+
+        const serverData = { ...server, updatedAt: Date.now() };
+
+        try {
+            const transaction = db.transaction([STORES.MCP_SERVERS], 'readwrite');
+            const store = transaction.objectStore(STORES.MCP_SERVERS);
+            const request = store.put(serverData);
+
+            request.onsuccess = () => {
+                console.log(`[Storage] ✅ 保存 MCP 服务器: ${server.id}`);
+                resolve();
+            };
+            request.onerror = () => {
+                console.error('[Storage] ❌ 保存 MCP 服务器失败:', request.error);
+                reject(request.error);
+            };
+        } catch (error) {
+            console.error('[Storage] ❌ 保存 MCP 服务器异常:', error);
+            reject(error);
+        }
+    });
+}
+
+/**
+ * 从 IndexedDB 加载所有 MCP 服务器
+ * @returns {Promise<Array>} MCP 服务器数组
+ */
+export async function loadAllMCPServers() {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject(new Error('数据库未初始化'));
+            return;
+        }
+
+        try {
+            const transaction = db.transaction([STORES.MCP_SERVERS], 'readonly');
+            const store = transaction.objectStore(STORES.MCP_SERVERS);
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                // 按更新时间排序，最新的在前
+                const servers = request.result.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+                console.log(`[Storage] ✅ 加载 ${servers.length} 个 MCP 服务器`);
+                resolve(servers);
+            };
+            request.onerror = () => {
+                console.error('[Storage] ❌ 加载 MCP 服务器失败:', request.error);
+                reject(request.error);
+            };
+        } catch (error) {
+            console.error('[Storage] ❌ 加载 MCP 服务器异常:', error);
+            reject(error);
+        }
+    });
+}
+
+/**
+ * 从 IndexedDB 加载单个 MCP 服务器
+ * @param {string} serverId - 服务器 ID
+ * @returns {Promise<Object|null>} MCP 服务器对象或 null
+ */
+export async function loadMCPServer(serverId) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject(new Error('数据库未初始化'));
+            return;
+        }
+
+        try {
+            const transaction = db.transaction([STORES.MCP_SERVERS], 'readonly');
+            const store = transaction.objectStore(STORES.MCP_SERVERS);
+            const request = store.get(serverId);
+
+            request.onsuccess = () => {
+                resolve(request.result || null);
+            };
+            request.onerror = () => {
+                console.error('[Storage] ❌ 加载 MCP 服务器失败:', request.error);
+                reject(request.error);
+            };
+        } catch (error) {
+            console.error('[Storage] ❌ 加载 MCP 服务器异常:', error);
+            reject(error);
+        }
+    });
+}
+
+/**
+ * 从 IndexedDB 删除 MCP 服务器
+ * @param {string} serverId - 服务器 ID
+ * @returns {Promise<void>}
+ */
+export async function deleteMCPServer(serverId) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject(new Error('数据库未初始化'));
+            return;
+        }
+
+        try {
+            const transaction = db.transaction([STORES.MCP_SERVERS], 'readwrite');
+            const store = transaction.objectStore(STORES.MCP_SERVERS);
+            const request = store.delete(serverId);
+
+            request.onsuccess = () => {
+                console.log(`[Storage] ✅ 删除 MCP 服务器: ${serverId}`);
+                resolve();
+            };
+            request.onerror = () => {
+                console.error('[Storage] ❌ 删除 MCP 服务器失败:', request.error);
+                reject(request.error);
+            };
+        } catch (error) {
+            console.error('[Storage] ❌ 删除 MCP 服务器异常:', error);
+            reject(error);
+        }
+    });
+}
+
+/**
+ * 批量保存 MCP 服务器到 IndexedDB
+ * @param {Array} servers - MCP 服务器数组
+ * @returns {Promise<void>}
+ */
+export async function saveAllMCPServers(servers) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject(new Error('数据库未初始化'));
+            return;
+        }
+
+        try {
+            const transaction = db.transaction([STORES.MCP_SERVERS], 'readwrite');
+            const store = transaction.objectStore(STORES.MCP_SERVERS);
+
+            // 批量写入
+            servers.forEach(server => {
+                const serverData = { ...server, updatedAt: Date.now() };
+                store.put(serverData);
+            });
+
+            transaction.oncomplete = () => {
+                console.log(`[Storage] ✅ 批量保存 ${servers.length} 个 MCP 服务器`);
+                resolve();
+            };
+            transaction.onerror = () => {
+                console.error('[Storage] ❌ 批量保存 MCP 服务器失败:', transaction.error);
+                reject(transaction.error);
+            };
+        } catch (error) {
+            console.error('[Storage] ❌ 批量保存 MCP 服务器异常:', error);
+            reject(error);
+        }
+    });
+}
+
+/**
+ * 从 localStorage 迁移 MCP 服务器到 IndexedDB（一次性操作）
+ * @returns {Promise<number>} 迁移的服务器数量
+ */
+export async function migrateMCPServersFromLocalStorage() {
+    const MIGRATION_LOCK_KEY = 'mcpMigrationLock';
+    const MIGRATION_COMPLETE_KEY = 'mcpMigrationComplete';
+
+    // 检查是否已完成迁移
+    if (localStorage.getItem(MIGRATION_COMPLETE_KEY) === 'true') {
+        console.log('[Storage] 🔄 MCP 服务器迁移已完成，跳过');
+        return 0;
+    }
+
+    // 防止多标签页同时迁移
+    const lock = localStorage.getItem(MIGRATION_LOCK_KEY);
+    if (lock) {
+        const lockTime = parseInt(lock, 10);
+        const now = Date.now();
+        // 如果锁超过30秒，认为是死锁，清除
+        if (now - lockTime < 30000) {
+            console.log('[Storage] 🔄 其他标签页正在迁移，跳过');
+            return 0;
+        } else {
+            console.warn('[Storage] ⚠️ 检测到迁移死锁，清除锁');
+            localStorage.removeItem(MIGRATION_LOCK_KEY);
+        }
+    }
+
+    // 检查是否有需要迁移的数据
+    const saved = localStorage.getItem('mcpServers');
+    if (!saved) {
+        console.log('[Storage] 🔄 没有需要迁移的 MCP 服务器数据');
+        localStorage.setItem(MIGRATION_COMPLETE_KEY, 'true');
+        return 0;
+    }
+
+    // 设置迁移锁
+    localStorage.setItem(MIGRATION_LOCK_KEY, Date.now().toString());
+
+    try {
+        const servers = JSON.parse(saved);
+
+        if (!Array.isArray(servers) || servers.length === 0) {
+            console.log('[Storage] 🔄 MCP 服务器数据为空，无需迁移');
+            localStorage.setItem(MIGRATION_COMPLETE_KEY, 'true');
+            localStorage.removeItem(MIGRATION_LOCK_KEY);
+            return 0;
+        }
+
+        // 执行迁移
+        await saveAllMCPServers(servers);
+
+        // 迁移成功后删除 localStorage 数据
+        localStorage.removeItem('mcpServers');
+        localStorage.setItem(MIGRATION_COMPLETE_KEY, 'true');
+        localStorage.removeItem(MIGRATION_LOCK_KEY);
+
+        console.log(`[Storage] ✅ 成功迁移 ${servers.length} 个 MCP 服务器到 IndexedDB`);
+        return servers.length;
+
+    } catch (error) {
+        // 迁移失败，保留原数据，移除锁
+        localStorage.removeItem(MIGRATION_LOCK_KEY);
+        console.error('[Storage] ❌ MCP 服务器迁移失败（原数据已保留）:', error);
+        throw error;
+    }
+}
+
+/**
+ * 更新 MCP 服务器
+ * @param {string} serverId - 服务器 ID
+ * @param {Object} updates - 更新的字段
+ * @returns {Promise<void>}
+ */
+export async function updateMCPServer(serverId, updates) {
+    return new Promise(async (resolve, reject) => {
+        if (!db) {
+            reject(new Error('数据库未初始化'));
+            return;
+        }
+
+        try {
+            // 先加载现有服务器
+            const existingServer = await loadMCPServer(serverId);
+            if (!existingServer) {
+                reject(new Error(`MCP 服务器不存在: ${serverId}`));
+                return;
+            }
+
+            // 合并更新
+            const updatedServer = {
+                ...existingServer,
+                ...updates,
+                id: serverId,  // 确保 ID 不变
+                updatedAt: Date.now()
+            };
+
+            // 保存更新后的服务器
+            await saveMCPServer(updatedServer);
+            console.log(`[Storage] ✅ 更新 MCP 服务器: ${serverId}`);
+            resolve();
+
+        } catch (error) {
+            console.error('[Storage] ❌ 更新 MCP 服务器失败:', error);
             reject(error);
         }
     });

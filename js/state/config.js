@@ -16,54 +16,58 @@ let saveConfigTimeout = null;
 
 /**
  * 立即保存当前配置（用于页面关闭时）
+ * ✅ 优化：同时保存到 localStorage（同步）确保数据不丢失
  */
 export async function saveCurrentConfigImmediate() {
     const config = buildConfigObject();
 
+    // ✅ 关键：先同步保存到 localStorage，确保页面关闭前数据已保存
     try {
-        // ✅ 优先保存到 IndexedDB
+        localStorage.setItem('geminiChatConfig', JSON.stringify(config));
+    } catch (e) {
+        console.error('[saveCurrentConfigImmediate] localStorage 保存失败:', e);
+    }
+
+    // 然后异步保存到 IndexedDB
+    try {
         if (state.storageMode !== 'localStorage') {
             await saveConfigToDB(config);
             console.log('[saveCurrentConfigImmediate] 配置已保存到 IndexedDB');
-        } else {
-            // 降级：保存到 localStorage
-            localStorage.setItem('geminiChatConfig', JSON.stringify(config));
-            console.log('[saveCurrentConfigImmediate] 配置已保存到 localStorage（降级模式）');
         }
     } catch (error) {
-        console.error('[saveCurrentConfigImmediate] IndexedDB 保存失败，降级到 localStorage:', error);
-        // 降级处理
-        localStorage.setItem('geminiChatConfig', JSON.stringify(config));
+        console.error('[saveCurrentConfigImmediate] IndexedDB 保存失败:', error);
+        // localStorage 已在上面保存，无需再次保存
     }
 }
 
 /**
  * 防抖保存配置（避免频繁写入）
+ * ✅ 优化：立即保存到 localStorage（同步），延迟保存到 IndexedDB（异步）
  */
 export function saveCurrentConfig() {
+    const config = buildConfigObject();
+
+    // ✅ 立即同步保存到 localStorage（确保数据不丢失）
+    try {
+        localStorage.setItem('geminiChatConfig', JSON.stringify(config));
+    } catch (e) {
+        console.warn('[saveCurrentConfig] localStorage 保存失败:', e);
+    }
+
     // 清除之前的定时器
     if (saveConfigTimeout) {
         clearTimeout(saveConfigTimeout);
     }
 
-    // 延迟 500ms 执行保存
+    // 延迟 500ms 保存到 IndexedDB（减少写入频率）
     saveConfigTimeout = setTimeout(async () => {
-        const config = buildConfigObject();
-
         try {
-            // ✅ 优先保存到 IndexedDB
             if (state.storageMode !== 'localStorage') {
                 await saveConfigToDB(config);
                 console.log('配置已保存到 IndexedDB');
-            } else {
-                // 降级：保存到 localStorage
-                localStorage.setItem('geminiChatConfig', JSON.stringify(config));
-                console.log('配置已保存到 localStorage（降级模式）');
             }
         } catch (error) {
-            console.error('IndexedDB 保存失败，降级到 localStorage:', error);
-            // 降级处理
-            localStorage.setItem('geminiChatConfig', JSON.stringify(config));
+            console.error('IndexedDB 保存失败:', error);
         }
     }, 500);
 }
@@ -77,15 +81,18 @@ function buildConfigObject() {
         // ⭐ 配置版本号（用于自动升级）
         configVersion: CONFIG_VERSION,
 
+        // ✅ 更新时间戳（用于比较 IndexedDB 和 localStorage 的新旧）
+        updatedAt: Date.now(),
+
         // 旧配置 (保持兼容，添加防御性检查)
         apiEndpoint: elements?.apiEndpoint?.value || '',
         apiKey: elements?.apiKey?.value || '',
         // ⚠️ 注意：selectedModel 是运行时状态，保存到 localStorage 用于刷新恢复
         // 但在配置导出时会被 export-import.js 的 filterRuntimeState() 过滤掉
-        selectedModel: state.selectedModel || elements?.modelSelect?.value || '',
-        apiFormat: state?.apiFormat || 'openai',
-        imageSize: state?.imageSize || '2K',
-        replyCount: state?.replyCount || 1,
+        selectedModel: state.selectedModel ?? elements?.modelSelect?.value ?? '',
+        apiFormat: state?.apiFormat ?? 'openai',
+        imageSize: state?.imageSize ?? '2K',  // ✅ 修复: 使用 ?? 保留空字符串
+        replyCount: state?.replyCount ?? 1,
 
         // 功能开关
         streamEnabled: state.streamEnabled,
@@ -99,6 +106,9 @@ function buildConfigObject() {
         // ⭐ 新增：输出详细度配置
         verbosityEnabled: state.verbosityEnabled || false,
         outputVerbosity: state.outputVerbosity || 'medium',
+
+        // XML 工具调用兜底
+        xmlToolCallingEnabled: state.xmlToolCallingEnabled || false,
 
         // 三格式独立端点（深拷贝）
         endpoints: { ...state.endpoints },
@@ -243,21 +253,41 @@ function upgradeConfig(config, fromVersion, toVersion) {
  */
 export async function loadConfig() {
     let savedConfig = null;
+    let idbConfig = null;
+    let lsConfig = null;
 
     try {
-        // ✅ 优先从 IndexedDB 加载
+        // ✅ 同时读取 IndexedDB 和 localStorage
         if (state.storageMode !== 'localStorage') {
-            savedConfig = await loadConfigFromDB();
-            console.log('[loadConfig] 从 IndexedDB 读取:', savedConfig ? '有数据' : '无数据');
+            idbConfig = await loadConfigFromDB();
+            console.log('[loadConfig] IndexedDB:', idbConfig ? `有数据 (updatedAt: ${idbConfig.updatedAt})` : '无数据');
         }
 
-        // 降级：从 localStorage 加载
-        if (!savedConfig) {
+        // 读取 localStorage
+        try {
             const localStorageData = localStorage.getItem('geminiChatConfig');
             if (localStorageData) {
-                savedConfig = JSON.parse(localStorageData);
-                console.log('[loadConfig] 从 localStorage 读取（降级模式）');
+                lsConfig = JSON.parse(localStorageData);
+                console.log('[loadConfig] localStorage:', lsConfig ? `有数据 (updatedAt: ${lsConfig.updatedAt})` : '无数据');
             }
+        } catch (e) {
+            console.warn('[loadConfig] localStorage 解析失败:', e);
+        }
+
+        // ✅ 比较两个来源，使用更新的那个
+        if (idbConfig && lsConfig) {
+            const idbTime = idbConfig.updatedAt || 0;
+            const lsTime = lsConfig.updatedAt || 0;
+            if (lsTime > idbTime) {
+                console.log('[loadConfig] ⚠️ localStorage 更新，使用 localStorage 数据');
+                savedConfig = lsConfig;
+                // 同步到 IndexedDB
+                saveConfigToDB(lsConfig).catch(e => console.warn('[loadConfig] 同步到 IndexedDB 失败:', e));
+            } else {
+                savedConfig = idbConfig;
+            }
+        } else {
+            savedConfig = idbConfig || lsConfig;
         }
 
         if (!savedConfig) {
@@ -378,6 +408,9 @@ function applyConfigToState(config) {
     // ⭐ 新增：输出详细度配置（向后兼容）
     state.verbosityEnabled = config.verbosityEnabled ?? false;
     state.outputVerbosity = config.outputVerbosity ?? 'medium';
+
+    // XML 工具调用兜底
+    state.xmlToolCallingEnabled = config.xmlToolCallingEnabled ?? false;
 
     // 三格式独立端点 (带默认值兜底)
     state.endpoints = config.endpoints ?? { openai: '', gemini: '', claude: '' };
@@ -538,7 +571,7 @@ export function importConfigData(configData) {
  */
 export function generateExportFilename(type) {
     const date = new Date().toISOString().slice(0, 10);
-    return `webchat-${type}-${date}.json`;
+    return `miaomiao-chat-${type}-${date}.json`;
 }
 
 /**
@@ -647,6 +680,12 @@ export function syncUIWithState() {
     const webSearchEnabled = document.getElementById('web-search-enabled');
     if (webSearchEnabled) {
         webSearchEnabled.checked = state.webSearchEnabled;
+    }
+
+    // XML 工具调用兜底
+    const xmlToolCalling = document.getElementById('xml-tool-calling-enabled');
+    if (xmlToolCalling) {
+        xmlToolCalling.checked = state.xmlToolCallingEnabled;
     }
 
     // 三格式端点输入框和自定义模型

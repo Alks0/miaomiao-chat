@@ -13,6 +13,7 @@ import {
     sendQuickMessage
 } from '../state/quick-messages.js';
 import { escapeHtml } from '../utils/helpers.js';
+import { showNotification } from './notifications.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
 
 // 模块状态
@@ -365,13 +366,13 @@ function saveQuickMessageHandler() {
 
     // 验证
     if (!name) {
-        alert('请输入消息名称');
+        showNotification('请输入消息名称', 'error');
         elements.qmNameInput.focus();
         return;
     }
 
     if (!content) {
-        alert('请输入消息内容');
+        showNotification('请输入消息内容', 'error');
         elements.qmContentInput.focus();
         return;
     }

@@ -373,7 +373,10 @@ export function renderContentParts(contentParts) {
             // ✅ 支持 inline thinking
             html += renderThinkingBlock(part.text, false);
         } else if (part.type === 'text') {
-            html += safeMarkedParse(part.text);
+            // ✅ 过滤工具调用占位符（重新加载时不显示）
+            if (part.text && part.text !== '(调用工具)') {
+                html += safeMarkedParse(part.text);
+            }
         } else if (part.type === 'image_url' && part.complete && part.url) {
             const match = part.url.match(/^data:image\/(\w+);/);
             const ext = match ? match[1] : 'png';
@@ -714,7 +717,7 @@ function detectCodeLanguage(code, hintedLang) {
  * ✅ 实现缺失的交互功能
  * @param {HTMLElement} container - 容器元素
  */
-function enhanceThinkingBlocks(container = null) {
+export function enhanceThinkingBlocks(container = null) {
     const target = container || elements.messagesArea;
     target.querySelectorAll('.thinking-header').forEach((header) => {
         // 避免重复绑定
@@ -872,23 +875,51 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
     const contentDiv = messageEl.querySelector('.message-content');
     if (!contentDiv) return;
 
-    // 根据当前API格式从state中获取消息数据
+    // ✅ 优先使用 OpenAI 格式的 contentParts（包含思维链）
+    const openaiMsg = state.messages[index];
+
+    // ✅ 修复：优先使用 contentParts 渲染（包含编辑后的思维链）
+    if (openaiMsg?.contentParts && openaiMsg.contentParts.length > 0) {
+        // 过滤掉占位符
+        const validParts = openaiMsg.contentParts.filter(
+            p => !(p.type === 'text' && p.text === '(调用工具)')
+        );
+        if (validParts.length > 0) {
+            contentDiv.innerHTML = renderContentParts(validParts);
+            enhanceCodeBlocks(messageEl);
+            eventBus.emit('ui:notification', { message: '消息已保存', type: 'success' });
+            return;
+        }
+    }
+
+    // ✅ 回退：使用 thinkingContent + content 渲染
+    if (role === 'assistant' && openaiMsg?.thinkingContent) {
+        let html = renderThinkingBlock(openaiMsg.thinkingContent);
+        if (typeof openaiMsg.content === 'string') {
+            html += safeMarkedParse(openaiMsg.content);
+        } else if (Array.isArray(openaiMsg.content)) {
+            html += renderContent(openaiMsg.content);
+        }
+        contentDiv.innerHTML = html;
+        enhanceCodeBlocks(messageEl);
+        eventBus.emit('ui:notification', { message: '消息已保存', type: 'success' });
+        return;
+    }
+
+    // ✅ 最后回退：根据 API 格式渲染
     let htmlContent = '';
 
     if (state.apiFormat === 'gemini') {
         const messageData = state.geminiContents[index];
         if (messageData?.parts) {
-            // Gemini格式：parts数组
             messageData.parts.forEach(part => {
                 if (part.text !== undefined) {
-                    // 文本内容
                     if (role === 'assistant') {
                         htmlContent += safeMarkedParse(part.text);
                     } else {
                         htmlContent += part.text;
                     }
                 } else if (part.inlineData || part.inline_data) {
-                    // 图片内容
                     const inlineData = part.inlineData || part.inline_data;
                     const mimeType = inlineData.mimeType || inlineData.mime_type;
                     const base64Data = inlineData.data;
@@ -903,7 +934,6 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
         const messageData = state.claudeContents[index];
         if (messageData?.content) {
             if (Array.isArray(messageData.content)) {
-                // Claude格式：content数组
                 messageData.content.forEach(part => {
                     if (part.type === 'text') {
                         if (role === 'assistant') {
@@ -912,7 +942,6 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
                             htmlContent += part.text || '';
                         }
                     } else if (part.type === 'image' && part.source) {
-                        // Claude图片格式
                         const imgUrl = `data:${part.source.media_type};base64,${part.source.data}`;
                         htmlContent += `<div class="image-wrapper">
                             <img src="${imgUrl}" alt="图片" title="点击查看大图" style="cursor:pointer;">
@@ -920,7 +949,6 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
                     }
                 });
             } else {
-                // 纯文本
                 if (role === 'assistant') {
                     htmlContent = safeMarkedParse(messageData.content);
                 } else {
@@ -929,7 +957,6 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
             }
         }
     } else {
-        // OpenAI格式
         const messageData = state.messages[index];
         if (messageData?.content) {
             htmlContent = renderContent(messageData.content);
