@@ -61,7 +61,8 @@ android/.cxx/
 android/captures/
 android/app/release/
 *.jks
-*.keystore
+# 保留 debug.keystore 用于 CI 构建
+!android/app/debug.keystore
 
 # Documentation (temporary)
 docs/
