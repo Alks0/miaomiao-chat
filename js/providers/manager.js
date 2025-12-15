@@ -11,10 +11,19 @@ import { setApiFormat } from '../ui/format-switcher.js';
 
 /**
  * 生成唯一 ID
+ * @param {string} prefix - ID 前缀
  * @returns {string} 唯一标识符
  */
-function generateId() {
-    return `provider-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+function generateId(prefix = 'provider') {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * 生成密钥 ID
+ * @returns {string} 密钥唯一标识符
+ */
+function generateKeyId() {
+    return generateId('key');
 }
 
 /**
@@ -23,18 +32,43 @@ function generateId() {
  * @returns {Object} 创建的提供商对象
  */
 export function createProvider(data) {
+    // 初始化密钥列表
+    let apiKeys = [];
+    let currentKeyId = null;
+
+    if (data.apiKey) {
+        const keyId = generateKeyId();
+        apiKeys.push({
+            id: keyId,
+            key: data.apiKey,
+            name: '密钥 1',
+            enabled: true,
+            usageCount: 0,
+            lastUsed: null,
+            errorCount: 0,
+        });
+        currentKeyId = keyId;
+    }
+
     const provider = {
         id: generateId(),
         name: data.name,
         apiFormat: data.apiFormat,
         endpoint: data.endpoint || getDefaultEndpoint(data.apiFormat),
-        apiKey: data.apiKey || '',
-        customModel: data.customModel || '',
+        apiKey: data.apiKey || '', // 保留兼容：当前使用的密钥
+        apiKeys: apiKeys, // 密钥列表
+        currentKeyId: currentKeyId, // 当前选中的密钥 ID
+        keyRotation: { // 轮询配置
+            enabled: false,
+            strategy: 'round-robin', // round-robin | random | least-used | smart
+            rotateOnError: true,
+            currentIndex: 0,
+        },
         enabled: true,
-        models: data.models || [], // ✅ 新增：用户选择的模型列表
+        models: data.models || [],
         createdAt: Date.now(),
         geminiApiKeyInHeader: data.geminiApiKeyInHeader || false,
-        modelParams: null, // 使用全局参数
+        modelParams: null,
     };
 
     state.providers.push(provider);
@@ -76,6 +110,299 @@ export function deleteProvider(id) {
     eventBus.emit('providers:deleted', { id });
 
     return true;
+}
+
+// ============================================
+// 多密钥管理功能
+// ============================================
+
+/**
+ * 确保提供商有 apiKeys 数组（兼容旧数据）
+ * @param {Object} provider - 提供商对象
+ */
+export function ensureApiKeysArray(provider) {
+    if (!provider.apiKeys) {
+        provider.apiKeys = [];
+        provider.currentKeyId = null;
+        provider.keyRotation = {
+            enabled: false,
+            strategy: 'round-robin',
+            rotateOnError: true,
+            currentIndex: 0,
+        };
+
+        // 迁移旧的 apiKey 到 apiKeys 数组
+        if (provider.apiKey) {
+            const keyId = generateKeyId();
+            provider.apiKeys.push({
+                id: keyId,
+                key: provider.apiKey,
+                name: '密钥 1',
+                enabled: true,
+                usageCount: 0,
+                lastUsed: null,
+                errorCount: 0,
+            });
+            provider.currentKeyId = keyId;
+        }
+    }
+}
+
+/**
+ * 添加 API 密钥
+ * @param {string} providerId - 提供商 ID
+ * @param {string} key - 密钥值
+ * @param {string} name - 密钥名称（可选）
+ * @returns {Object|null} 新增的密钥对象
+ */
+export function addApiKey(providerId, key, name = '') {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return null;
+
+    ensureApiKeysArray(provider);
+
+    const keyId = generateKeyId();
+    const keyName = name || `密钥 ${provider.apiKeys.length + 1}`;
+
+    const newKey = {
+        id: keyId,
+        key: key,
+        name: keyName,
+        enabled: true,
+        usageCount: 0,
+        lastUsed: null,
+        errorCount: 0,
+    };
+
+    provider.apiKeys.push(newKey);
+
+    // 如果是第一个密钥，自动设为当前密钥
+    if (provider.apiKeys.length === 1) {
+        provider.currentKeyId = keyId;
+        provider.apiKey = key;
+    }
+
+    saveCurrentConfig();
+    eventBus.emit('providers:key-added', { providerId, key: newKey });
+
+    return newKey;
+}
+
+/**
+ * 删除 API 密钥
+ * @param {string} providerId - 提供商 ID
+ * @param {string} keyId - 密钥 ID
+ * @returns {boolean} 是否删除成功
+ */
+export function removeApiKey(providerId, keyId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider || !provider.apiKeys) return false;
+
+    const index = provider.apiKeys.findIndex(k => k.id === keyId);
+    if (index === -1) return false;
+
+    provider.apiKeys.splice(index, 1);
+
+    // 如果删除的是当前密钥，切换到第一个可用密钥
+    if (provider.currentKeyId === keyId) {
+        const nextKey = provider.apiKeys.find(k => k.enabled);
+        provider.currentKeyId = nextKey?.id || null;
+        provider.apiKey = nextKey?.key || '';
+    }
+
+    saveCurrentConfig();
+    eventBus.emit('providers:key-removed', { providerId, keyId });
+
+    return true;
+}
+
+/**
+ * 设置当前使用的密钥
+ * @param {string} providerId - 提供商 ID
+ * @param {string} keyId - 密钥 ID
+ * @returns {boolean} 是否设置成功
+ */
+export function setCurrentKey(providerId, keyId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider || !provider.apiKeys) return false;
+
+    const key = provider.apiKeys.find(k => k.id === keyId);
+    if (!key) return false;
+
+    provider.currentKeyId = keyId;
+    provider.apiKey = key.key; // 同步到兼容字段
+
+    saveCurrentConfig();
+    eventBus.emit('providers:key-changed', { providerId, keyId });
+
+    return true;
+}
+
+/**
+ * 更新密钥信息
+ * @param {string} providerId - 提供商 ID
+ * @param {string} keyId - 密钥 ID
+ * @param {Object} updates - 更新内容
+ * @returns {Object|null} 更新后的密钥对象
+ */
+export function updateApiKey(providerId, keyId, updates) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider || !provider.apiKeys) return null;
+
+    const key = provider.apiKeys.find(k => k.id === keyId);
+    if (!key) return null;
+
+    Object.assign(key, updates);
+
+    // 如果更新的是当前密钥的 key 值，同步到兼容字段
+    if (provider.currentKeyId === keyId && updates.key) {
+        provider.apiKey = updates.key;
+    }
+
+    saveCurrentConfig();
+    eventBus.emit('providers:key-updated', { providerId, keyId, key });
+
+    return key;
+}
+
+/**
+ * 获取当前有效的 API 密钥
+ * @param {string} providerId - 提供商 ID
+ * @returns {string} API 密钥
+ */
+export function getActiveApiKey(providerId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return '';
+
+    ensureApiKeysArray(provider);
+
+    // 如果没有密钥列表，返回兼容字段
+    if (!provider.apiKeys || provider.apiKeys.length === 0) {
+        return provider.apiKey || '';
+    }
+
+    // 如果开启了轮询，使用轮询逻辑
+    if (provider.keyRotation?.enabled) {
+        return getRotatedKey(provider);
+    }
+
+    // 否则使用当前选中的密钥
+    const currentKey = provider.apiKeys.find(k => k.id === provider.currentKeyId && k.enabled);
+    if (currentKey) {
+        return currentKey.key;
+    }
+
+    // 回退：返回第一个可用密钥
+    const firstEnabled = provider.apiKeys.find(k => k.enabled);
+    return firstEnabled?.key || provider.apiKey || '';
+}
+
+/**
+ * 根据轮询策略获取密钥
+ * @param {Object} provider - 提供商对象
+ * @returns {string} API 密钥
+ */
+function getRotatedKey(provider) {
+    const enabledKeys = provider.apiKeys.filter(k => k.enabled);
+    if (enabledKeys.length === 0) return provider.apiKey || '';
+
+    const rotation = provider.keyRotation;
+    let selectedKey;
+
+    switch (rotation.strategy) {
+        case 'random':
+            selectedKey = enabledKeys[Math.floor(Math.random() * enabledKeys.length)];
+            break;
+
+        case 'least-used':
+            selectedKey = enabledKeys.reduce((min, k) =>
+                k.usageCount < min.usageCount ? k : min
+            );
+            break;
+
+        case 'smart':
+            // 综合考虑使用次数和错误率
+            selectedKey = enabledKeys.reduce((best, k) => {
+                const score = k.usageCount + k.errorCount * 10; // 错误权重更高
+                const bestScore = best.usageCount + best.errorCount * 10;
+                return score < bestScore ? k : best;
+            });
+            break;
+
+        case 'round-robin':
+        default:
+            const index = rotation.currentIndex % enabledKeys.length;
+            selectedKey = enabledKeys[index];
+            rotation.currentIndex = (index + 1) % enabledKeys.length;
+            break;
+    }
+
+    // 更新使用统计
+    selectedKey.usageCount++;
+    selectedKey.lastUsed = Date.now();
+
+    return selectedKey.key;
+}
+
+/**
+ * 轮询切换到下一个密钥（遇到错误时调用）
+ * @param {string} providerId - 提供商 ID
+ * @param {boolean} markError - 是否标记当前密钥错误
+ * @returns {string} 新的 API 密钥
+ */
+export function rotateToNextKey(providerId, markError = false) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider || !provider.apiKeys || provider.apiKeys.length <= 1) {
+        return provider?.apiKey || '';
+    }
+
+    ensureApiKeysArray(provider);
+
+    // 标记当前密钥错误
+    if (markError) {
+        const currentKey = provider.apiKeys.find(k => k.id === provider.currentKeyId);
+        if (currentKey) {
+            currentKey.errorCount++;
+        }
+    }
+
+    // 获取可用密钥列表（排除当前密钥）
+    const enabledKeys = provider.apiKeys.filter(k => k.enabled && k.id !== provider.currentKeyId);
+    if (enabledKeys.length === 0) {
+        return provider.apiKey || '';
+    }
+
+    // 选择下一个密钥
+    const nextKey = enabledKeys[0];
+    provider.currentKeyId = nextKey.id;
+    provider.apiKey = nextKey.key;
+
+    saveCurrentConfig();
+    eventBus.emit('providers:key-rotated', { providerId, keyId: nextKey.id });
+
+    console.log(`[KeyRotation] 切换到密钥: ${nextKey.name} (${nextKey.id})`);
+
+    return nextKey.key;
+}
+
+/**
+ * 设置密钥轮询配置
+ * @param {string} providerId - 提供商 ID
+ * @param {Object} config - 轮询配置
+ */
+export function setKeyRotationConfig(providerId, config) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return;
+
+    ensureApiKeysArray(provider);
+
+    provider.keyRotation = {
+        ...provider.keyRotation,
+        ...config,
+    };
+
+    saveCurrentConfig();
+    eventBus.emit('providers:rotation-config-changed', { providerId, config: provider.keyRotation });
 }
 
 /**

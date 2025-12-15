@@ -104,11 +104,9 @@ export function initModels() {
             // 更新 apiFormat (不触发格式切换事件,避免重复刷新模型列表)
             state.apiFormat = provider.apiFormat;
 
-            // 显示/隐藏对应的配置面板
+            // 显示/隐藏对应的配置面板：只显示当前格式对应的配置面板
             document.querySelectorAll('.api-config').forEach(panel => {
-                if (panel.id !== 'gemini-config') {
-                    panel.style.display = 'none';
-                }
+                panel.style.display = 'none';
             });
             const configPanel = document.getElementById(`${provider.apiFormat}-config`);
             if (configPanel) {

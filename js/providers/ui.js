@@ -12,7 +12,14 @@ import {
     addModelToProvider,
     removeModelFromProvider,
     addModelsToProvider,
-    fetchProviderModels
+    fetchProviderModels,
+    addApiKey,
+    removeApiKey,
+    setCurrentKey,
+    updateApiKey,
+    getActiveApiKey,
+    setKeyRotationConfig,
+    ensureApiKeysArray
 } from './manager.js';
 import { renderCapabilityBadges } from '../utils/capability-badges.js';
 import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
@@ -256,18 +263,20 @@ function showProviderForm(providerId) {
                 <p class="form-hint endpoint-hint" id="endpoint-hint-text"></p>
             </div>
 
-            <div class="form-group">
-                <label for="detail-provider-apikey">API 密钥</label>
-                <div class="password-input-wrapper">
-                    <input type="password" id="detail-provider-apikey" value="${provider?.apiKey || ''}"
-                           placeholder="sk-..." />
-                    <button type="button" class="password-toggle-btn" id="toggle-apikey-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </button>
-                </div>
+            <div class="form-group api-keys-section">
+                ${isEdit ? renderApiKeysCollapsible(provider) : `
+                    <label for="detail-provider-apikey">API 密钥</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="detail-provider-apikey" value=""
+                               placeholder="sk-..." />
+                        <button type="button" class="password-toggle-btn" id="toggle-apikey-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
+                    </div>
+                `}
             </div>
 
             <div class="form-group gemini-only" style="display: ${provider?.apiFormat === 'gemini' || !provider ? 'block' : 'none'};">
@@ -277,12 +286,6 @@ function showProviderForm(providerId) {
                     <label for="detail-provider-gemini-header">通过请求头传递 API Key</label>
                 </div>
                 <p class="form-hint">启用后使用 x-goog-api-key 请求头（适用于代理）</p>
-            </div>
-
-            <div class="form-group">
-                <label for="detail-provider-custom-model">自定义模型（可选）</label>
-                <input type="text" id="detail-provider-custom-model" value="${provider?.customModel || ''}"
-                       placeholder="gpt-4o, gemini-2.0-flash-exp" />
             </div>
 
             ${isEdit ? `
@@ -414,6 +417,11 @@ function bindFormEvents(providerId) {
         }
     });
 
+    // API 密钥管理（仅编辑模式）
+    if (isEdit) {
+        bindApiKeysEvents(providerId);
+    }
+
     // 模型管理按钮（仅编辑模式）
     if (isEdit) {
         // 管理模型按钮
@@ -460,7 +468,6 @@ function saveProviderForm(providerId) {
     const apiFormat = document.getElementById('detail-provider-format')?.value;
     const endpoint = document.getElementById('detail-provider-endpoint')?.value.trim();
     const apiKey = document.getElementById('detail-provider-apikey')?.value.trim();
-    const customModel = document.getElementById('detail-provider-custom-model')?.value.trim();
     const geminiApiKeyInHeader = document.getElementById('detail-provider-gemini-header')?.checked || false;
     const enabled = document.getElementById('detail-provider-enabled')?.checked ?? true; // 新建默认启用
 
@@ -482,7 +489,6 @@ function saveProviderForm(providerId) {
         apiFormat,
         endpoint: finalEndpoint,
         apiKey,
-        customModel,
         geminiApiKeyInHeader,
         enabled
     };
@@ -536,6 +542,296 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ========== API 密钥管理 ==========
+
+/**
+ * 渲染可折叠的 API 密钥管理区域
+ * @param {Object} provider - 提供商对象
+ * @returns {string} HTML 字符串
+ */
+function renderApiKeysCollapsible(provider) {
+    // 确保 apiKeys 数组存在
+    ensureApiKeysArray(provider);
+
+    const keysCount = provider.apiKeys?.length || 0;
+    const currentKey = provider.apiKeys?.find(k => k.id === provider.currentKeyId);
+    const currentKeyPreview = currentKey ? maskApiKey(currentKey.key) : '未设置';
+    const rotationEnabled = provider.keyRotation?.enabled || false;
+
+    return `
+        <div class="api-keys-collapsible">
+            <button type="button" class="api-keys-header" id="toggle-api-keys-panel">
+                <div class="api-keys-header-left">
+                    <svg class="collapse-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span class="api-keys-title">API 密钥管理</span>
+                    <span class="api-keys-count">${keysCount} 个密钥</span>
+                </div>
+                <div class="api-keys-header-right">
+                    ${rotationEnabled ? '<span class="rotation-badge">轮询中</span>' : ''}
+                    <span class="current-key-preview">${currentKeyPreview}</span>
+                </div>
+            </button>
+            <div class="api-keys-panel" id="api-keys-panel" style="display: none;">
+                <!-- 密钥列表 -->
+                <div class="api-keys-list" id="api-keys-list">
+                    ${renderApiKeyItems(provider)}
+                </div>
+
+                <!-- 添加密钥 -->
+                <div class="add-key-form" id="add-key-form">
+                    <div class="add-key-inputs">
+                        <input type="password" id="new-api-key-input" placeholder="输入新的 API 密钥" />
+                        <input type="text" id="new-api-key-name" placeholder="名称（可选）" />
+                    </div>
+                    <button type="button" class="btn-secondary btn-add-key" id="add-api-key-btn">+ 添加</button>
+                </div>
+
+                <!-- 轮询设置 -->
+                <div class="rotation-settings">
+                    <div class="rotation-toggle">
+                        <label class="toggle-switch-modern">
+                            <input type="checkbox" id="rotation-enabled" ${rotationEnabled ? 'checked' : ''} />
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="rotation-label">
+                            <span>自动轮询</span>
+                            <p class="form-hint">在多个密钥之间自动切换</p>
+                        </div>
+                    </div>
+                    <div class="rotation-options" id="rotation-options" style="display: ${rotationEnabled ? 'flex' : 'none'};">
+                        <div class="rotation-option">
+                            <label for="rotation-strategy">轮询策略</label>
+                            <select id="rotation-strategy">
+                                <option value="round-robin" ${provider.keyRotation?.strategy === 'round-robin' ? 'selected' : ''}>顺序轮询</option>
+                                <option value="random" ${provider.keyRotation?.strategy === 'random' ? 'selected' : ''}>随机选择</option>
+                                <option value="least-used" ${provider.keyRotation?.strategy === 'least-used' ? 'selected' : ''}>最少使用</option>
+                                <option value="smart" ${provider.keyRotation?.strategy === 'smart' ? 'selected' : ''}>智能选择</option>
+                            </select>
+                        </div>
+                        <div class="rotation-option">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="rotate-on-error" ${provider.keyRotation?.rotateOnError !== false ? 'checked' : ''} />
+                                <span>错误时自动切换</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * 渲染密钥列表项
+ * @param {Object} provider - 提供商对象
+ * @returns {string} HTML 字符串
+ */
+function renderApiKeyItems(provider) {
+    const apiKeys = provider.apiKeys || [];
+
+    if (apiKeys.length === 0) {
+        return '<div class="empty-keys">暂无密钥，请添加</div>';
+    }
+
+    return apiKeys.map(key => {
+        const isCurrent = key.id === provider.currentKeyId;
+        const maskedKey = maskApiKey(key.key);
+        const displayName = key.name || maskedKey;
+
+        return `
+            <div class="api-key-item ${isCurrent ? 'current' : ''} ${!key.enabled ? 'disabled' : ''}" data-key-id="${key.id}">
+                <label class="key-select">
+                    <input type="radio" name="current-key" value="${key.id}" ${isCurrent ? 'checked' : ''} ${!key.enabled ? 'disabled' : ''} />
+                    <span class="key-info">
+                        <span class="key-name">${escapeHtml(displayName)}</span>
+                        <span class="key-preview">${maskedKey}</span>
+                        ${key.usageCount > 0 ? `<span class="key-stats">使用 ${key.usageCount} 次</span>` : ''}
+                    </span>
+                </label>
+                <div class="key-actions">
+                    <button type="button" class="key-toggle-btn" data-key-id="${key.id}" title="${key.enabled ? '禁用' : '启用'}">
+                        ${key.enabled ? '✓' : '✗'}
+                    </button>
+                    <button type="button" class="key-delete-btn" data-key-id="${key.id}" title="删除">×</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * 遮蔽 API 密钥
+ * @param {string} key - 原始密钥
+ * @returns {string} 遮蔽后的密钥
+ */
+function maskApiKey(key) {
+    if (!key) return '未设置';
+    if (key.length <= 8) return '****';
+    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
+}
+
+/**
+ * 绑定 API 密钥管理事件
+ * @param {string} providerId - 提供商ID
+ */
+function bindApiKeysEvents(providerId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return;
+
+    // 折叠/展开面板
+    const toggleBtn = document.getElementById('toggle-api-keys-panel');
+    const panel = document.getElementById('api-keys-panel');
+
+    toggleBtn?.addEventListener('click', () => {
+        const isExpanded = panel.style.display !== 'none';
+        panel.style.display = isExpanded ? 'none' : 'block';
+        toggleBtn.classList.toggle('expanded', !isExpanded);
+    });
+
+    // 添加密钥
+    document.getElementById('add-api-key-btn')?.addEventListener('click', () => {
+        const keyInput = document.getElementById('new-api-key-input');
+        const nameInput = document.getElementById('new-api-key-name');
+        const key = keyInput?.value.trim();
+        const name = nameInput?.value.trim();
+
+        if (!key) {
+            showNotification('请输入 API 密钥', 'warning');
+            return;
+        }
+
+        const newKey = addApiKey(providerId, key, name);
+        if (newKey) {
+            showNotification('密钥已添加', 'success');
+            keyInput.value = '';
+            nameInput.value = '';
+            // 刷新密钥列表
+            refreshApiKeysList(providerId);
+        } else {
+            showNotification('添加失败：密钥可能已存在', 'error');
+        }
+    });
+
+    // 选择当前密钥
+    document.querySelectorAll('input[name="current-key"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const keyId = e.target.value;
+            setCurrentKey(providerId, keyId);
+            refreshApiKeysList(providerId);
+            showNotification('已切换当前密钥', 'success');
+        });
+    });
+
+    // 删除密钥
+    document.querySelectorAll('.key-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const keyId = btn.dataset.keyId;
+            const key = provider.apiKeys?.find(k => k.id === keyId);
+
+            const confirmed = await showConfirmDialog(
+                `确定删除密钥 "${key?.name || maskApiKey(key?.key)}"？`,
+                '确认删除'
+            );
+
+            if (confirmed) {
+                removeApiKey(providerId, keyId);
+                refreshApiKeysList(providerId);
+                showNotification('密钥已删除', 'success');
+            }
+        });
+    });
+
+    // 启用/禁用密钥
+    document.querySelectorAll('.key-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const keyId = btn.dataset.keyId;
+            const key = provider.apiKeys?.find(k => k.id === keyId);
+            if (key) {
+                updateApiKey(providerId, keyId, { enabled: !key.enabled });
+                refreshApiKeysList(providerId);
+                showNotification(key.enabled ? '密钥已禁用' : '密钥已启用', 'success');
+            }
+        });
+    });
+
+    // 轮询开关
+    document.getElementById('rotation-enabled')?.addEventListener('change', (e) => {
+        const enabled = e.target.checked;
+        const optionsPanel = document.getElementById('rotation-options');
+        if (optionsPanel) {
+            optionsPanel.style.display = enabled ? 'flex' : 'none';
+        }
+        setKeyRotationConfig(providerId, { enabled });
+        refreshApiKeysHeader(providerId);
+    });
+
+    // 轮询策略
+    document.getElementById('rotation-strategy')?.addEventListener('change', (e) => {
+        setKeyRotationConfig(providerId, { strategy: e.target.value });
+    });
+
+    // 错误时切换
+    document.getElementById('rotate-on-error')?.addEventListener('change', (e) => {
+        setKeyRotationConfig(providerId, { rotateOnError: e.target.checked });
+    });
+}
+
+/**
+ * 刷新密钥列表显示
+ * @param {string} providerId - 提供商ID
+ */
+function refreshApiKeysList(providerId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return;
+
+    const listContainer = document.getElementById('api-keys-list');
+    if (listContainer) {
+        listContainer.innerHTML = renderApiKeyItems(provider);
+        // 重新绑定事件
+        bindApiKeysEvents(providerId);
+    }
+
+    refreshApiKeysHeader(providerId);
+}
+
+/**
+ * 刷新密钥面板头部显示
+ * @param {string} providerId - 提供商ID
+ */
+function refreshApiKeysHeader(providerId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return;
+
+    // 更新密钥数量
+    const countSpan = document.querySelector('.api-keys-count');
+    if (countSpan) {
+        countSpan.textContent = `${provider.apiKeys?.length || 0} 个密钥`;
+    }
+
+    // 更新当前密钥预览
+    const currentKey = provider.apiKeys?.find(k => k.id === provider.currentKeyId);
+    const previewSpan = document.querySelector('.current-key-preview');
+    if (previewSpan) {
+        previewSpan.textContent = currentKey ? maskApiKey(currentKey.key) : '未设置';
+    }
+
+    // 更新轮询徽章
+    const headerRight = document.querySelector('.api-keys-header-right');
+    const existingBadge = headerRight?.querySelector('.rotation-badge');
+    if (provider.keyRotation?.enabled && !existingBadge) {
+        const badge = document.createElement('span');
+        badge.className = 'rotation-badge';
+        badge.textContent = '轮询中';
+        headerRight?.insertBefore(badge, headerRight.firstChild);
+    } else if (!provider.keyRotation?.enabled && existingBadge) {
+        existingBadge.remove();
+    }
 }
 
 // ========== 模型管理弹窗 ==========

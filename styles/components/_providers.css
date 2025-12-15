@@ -525,6 +525,326 @@
     opacity: 0.9;
 }
 
+/* ========== API 密钥管理 ========== */
+
+.api-keys-collapsible {
+    border: var(--border);
+    border-radius: 10px;
+    background: var(--md-surface);
+    overflow: hidden;
+}
+
+.api-keys-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.api-keys-header:hover {
+    background: var(--md-bg);
+}
+
+.api-keys-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.api-keys-header .collapse-icon {
+    transition: transform 0.2s;
+    color: var(--md-muted);
+}
+
+.api-keys-header.expanded .collapse-icon {
+    transform: rotate(90deg);
+}
+
+.api-keys-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-text);
+}
+
+.api-keys-count {
+    font-size: 12px;
+    color: var(--md-muted);
+    background: var(--md-bg);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.api-keys-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rotation-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+    font-weight: 500;
+}
+
+.current-key-preview {
+    font-size: 12px;
+    color: var(--md-muted);
+    font-family: monospace;
+}
+
+/* 密钥面板内容 */
+.api-keys-panel {
+    border-top: var(--border);
+    padding: 12px;
+}
+
+/* 密钥列表 */
+.api-keys-list {
+    max-height: 180px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+
+.empty-keys {
+    padding: 20px;
+    text-align: center;
+    color: var(--md-muted);
+    font-size: 13px;
+}
+
+/* 单个密钥项 */
+.api-key-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    background: var(--md-bg);
+    transition: all 0.2s;
+}
+
+.api-key-item:hover {
+    background: var(--md-surface-container);
+}
+
+.api-key-item.current {
+    background: rgba(33, 150, 243, 0.1);
+    border: 1px solid var(--md-blue);
+}
+
+.api-key-item.disabled {
+    opacity: 0.5;
+}
+
+.api-key-item.disabled .key-name {
+    text-decoration: line-through;
+}
+
+.key-select {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.key-select input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.key-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.key-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--md-text);
+}
+
+.key-preview {
+    font-size: 11px;
+    color: var(--md-muted);
+    font-family: monospace;
+}
+
+.key-stats {
+    font-size: 10px;
+    color: var(--md-muted);
+}
+
+.key-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.key-toggle-btn,
+.key-delete-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--md-muted);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.key-toggle-btn:hover {
+    background: var(--md-surface);
+    color: var(--md-blue);
+}
+
+.key-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--md-coral);
+}
+
+/* 添加密钥表单 */
+.add-key-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-top: 12px;
+    border-top: var(--border);
+}
+
+.add-key-inputs {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+}
+
+.add-key-inputs input {
+    flex: 1;
+    padding: 8px 12px;
+    border: var(--border);
+    border-radius: 6px;
+    background: var(--md-bg);
+    color: var(--md-text);
+    font-size: 13px;
+}
+
+.add-key-inputs input:focus {
+    outline: none;
+    border-color: var(--md-blue);
+}
+
+.add-key-inputs input:first-child {
+    flex: 2;
+}
+
+.btn-add-key {
+    padding: 8px 16px !important;
+    white-space: nowrap;
+}
+
+/* 轮询设置 */
+.rotation-settings {
+    padding-top: 12px;
+    border-top: var(--border);
+}
+
+.rotation-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.rotation-label {
+    flex: 1;
+}
+
+.rotation-label span {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-text);
+}
+
+.rotation-label .form-hint {
+    margin-top: 2px;
+}
+
+.rotation-options {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    background: var(--md-bg);
+    border-radius: 8px;
+}
+
+.rotation-option {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rotation-option label {
+    font-size: 12px;
+    color: var(--md-muted);
+}
+
+.rotation-option select {
+    padding: 6px 10px;
+    border: var(--border);
+    border-radius: 6px;
+    background: var(--md-surface);
+    color: var(--md-text);
+    font-size: 13px;
+}
+
+.rotation-option .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--md-text);
+    cursor: pointer;
+}
+
+.rotation-option .checkbox-label input {
+    width: 16px;
+    height: 16px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .api-keys-header {
+        padding: 12px 14px;
+    }
+
+    .add-key-form {
+        flex-direction: column;
+    }
+
+    .add-key-inputs {
+        flex-direction: column;
+    }
+
+    .rotation-options {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
 /* ========== 模型管理 ========== */
 
 /* 已添加模型列表 */

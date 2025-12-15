@@ -24,12 +24,9 @@ export function setApiFormat(format, shouldFetchModels = true) {
     const oldFormat = state.apiFormat;
     state.apiFormat = format;
 
-    // 始终更新配置面板显示
-    // 注意：gemini-config 始终显示，不受格式切换影响（用户知道它只适用于 Gemini）
+    // 更新配置面板显示：只显示当前格式对应的配置面板
     document.querySelectorAll('.api-config').forEach(panel => {
-        if (panel.id !== 'gemini-config') {
-            panel.style.display = 'none';
-        }
+        panel.style.display = 'none';
     });
     const configPanel = document.getElementById(`${format}-config`);
     if (configPanel) {

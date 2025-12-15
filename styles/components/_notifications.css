@@ -11,7 +11,7 @@
     color: var(--md-charcoal);
     border: var(--border);
     box-shadow: var(--shadow-md);
-    z-index: 1000;
+    z-index: 99999;  /* 确保在所有模态框之上 */
     font-family: var(--font-mono);
     font-size: 13px;
     animation: slideInRight 0.3s var(--ease);

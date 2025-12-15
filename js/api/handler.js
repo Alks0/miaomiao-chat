@@ -6,7 +6,7 @@
 import { state, elements } from '../core/state.js';
 import { eventBus } from '../core/events.js';
 import { getSendFunction } from './factory.js';
-import { getCurrentProvider } from '../providers/manager.js';
+import { getCurrentProvider, getActiveApiKey, rotateToNextKey } from '../providers/manager.js';
 import { parseOpenAIStream } from '../stream/parser-openai.js';
 import { parseClaudeStream } from '../stream/parser-claude.js';
 import { parseGeminiStream } from '../stream/parser-gemini.js';
@@ -54,12 +54,15 @@ export function getCurrentEndpoint() {
 }
 
 /**
- * 获取当前 API 密钥（从提供商获取）
+ * 获取当前 API 密钥（从提供商获取，支持多密钥轮询）
  * @returns {string} API 密钥
  */
 export function getCurrentApiKey() {
     const provider = getCurrentProvider();
-    return provider?.apiKey || '';
+    if (!provider) return '';
+
+    // 使用多密钥管理的 getActiveApiKey 函数
+    return getActiveApiKey(provider.id);
 }
 
 /**
@@ -548,6 +551,15 @@ async function sendToAPI() {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
+            // ✅ 检查是否需要轮询到下一个密钥
+            const shouldRotate = [401, 403, 429].includes(response.status);
+            if (shouldRotate && provider) {
+                const rotated = rotateToNextKey(provider.id);
+                if (rotated) {
+                    console.log('[sendToAPI] API 密钥出错，已自动轮询到下一个密钥');
+                }
+            }
+
             // 处理错误响应
             try {
                 const errorData = await response.json();
