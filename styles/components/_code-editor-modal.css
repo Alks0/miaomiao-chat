@@ -18,7 +18,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-bottom: 2px solid var(--md-blue);
 }
 
@@ -27,7 +27,7 @@
     font-family: var(--font-sans);
     font-size: 18px;
     font-weight: 600;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
 }
 
 /* ========== 标签页导航 ========== */
@@ -64,11 +64,11 @@
 
 .code-editor-tabs .tab-btn:hover {
     background: rgba(74, 144, 226, 0.1);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .code-editor-tabs .tab-btn.active {
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     color: var(--md-blue);
 }
 
@@ -129,7 +129,7 @@
 .analysis-section {
     margin-bottom: 24px;
     padding: 16px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     border-radius: 4px;
 }
@@ -155,7 +155,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 12px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-radius: 4px;
 }
@@ -170,7 +170,7 @@
 .stat-value {
     font-size: 18px;
     font-weight: 700;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     font-family: var(--font-mono);
 }
 
@@ -197,7 +197,7 @@
 
 .analysis-list li {
     padding: 8px 12px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border-left: 3px solid var(--md-blue);
     font-family: var(--font-mono);
     font-size: 13px;
@@ -218,7 +218,7 @@
     flex-direction: column;
     border: var(--border);
     border-radius: 4px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     overflow: hidden;
 }
 
@@ -227,7 +227,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-bottom: 2px solid var(--md-blue);
 }
 
@@ -235,7 +235,7 @@
     font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     text-transform: uppercase;
 }
 
@@ -244,7 +244,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 3px;
     background: rgba(0, 0, 0, 0.2);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 11px;
 }
@@ -259,7 +259,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 3px;
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -276,7 +276,7 @@
     flex: 1;
     position: relative;
     display: flex;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     overflow: hidden;
 }
 
@@ -300,8 +300,8 @@
     flex: 1;
     padding: 12px;
     border: none;
-    background: var(--md-charcoal);
-    color: var(--md-white);
+    background: var(--color-bg-accent);
+    color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.6;
@@ -322,7 +322,7 @@
 .code-preview-content {
     flex: 1;
     padding: 0;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     overflow: hidden;
     display: flex;
 }
@@ -332,7 +332,7 @@
     width: 100%;
     height: 100%;
     border: none;
-    background: white;
+    background: var(--color-bg-surface);
 }
 
 /* ========== 模态框底部 ========== */
@@ -342,7 +342,7 @@
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 20px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border-top: var(--border);
 }
 
@@ -407,7 +407,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border: var(--border);
     border-radius: 4px;
 }
@@ -416,7 +416,7 @@
     font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     text-transform: uppercase;
 }
 
@@ -425,7 +425,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 3px;
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -443,7 +443,7 @@
     min-height: 300px;
     border: var(--border);
     border-radius: 4px;
-    background: white;
+    background: var(--color-bg-surface);
 }
 
 .preview-console {
@@ -452,7 +452,7 @@
     max-height: 200px;
     border: var(--border);
     border-radius: 4px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     overflow: hidden;
 }
 
@@ -469,7 +469,7 @@
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     text-transform: uppercase;
 }
 
@@ -478,7 +478,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 3px;
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     font-size: 14px;
     cursor: pointer;
     transition: all 0.15s;
@@ -494,7 +494,7 @@
     padding: 8px 12px;
     font-family: var(--font-mono);
     font-size: 12px;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     overflow-y: auto;
     max-height: 150px;
 }
@@ -530,7 +530,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 24px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-bottom: 2px solid var(--md-blue);
 }
 
@@ -538,7 +538,7 @@
     font-family: var(--font-sans);
     font-size: 18px;
     font-weight: 600;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
 }
 
 .fullscreen-preview-close {
@@ -546,7 +546,7 @@
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -562,7 +562,7 @@
     flex: 1;
     width: 100%;
     border: none;
-    background: white;
+    background: var(--color-bg-surface);
 }
 
 .fullscreen-preview-btn {
@@ -570,7 +570,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 3px;
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     cursor: pointer;
     display: flex;
     align-items: center;

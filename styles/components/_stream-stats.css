@@ -6,8 +6,8 @@
     margin-top: 12px;
     font-size: 11px;
     font-family: var(--font-mono);
-    color: var(--md-charcoal);
-    background: var(--md-white);
+    color: var(--color-text-primary);
+    background: var(--color-bg-surface);
     border: var(--border);
     box-shadow: var(--shadow-sm);
     flex-wrap: wrap;

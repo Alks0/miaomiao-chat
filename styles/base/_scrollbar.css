@@ -2,7 +2,7 @@
 /* Firefox */
 * {
     scrollbar-width: thin;
-    scrollbar-color: var(--md-blue) var(--md-cream);
+    scrollbar-color: var(--md-blue) var(--color-bg-primary);
 }
 
 /* 设置面板滚动条始终可见 */
@@ -18,15 +18,15 @@
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--md-cream);
-    border: 2px solid var(--md-charcoal);
+    background: var(--color-bg-primary);
+    border: 2px solid var(--color-border-primary);
     margin: 4px;
 }
 
 /* 像素风格滚动条thumb - 纯直角 */
 ::-webkit-scrollbar-thumb {
     background: var(--md-blue);
-    border: 2px solid var(--md-charcoal);
+    border: 2px solid var(--color-border-primary);
     box-shadow: var(--shadow-sm);
     transition: all 0.2s ease;
     border-radius: 0;
@@ -50,13 +50,13 @@
 
 .settings-content::-webkit-scrollbar-track {
     background: rgba(249, 115, 22, 0.08);
-    border: 2px solid var(--md-charcoal);
+    border: 2px solid var(--color-border-primary);
     margin: 8px 0;
 }
 
 .settings-content::-webkit-scrollbar-thumb {
     background: var(--md-orange);
-    border: 3px solid var(--md-cream);
+    border: 3px solid var(--color-bg-primary);
     box-shadow: var(--shadow-sm);
 }
 

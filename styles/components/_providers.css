@@ -36,7 +36,7 @@
 
 .modal-content {
     position: relative;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border-radius: 16px;
     box-shadow: 0 8px 48px rgba(0, 0, 0, 0.4);
     overflow: hidden;
@@ -235,7 +235,7 @@
 .add-provider-btn {
     margin: 12px;
     padding: 10px;
-    border: 2px dashed var(--md-charcoal);
+    border: 2px dashed var(--color-border-primary);
     background: transparent;
     color: var(--md-muted);
     border-radius: 8px;
@@ -260,7 +260,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
 }
 
 .detail-header {
@@ -405,7 +405,7 @@
     width: 20px;
     left: 4px;
     bottom: 4px;
-    background-color: white;
+    background-color: var(--color-text-inverse, #FFFFFF);
     border-radius: 50%;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -611,6 +611,18 @@
     max-height: 180px;
     overflow-y: auto;
     margin-bottom: 12px;
+    /* 添加滚动阴影指示器 */
+    --scroll-shadow-color: rgba(56, 56, 56, 0.35);
+    background:
+        linear-gradient(var(--md-bg) 30%, transparent),
+        linear-gradient(transparent, var(--md-bg) 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, var(--scroll-shadow-color), transparent),
+        radial-gradient(farthest-side at 50% 100%, var(--scroll-shadow-color), transparent) 0 100%;
+    background-repeat: no-repeat;
+    background-color: var(--md-bg);
+    background-size: 100% 32px, 100% 32px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
+    border-radius: 8px;
 }
 
 .empty-keys {
@@ -855,8 +867,23 @@
     border: var(--border);
     border-radius: 8px;
     padding: 12px;
-    background: var(--md-surface);
+    /* 添加滚动阴影指示器 */
+    --scroll-shadow-color: rgba(56, 56, 56, 0.35);
+    background:
+        linear-gradient(var(--md-surface) 30%, transparent),
+        linear-gradient(transparent, var(--md-surface) 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, var(--scroll-shadow-color), transparent),
+        radial-gradient(farthest-side at 50% 100%, var(--scroll-shadow-color), transparent) 0 100%;
+    background-repeat: no-repeat;
+    background-color: var(--md-surface);
+    background-size: 100% 32px, 100% 32px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
     margin-bottom: 12px;
+}
+
+.dark-theme .api-keys-list,
+.dark-theme .provider-models-list {
+    --scroll-shadow-color: rgba(229, 229, 229, 0.45);
 }
 
 .model-chip {

@@ -8,8 +8,8 @@
     max-width: 600px;
     height: 100vh;
     height: 100dvh;
-    background: var(--md-white);
-    border-left: 3px solid var(--md-charcoal);
+    background: var(--color-bg-surface);
+    border-left: 3px solid var(--color-border-primary);
     z-index: 101; /* 最高层级，在侧边栏(100)之上 */
     transform: translateX(100%);
     transition: transform 0.25s ease-out;
@@ -74,15 +74,15 @@
     font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 600;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .close-settings-btn {
     width: 44px;  /* WCAG触摸目标最小尺寸 */
     height: 44px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -98,17 +98,17 @@
     flex: 1;
     overflow-y: auto;
     padding: 16px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     /* 添加滚动阴影指示器 */
     background:
         /* 顶部遮罩 */
-        linear-gradient(var(--md-cream) 30%, transparent),
-        linear-gradient(transparent, var(--md-cream) 70%) 0 100%,
+        linear-gradient(var(--color-bg-primary) 30%, transparent),
+        linear-gradient(transparent, var(--color-bg-primary) 70%) 0 100%,
         /* 滚动阴影 */
         radial-gradient(farthest-side at 50% 0, rgba(56, 56, 56, 0.5), transparent),
         radial-gradient(farthest-side at 50% 100%, rgba(56, 56, 56, 0.5), transparent) 0 100%;
     background-repeat: no-repeat;
-    background-color: var(--md-cream);
+    background-color: var(--color-bg-primary);
     background-size: 100% 40px, 100% 40px, 100% 14px, 100% 14px;
     background-attachment: local, local, scroll, scroll;
 }
@@ -116,12 +116,12 @@
 /* 暗色主题适配 */
 .dark-theme .settings-content {
     background:
-        linear-gradient(var(--md-cream) 30%, transparent),
-        linear-gradient(transparent, var(--md-cream) 70%) 0 100%,
-        radial-gradient(farthest-side at 50% 0, rgba(229, 229, 229, 0.3), transparent),
-        radial-gradient(farthest-side at 50% 100%, rgba(229, 229, 229, 0.3), transparent) 0 100%;
+        linear-gradient(var(--color-bg-primary) 30%, transparent),
+        linear-gradient(transparent, var(--color-bg-primary) 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, rgba(229, 229, 229, 0.45), transparent),
+        radial-gradient(farthest-side at 50% 100%, rgba(229, 229, 229, 0.45), transparent) 0 100%;
     background-repeat: no-repeat;
-    background-color: var(--md-cream);
+    background-color: var(--color-bg-primary);
     background-size: 100% 40px, 100% 40px, 100% 14px, 100% 14px;
     background-attachment: local, local, scroll, scroll;
 }
@@ -140,6 +140,17 @@
     background: rgba(255, 255, 255, 0.5);
     border-color: rgba(56, 56, 56, 0.2);
     transform: translateX(-2px);
+}
+
+/* 暗色主题适配 */
+.dark-theme .settings-group {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark-theme .settings-group:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* 交替配色方案 - 使用不同颜色区分设置组 */
@@ -216,8 +227,8 @@
     flex: 1;
     padding: 10px 12px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     font-family: var(--font-mono);
     font-size: 13px;
     cursor: pointer;
@@ -233,8 +244,8 @@
     width: 100%;
     padding: 10px 12px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     font-family: var(--font-mono);
     font-size: 13px;
 }
@@ -242,7 +253,7 @@
 .settings-input:focus {
     outline: 3px solid var(--md-blue);
     outline-offset: 2px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
 }
 
 /* 表单验证状态 */
@@ -283,7 +294,7 @@
     justify-self: end;     /* 水平靠右 */
     align-self: stretch;   /* 垂直拉伸填满 */
     width: 36px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-left: none;
     cursor: pointer;
@@ -297,7 +308,7 @@
 
 .password-toggle:hover {
     background: var(--md-blue);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .password-toggle:active {
@@ -325,7 +336,7 @@
     border: var(--border);
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .input-error-message.show {
@@ -341,7 +352,7 @@
     border: var(--border);
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .input-success-message.show {
@@ -352,8 +363,8 @@
     width: 44px;  /* WCAG触摸目标最小尺寸 */
     height: 44px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -393,7 +404,7 @@
     transform: translate(-50%, -50%);
     width: 16px;
     height: 16px;
-    border: 2px solid var(--md-charcoal);
+    border: 2px solid var(--color-border-primary);
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -401,7 +412,7 @@
 
 .send-btn.loading::after,
 .new-session-btn.loading::after {
-    border-color: var(--md-charcoal);
+    border-color: var(--color-text-primary);
     border-top-color: transparent;
 }
 
@@ -421,7 +432,7 @@
 .format-toggle {
     display: flex;
     border: var(--border);
-    background: var(--md-white);
+    background: var(--color-bg-surface);
 }
 
 .format-btn {
@@ -438,13 +449,13 @@
 }
 
 .format-btn:hover {
-    color: var(--md-charcoal);
-    background: var(--md-cream);
+    color: var(--color-text-primary);
+    background: var(--color-bg-primary);
 }
 
 .format-btn.active {
     background: var(--md-blue);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .format-btn:active {

@@ -5,7 +5,7 @@
     flex-direction: column;
     height: 100vh;
     height: 100dvh; /* 动态视口高度，移动端更准确 */
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     position: relative;
     overflow: hidden;
 }
@@ -68,7 +68,7 @@
 /* 像素方块 */
 .pixel-block {
     position: absolute;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     opacity: 0.08;
 }
 

@@ -6,8 +6,8 @@
     width: 44px;
     height: 44px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -59,7 +59,7 @@
 
 .dark-theme .scroll-to-bottom-btn:hover {
     background: var(--md-teal);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 /* 移动端调整 */

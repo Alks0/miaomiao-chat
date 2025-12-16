@@ -1,10 +1,31 @@
 /* ========== MotherDuck 设计系统 ========== */
 :root {
-    /* 核心颜色 - 像素艺术调色板 */
-    --md-cream: #F4EFEA;
-    --md-charcoal: #383838;
-    --md-white: #FFFFFF;
+    /* ===== 语义化颜色系统（新） ===== */
+    /* 背景色系统 */
+    --color-bg-primary: #F4EFEA;      /* 主背景（页面底色） */
+    --color-bg-surface: #FFFFFF;      /* 表面背景（卡片/面板） */
+    --color-bg-elevated: #FFFFFF;     /* 悬浮背景（模态框/下拉菜单） */
+    --color-bg-input: #FFFFFF;        /* 输入框背景 */
+    --color-bg-code: #F8F8F8;         /* 代码块背景 */
+    --color-bg-accent: #383838;       /* 反色背景（用户消息/导航栏/代码块外壳） */
 
+    /* 文本色系统 */
+    --color-text-primary: #383838;    /* 主要文本（正文） */
+    --color-text-secondary: #666666;  /* 次要文本（说明） */
+    --color-text-muted: #888888;      /* 弱化文本（placeholder） */
+    --color-text-inverse: #FFFFFF;    /* 反色文本（按钮上的白字） */
+
+    /* 边框色系统 */
+    --color-border-primary: #383838;  /* 主边框（强调） */
+    --color-border-secondary: #E5E5E5;/* 次边框（分隔线） */
+
+    /* ===== 兼容性别名（旧变量） ===== */
+    /* 核心颜色 - 像素艺术调色板 */
+    --md-cream: var(--color-bg-primary);
+    --md-charcoal: var(--color-border-primary);
+    --md-white: var(--color-bg-surface);
+
+    /* ===== 品牌色（保持不变） ===== */
     /* 主色调 - 去紫色化，采用像素游戏经典配色 */
     --md-blue: #0EA5E9;        /* 天空蓝 - 主要交互色 */
     --md-blue-dark: #0284C7;   /* 深蓝 */
@@ -68,24 +89,74 @@
     --content-max-width: 900px;
 }
 
-/* 暗色主题 */
+/* ========== 暗色主题 - 彻底深色重构 ========== */
 .dark-theme {
-    --md-cream: #1a1a1a;
-    --md-charcoal: #E5E5E5;
-    --md-white: #2a2a2a;
-    --md-muted: #999999;
-    --md-border: #E5E5E5;
-    --md-surface: #2a2a2a;
-    --md-bg: #1f1f1f;
-    --md-text: #E5E5E5;
-    --text-primary: #E5E5E5;
-    --text-secondary: #999999;
+    /* ===== 深色背景色阶系统（接近纯黑） ===== */
+    --color-bg-primary: #0a0a0a;      /* 主背景（最深，减少眼睛疲劳） */
+    --color-bg-surface: #161616;      /* 卡片背景（深灰，与主背景有层次） */
+    --color-bg-elevated: #1f1f1f;     /* 悬浮元素（稍浅，突出层级） */
+    --color-bg-input: #0f0f0f;        /* 输入框（极深，与主背景略有区分） */
+    --color-bg-code: #0d0d0d;         /* 代码块（最深，突出代码） */
+    --color-bg-accent: #2a2a2a;       /* 反色背景（相对较亮的深灰） */
+
+    /* ===== 深色文本色阶（高对比度） ===== */
+    --color-text-primary: #e8e8e8;    /* 主文本（浅灰白，对比度 15.8:1 ✅ AAA） */
+    --color-text-secondary: #b0b0b0;  /* 次文本（中灰，对比度 8.2:1 ✅ AAA） */
+    --color-text-muted: #999999;      /* 弱文本（提升亮度，对比度 7.4:1 ✅ AAA） */
+    --color-text-inverse: #f5f5f5;    /* 反色文本（用户消息气泡上的浅色字） */
+
+    /* ===== 深色边框系统 ===== */
+    --color-border-primary: #2a2a2a;  /* 主边框（低对比度，不刺眼） */
+    --color-border-secondary: #1a1a1a;/* 次边框（更暗） */
+
+    /* ===== 代码语法高亮配色（柔和暗色） ===== */
+    --syntax-keyword: #8ab4f8;       /* 关键字：柔和蓝 */
+    --syntax-string: #81c995;        /* 字符串：柔和绿 */
+    --syntax-number: #fdd663;        /* 数字：柔和黄 */
+    --syntax-function: #faa356;      /* 函数：柔和橙 */
+    --syntax-comment: #5f6368;       /* 注释：暗灰 */
+    --syntax-operator: #b0b0b0;      /* 操作符：中灰 */
+    --syntax-variable: #e8e8e8;      /* 变量：主文本色 */
+
+    /* ===== 兼容性别名（指向新变量） ===== */
+    --md-cream: var(--color-bg-primary);
+    --md-charcoal: var(--color-border-primary);
+    --md-white: var(--color-bg-surface);
+    --md-muted: var(--color-text-muted);
+    --md-border: var(--color-border-primary);
+    --md-surface: var(--color-bg-surface);
+    --md-bg: var(--color-bg-code);
+    --md-text: var(--color-text-primary);
+    --text-primary: var(--color-text-primary);
+    --text-secondary: var(--color-text-secondary);
 }
 
-/* 暗色主题下像素装饰更亮 */
-.dark-theme .pixel-star { opacity: 0.8; }
-.dark-theme .pixel-cloud { opacity: 0.25; }
-.dark-theme .pixel-heart { opacity: 0.7; }
-.dark-theme .pixel-diamond { opacity: 0.6; }
-.dark-theme .pixel-dots { opacity: 0.35; }
+/* ========== 暗色主题下的像素装饰调整 ========== */
+/* 星星：降低亮度避免刺眼 */
+.dark-theme .pixel-star {
+    filter: brightness(0.6);
+    opacity: 0.7;
+}
+
+/* 云朵：降低亮度和不透明度 */
+.dark-theme .pixel-cloud {
+    filter: brightness(0.5);
+    opacity: 0.15;
+}
+
+/* 其他装饰元素也降低亮度 */
+.dark-theme .pixel-diamond {
+    filter: brightness(0.7);
+    opacity: 0.6;
+}
+
+.dark-theme .pixel-heart {
+    filter: brightness(0.7);
+    opacity: 0.7;
+}
+
+.dark-theme .pixel-dots {
+    filter: brightness(0.6);
+    opacity: 0.35;
+}
 

@@ -2,8 +2,8 @@
 .retry-button {
     padding: 6px 12px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 500;
@@ -38,7 +38,7 @@
     padding: 4px 10px;
     border: 2px solid rgba(255,255,255,0.5);
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 11px;
     cursor: pointer;
@@ -53,7 +53,7 @@
 .message.user .edit-button:hover {
     background: var(--md-yellow);
     border-color: var(--md-yellow);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 /* 移动端：始终显示编辑按钮（触摸设备无hover） */

@@ -35,7 +35,7 @@
 /* ========== 模态框内容 ========== */
 
 .tool-manager-content {
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-radius: 12px;
     width: 90%;
@@ -112,7 +112,7 @@
 /* 搜索框 */
 .tool-search-box {
     padding: 1rem;
-    border-bottom: 1px solid var(--md-charcoal);
+    border-bottom: 1px solid var(--color-border-primary);
 }
 
 #tool-search-input {
@@ -229,8 +229,8 @@
     position: relative;
     width: 36px;
     height: 20px;
-    background: var(--md-charcoal);
-    border: 2px solid var(--md-charcoal);
+    background: var(--color-bg-accent);
+    border: 2px solid var(--color-border-primary);
     border-radius: 10px;
     transition: background 0.15s var(--ease);
     cursor: pointer;
@@ -255,13 +255,13 @@
 
 .tool-enable-switch:checked + .switch-slider::before {
     transform: translateX(16px);
-    background: white;
+    background: var(--color-text-inverse, #FFFFFF);
 }
 
 /* 添加自定义工具按钮 */
 .add-custom-tool-container {
     padding: 1rem;
-    border-top: 1px solid var(--md-charcoal);
+    border-top: 1px solid var(--color-border-primary);
 }
 
 #add-custom-tool-btn {
@@ -316,7 +316,7 @@
     width: 64px;
     height: 64px;
     margin-bottom: 1rem;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .empty-title {
@@ -561,7 +561,7 @@
 
 .btn-default {
     background: transparent;
-    border-color: var(--md-charcoal);
+    border-color: var(--color-text-primary);
     color: var(--md-text);
 }
 
@@ -626,7 +626,7 @@
 
 #tools-list-container::-webkit-scrollbar-thumb,
 #tool-detail-container::-webkit-scrollbar-thumb {
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-radius: 4px;
 }
 

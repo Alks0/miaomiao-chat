@@ -37,7 +37,7 @@
     width: 18px;
     left: 3px;
     bottom: 3px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     transition: 0.3s;
     border-radius: 50%;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);

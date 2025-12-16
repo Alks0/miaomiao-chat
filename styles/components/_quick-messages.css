@@ -12,9 +12,26 @@
 
 /* ========== 消息列表 ========== */
 .quick-messages-list {
+    --quick-messages-bg: var(--color-bg-primary);
+    --scroll-shadow-color: rgba(56, 56, 56, 0.35);
     padding: 16px;
     overflow-y: auto;
     max-height: 500px;
+    /* 添加滚动阴影指示器 */
+    background:
+        linear-gradient(var(--quick-messages-bg) 30%, transparent),
+        linear-gradient(transparent, var(--quick-messages-bg) 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, var(--scroll-shadow-color), transparent),
+        radial-gradient(farthest-side at 50% 100%, var(--scroll-shadow-color), transparent) 0 100%;
+    background-repeat: no-repeat;
+    background-color: var(--quick-messages-bg);
+    background-size: 100% 32px, 100% 32px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
+    border-radius: 8px;
+}
+
+.dark-theme .quick-messages-list {
+    --scroll-shadow-color: rgba(229, 229, 229, 0.45);
 }
 
 /* 空状态 */
@@ -75,7 +92,7 @@
 }
 
 .quick-message-item:hover {
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     transform: var(--hover-offset);
     box-shadow: var(--shadow-sm);
 }
@@ -84,7 +101,7 @@
 .quick-message-item:focus-visible {
     outline: 3px solid var(--md-blue);
     outline-offset: 2px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
 }
 
 .qm-item-content {
@@ -127,7 +144,7 @@
     /* WCAG 2.5.5 Target Size (Level AAA) - 最小 44x44px */
     width: 44px;
     height: 44px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     padding: 0;
     border-radius: 6px;
@@ -187,7 +204,7 @@
 #edit-quick-message-modal select:focus {
     outline: none;
     border-color: var(--md-blue);
-    background: var(--md-white);
+    background: var(--color-bg-surface);
 }
 
 #edit-quick-message-modal textarea {

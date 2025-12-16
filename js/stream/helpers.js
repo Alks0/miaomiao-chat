@@ -117,56 +117,112 @@ function doRender(textContent, thinkingContent) {
         // ✅ 增强代码块（流式渲染时折叠）
         enhanceCodeBlocks(continuationDiv);
     } else {
-        // ✅ 正常模式：覆盖整个内容
-        // ✅ 保存思维链展开状态（innerHTML 会重置状态）
-        const expandedStates = [];
-        if (thinkingContent) {
-            const existingBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
-            existingBlocks.forEach((block, index) => {
-                expandedStates[index] = !block.classList.contains('collapsed');
-            });
-        }
+        // ✅ 正常模式：优先增量更新，避免 DOM 重建
+        const existingThinkingBlock = state.currentAssistantMessage.querySelector('.thinking-block');
 
-        let html = '';
+        // 🔧 增量更新思考链（避免滚动重置）
+        if (existingThinkingBlock && thinkingContent) {
+            const thinkingContentEl = existingThinkingBlock.querySelector('.thinking-content');
 
-        // 渲染思维链（流式中显示）
-        if (thinkingContent) {
-            html += renderThinkingBlock(thinkingContent, true);
-        }
+            if (thinkingContentEl) {
+                // ✅ 保存当前滚动位置
+                const currentScrollTop = thinkingContentEl.scrollTop;
+                const isScrolledToBottom = thinkingContentEl.scrollHeight - thinkingContentEl.scrollTop <= thinkingContentEl.clientHeight + 10;
 
-        // 渲染文本内容
-        if (textContent) {
-            html += safeMarkedParse(textContent);
-        }
+                // ✅ 只更新内容，不重建 DOM
+                thinkingContentEl.innerHTML = safeMarkedParse(thinkingContent);
 
-        // 添加打字光标
-        html += '<span class="typing-cursor"></span>';
+                // ✅ 恢复滚动位置（如果用户在查看，保持位置；如果在底部，跟随新内容）
+                if (isScrolledToBottom) {
+                    thinkingContentEl.scrollTop = thinkingContentEl.scrollHeight;
+                } else {
+                    thinkingContentEl.scrollTop = currentScrollTop;
+                }
+            }
 
-        state.currentAssistantMessage.innerHTML = html;
-
-        // ✅ 重新绑定思维链事件监听器（innerHTML 会销毁原有监听器）
-        if (thinkingContent) {
-            enhanceThinkingBlocks(state.currentAssistantMessage.parentElement);
-
-            // ✅ 恢复展开状态
-            const newBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
-            newBlocks.forEach((block, index) => {
-                if (expandedStates[index]) {
-                    block.classList.remove('collapsed');
-                    const header = block.querySelector('.thinking-header');
-                    if (header) {
-                        header.setAttribute('aria-expanded', 'true');
-                        const icon = header.querySelector('.thinking-toggle-icon');
-                        if (icon) {
-                            icon.textContent = '▼';
-                        }
-                    }
+            // ✅ 更新文本内容部分（移除旧的文本和光标）
+            const nodes = Array.from(state.currentAssistantMessage.childNodes);
+            nodes.forEach(node => {
+                if (node !== existingThinkingBlock) {
+                    node.remove();
                 }
             });
-        }
 
-        // ✅ 增强代码块（流式渲染时折叠）
-        enhanceCodeBlocks(state.currentAssistantMessage);
+            // 添加新的文本内容
+            if (textContent) {
+                const textDiv = document.createElement('div');
+                textDiv.innerHTML = safeMarkedParse(textContent);
+                state.currentAssistantMessage.appendChild(textDiv);
+            }
+
+            // 添加打字光标
+            const cursor = document.createElement('span');
+            cursor.className = 'typing-cursor';
+            state.currentAssistantMessage.appendChild(cursor);
+
+            // ✅ 增强代码块（流式渲染时折叠）
+            enhanceCodeBlocks(state.currentAssistantMessage);
+        } else {
+            // ✅ 首次渲染或无思考链：使用完整渲染
+            // ✅ 保存思维链展开状态和滚动位置
+            const expandedStates = [];
+            const scrollPositions = [];
+            if (thinkingContent) {
+                const existingBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
+                existingBlocks.forEach((block, index) => {
+                    expandedStates[index] = !block.classList.contains('collapsed');
+                    const content = block.querySelector('.thinking-content');
+                    scrollPositions[index] = content ? content.scrollTop : 0;
+                });
+            }
+
+            let html = '';
+
+            // 渲染思维链（流式中显示）
+            if (thinkingContent) {
+                html += renderThinkingBlock(thinkingContent, true);
+            }
+
+            // 渲染文本内容
+            if (textContent) {
+                html += safeMarkedParse(textContent);
+            }
+
+            // 添加打字光标
+            html += '<span class="typing-cursor"></span>';
+
+            state.currentAssistantMessage.innerHTML = html;
+
+            // ✅ 重新绑定思维链事件监听器（innerHTML 会销毁原有监听器）
+            if (thinkingContent) {
+                enhanceThinkingBlocks(state.currentAssistantMessage.parentElement);
+
+                // ✅ 恢复展开状态和滚动位置
+                const newBlocks = state.currentAssistantMessage.querySelectorAll('.thinking-block');
+                newBlocks.forEach((block, index) => {
+                    if (expandedStates[index]) {
+                        block.classList.remove('collapsed');
+                        const header = block.querySelector('.thinking-header');
+                        if (header) {
+                            header.setAttribute('aria-expanded', 'true');
+                            const icon = header.querySelector('.thinking-toggle-icon');
+                            if (icon) {
+                                icon.textContent = '▼';
+                            }
+                        }
+
+                        // ✅ 恢复滚动位置
+                        const content = block.querySelector('.thinking-content');
+                        if (content && scrollPositions[index]) {
+                            content.scrollTop = scrollPositions[index];
+                        }
+                    }
+                });
+            }
+
+            // ✅ 增强代码块（流式渲染时折叠）
+            enhanceCodeBlocks(state.currentAssistantMessage);
+        }
     }
 
     scrollToBottom();

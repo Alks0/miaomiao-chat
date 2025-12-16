@@ -15,7 +15,7 @@
     z-index: 1000;
 
     /* 像素风格 */
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-radius: 10px;
     box-shadow: var(--shadow-md);
@@ -313,7 +313,7 @@ input[type="checkbox"]:focus-visible + .checkbox-custom {
 }
 
 .tools-list-container::-webkit-scrollbar-thumb {
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-radius: 4px;
 }
 

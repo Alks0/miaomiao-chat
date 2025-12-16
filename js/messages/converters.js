@@ -39,7 +39,7 @@ export function toOpenAIMessage(role, content, attachments = null) {
             parts.push({ type: 'text', text: content });
         }
         attachments.forEach(att => {
-            // 从 data URL 提取信息
+            // 检查是否是 data URL
             const match = att.match(/^data:(.+);base64,(.+)$/);
             if (match) {
                 const mimeType = match[1];
@@ -61,15 +61,21 @@ export function toOpenAIMessage(role, content, attachments = null) {
                 } else if (category === 'text') {
                     // 文本文件：解码后作为文本内容插入
                     try {
-                        const textContent = atob(base64Data);
+                        const textContent = decodeURIComponent(escape(atob(base64Data)));
                         parts.push({
                             type: 'text',
-                            text: `[文件内容]\n${textContent}\n[/文件内容]`
+                            text: `<document>\n${textContent}\n</document>`
                         });
                     } catch (e) {
                         console.warn('无法解码文本文件:', e);
                     }
                 }
+            } else if (typeof att === 'string' && !att.startsWith('http')) {
+                // 新格式：纯文本内容（不是 Data URL）
+                parts.push({
+                    type: 'text',
+                    text: `<document>\n${att}\n</document>`
+                });
             } else {
                 // 兼容旧格式（纯 URL）
                 parts.push({ type: 'image_url', image_url: { url: att } });
@@ -122,6 +128,15 @@ export function toGeminiMessage(role, content, attachments = null) {
                         }
                     });
                 }
+            } else if (typeof att === 'string' && !att.startsWith('http')) {
+                // 新格式：纯文本内容，需要编码为 base64
+                const base64 = btoa(unescape(encodeURIComponent(att)));
+                parts.push({
+                    inlineData: {
+                        mimeType: 'text/plain',
+                        data: base64
+                    }
+                });
             }
         });
     }
@@ -172,15 +187,21 @@ export function toClaudeMessage(role, content, attachments = null) {
                 } else if (category === 'text') {
                     // 文本文件：解码后作为文本内容插入
                     try {
-                        const textContent = atob(base64Data);
+                        const textContent = decodeURIComponent(escape(atob(base64Data)));
                         parts.push({
                             type: 'text',
-                            text: `[文件内容]\n${textContent}\n[/文件内容]`
+                            text: `<document>\n${textContent}\n</document>`
                         });
                     } catch (e) {
                         console.warn('无法解码文本文件:', e);
                     }
                 }
+            } else if (typeof att === 'string' && !att.startsWith('http')) {
+                // 新格式：纯文本内容（不是 Data URL）
+                parts.push({
+                    type: 'text',
+                    text: `<document>\n${att}\n</document>`
+                });
             }
         });
         if (content) {

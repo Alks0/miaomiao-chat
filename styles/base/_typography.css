@@ -20,7 +20,7 @@
     font-weight: 700;
     line-height: 1.4;
     margin: 28px 0 16px 0;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     position: relative;
 }
 
@@ -127,7 +127,7 @@
     margin: 28px 0;
     border: none;
     height: 4px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     position: relative;
     overflow: hidden;
 }
@@ -157,7 +157,7 @@
 .message-content strong,
 .message-content b {
     font-weight: 600;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .message-content em,
@@ -187,8 +187,8 @@
     padding: 3px 8px;
     font-family: var(--font-mono);
     font-size: 12px;
-    color: var(--md-charcoal);
-    background: var(--md-white);
+    color: var(--color-text-primary);
+    background: var(--color-bg-surface);
     border: var(--border);
     border-radius: 4px;
     box-shadow:
@@ -223,8 +223,8 @@
 /* 代码块容器 - 像素风格直角 */
 .message-content pre {
     position: relative;
-    background: var(--md-charcoal);
-    color: var(--md-white);
+    background: var(--color-bg-accent);
+    color: var(--color-text-inverse);
     border: var(--border);
     border-radius: 0;
     overflow: hidden;
@@ -262,7 +262,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     background-color: rgba(0, 0, 0, 0.3);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 12px;
     cursor: pointer;
@@ -286,8 +286,8 @@
 }
 
 .code-language-selector option {
-    background: var(--md-charcoal);
-    color: var(--md-white);
+    background: var(--color-bg-accent);
+    color: var(--color-text-inverse);
     padding: 8px;
 }
 
@@ -296,7 +296,7 @@
     padding: 4px 10px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     background: transparent;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 11px;
     cursor: pointer;
@@ -310,7 +310,7 @@
 .copy-code-btn:hover {
     background: var(--md-blue);
     border-color: var(--md-blue);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     transform: translateY(-1px);
 }
 
@@ -321,7 +321,7 @@
 .copy-code-btn.copied {
     background: var(--md-teal);
     border-color: var(--md-teal);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 /* 代码块内容 - 优化版（自动换行） */
@@ -362,7 +362,7 @@
 
 /* 行内代码 */
 .message-content code {
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     padding: 2px 6px;
     border: 1px solid var(--md-border);
     font-family: var(--font-mono);
@@ -403,7 +403,7 @@
 }
 
 .message-content a:hover {
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     border-bottom-width: 3px;
     transform: translateY(-1px);
 }
@@ -460,7 +460,7 @@
     width: 24px;
     height: 24px;
     background: var(--md-blue);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -468,7 +468,7 @@
     font-size: 12px;
     font-weight: 700;
     font-family: var(--font-mono);
-    border: 2px solid var(--md-charcoal);
+    border: 2px solid var(--color-border-primary);
 }
 
 .message-content ol li:nth-child(2)::before { background: var(--md-teal); }

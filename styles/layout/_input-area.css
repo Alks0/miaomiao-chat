@@ -1,6 +1,6 @@
 /* ========== 简洁输入栏 ========== */
 .input-bar {
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     padding: 12px 20px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
@@ -42,7 +42,7 @@
     display: flex;
     align-items: flex-end;
     gap: 8px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     padding: 8px 12px;
     box-shadow: var(--shadow-md);
@@ -52,7 +52,7 @@
     flex: 1;
     border: none;
     background: transparent;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-size: 15px;
     line-height: 1.5;
@@ -134,8 +134,8 @@
 }
 
 .input-icon-btn:hover {
-    color: var(--md-charcoal);
-    background: var(--md-cream);
+    color: var(--color-text-primary);
+    background: var(--color-bg-primary);
 }
 
 .send-btn {
@@ -143,7 +143,7 @@
     height: 44px;
     border: var(--border);
     background: var(--md-teal);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -163,7 +163,7 @@
 }
 
 .send-btn:disabled {
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     color: var(--md-muted);
     cursor: not-allowed;
     box-shadow: none;
@@ -223,14 +223,14 @@
 }
 
 .quick-toggle-btn:hover {
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     transform: translate(1px, -1px);
     box-shadow: none;
 }
 
 .quick-toggle-btn.active {
     background: var(--md-teal);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .quick-toggle-btn.active:hover {
@@ -277,7 +277,7 @@
     height: 44px;
     border: var(--border);
     background: var(--md-coral);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: none;
     align-items: center;
@@ -305,7 +305,7 @@
     flex-wrap: wrap;
     gap: 12px;
     padding: 0 12px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     border-bottom: none;
     transition: max-height 0.3s var(--ease),
@@ -331,7 +331,7 @@
     height: 100px;
     border: var(--border);
     border-radius: 8px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     box-shadow: var(--shadow-sm);
     transition: all 0.15s var(--ease);
 }
@@ -363,7 +363,7 @@
     border: var(--border);
     border-radius: 50%;
     background: var(--md-coral);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -396,14 +396,14 @@
 
 .remove-image:hover {
     transform: scale(1.1) !important;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
 }
 
 /* ========== ✅ 引用预览栏（输入框上方，与图片预览并列） ========== */
 .quote-preview {
     max-width: var(--content-max-width);
     margin: 0 auto 0;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-bottom: none;  /* 默认无底部边框，与图片预览衔接 */
     padding: 12px;
@@ -461,14 +461,14 @@
 }
 
 .quote-preview-label strong {
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     font-weight: 600;
 }
 
 .quote-preview-message {
     font-family: var(--font-sans);
     font-size: 14px;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     line-height: 1.4;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -481,7 +481,7 @@
     width: 32px;
     height: 32px;
     border: var(--border);
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     color: var(--md-muted);
     cursor: pointer;
     display: flex;
@@ -494,7 +494,7 @@
 
 .quote-preview-close:hover {
     background: var(--md-coral);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     transform: scale(1.1);
 }
 
@@ -550,7 +550,7 @@
 .file-preview-item .file-name {
     font-size: 11px;
     font-family: var(--font-mono);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;

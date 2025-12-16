@@ -144,7 +144,15 @@ function convertOpenAIMessageToGemini(msg) {
         }
     }
 
-    return { role: geminiRole, parts };
+    const result = { role: geminiRole, parts };
+
+    // ✅ 保留 thoughtSignature（如果存在）
+    // 这个签名来自之前的 API 响应，需要原样传回
+    if (msg.thoughtSignature) {
+        result.thoughtSignature = msg.thoughtSignature;
+    }
+
+    return result;
 }
 
 /**
@@ -203,8 +211,9 @@ async function processContentsForRequest(contents) {
 
 /**
  * 构建带 thoughtSignature 的 Gemini contents
+ * ✅ 只传播从 API 响应中接收到的签名，不自动生成新签名
  * @param {Array} contents - Gemini 格式的消息数组
- * @returns {Array} 带 thoughtSignature 的消息数组
+ * @returns {Array} 处理后的消息数组
  */
 function buildGeminiContentsWithSignatures(contents) {
     return contents.map(content => {
@@ -227,7 +236,8 @@ function buildGeminiContentsWithSignatures(contents) {
             };
         }
 
-        // 没有签名的消息保持原样
+        // ✅ 没有签名的消息保持原样（不自动生成签名）
+        // 根据 Gemini 官方文档：签名应该从 API 响应中接收并原样传回，而不是客户端生成
         return { role: content.role, parts: content.parts };
     });
 }
@@ -358,6 +368,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     }
 
     // 构建带 thoughtSignature 的 contents
+    // ✅ 只传播从 API 响应中接收到的签名，不自动生成新签名
     const contentsWithSignatures = buildGeminiContentsWithSignatures(finalContents);
 
     const requestBody = {

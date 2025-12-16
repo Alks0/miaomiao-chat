@@ -7,7 +7,7 @@
 .tool-call-container {
     border: var(--border);
     border-radius: 4px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     box-shadow: var(--shadow-md);
     margin: 12px 0;
     padding: 12px;
@@ -37,7 +37,7 @@
 
 /* 成功闪烁动画 */
 @keyframes successFlash {
-    0%, 100% { background: var(--md-white); }
+    0%, 100% { background: var(--color-bg-surface); }
     50% { background: rgba(20, 184, 166, 0.1); }
 }
 
@@ -200,7 +200,7 @@
 .result-json {
     font-family: var(--font-mono);
     font-size: 11px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     padding: 12px;
     border-radius: 4px;
     overflow-x: auto;
@@ -229,7 +229,7 @@
     display: flex;
     gap: 12px;
     padding: 10px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     border-radius: 4px;
     transition: all 0.15s var(--ease);
@@ -248,7 +248,7 @@
     align-items: center;
     justify-content: center;
     background: var(--md-blue);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     border-radius: 4px;
     font-weight: 700;
     font-size: 12px;
@@ -317,8 +317,8 @@
 .retry-button {
     border: var(--border);
     border-radius: 4px;
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-weight: 600;
     font-size: 12px;
@@ -332,7 +332,7 @@
     transform: var(--hover-offset-sm);
     box-shadow: var(--shadow-md);
     background: var(--md-orange);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
 }
 
 .retry-button:active {
@@ -383,10 +383,10 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-radius: 4px;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;

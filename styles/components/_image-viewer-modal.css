@@ -23,7 +23,7 @@
     max-width: 95vw;
     max-height: 95vh;
     object-fit: contain;
-    border: 4px solid var(--md-white);
+    border: 4px solid var(--color-bg-surface);
     box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
     cursor: default;
 }
@@ -38,8 +38,8 @@
     width: 48px;
     height: 48px;
     background: var(--md-coral);
-    border: 3px solid var(--md-charcoal);
-    color: var(--md-charcoal);
+    border: 3px solid var(--color-border-primary);
+    color: var(--color-text-primary);
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;

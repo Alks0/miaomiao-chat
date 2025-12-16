@@ -4,7 +4,7 @@
     border-collapse: separate;
     border-spacing: 0;
     margin: 20px 0;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     border-radius: 0;
     overflow: hidden;
@@ -15,7 +15,7 @@
 /* 表头样式 - 纯色像素风格 */
 .message-content thead {
     background: var(--md-blue);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     position: relative;
 }
 
@@ -38,7 +38,7 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: 3px solid var(--md-charcoal);
+    border-bottom: 3px solid var(--color-border-primary);
     position: relative;
 }
 
@@ -77,7 +77,7 @@
 .message-content td {
     padding: 12px 16px;
     border-bottom: 1px solid rgba(56, 56, 56, 0.08);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .message-content tbody tr:last-child td {
@@ -156,8 +156,8 @@
     height: 32px;
     border: var(--border);
     border-radius: 4px;
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -198,7 +198,7 @@
 .loading-dot {
     width: 10px;
     height: 10px;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     animation: bounce 1.4s infinite var(--ease) both;
 }
 
@@ -249,7 +249,7 @@
     display: inline-block;
     width: 2px;
     height: 1em;
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     animation: blink 1s steps(2) infinite;
     margin-left: 2px;
     vertical-align: text-bottom;
@@ -301,7 +301,7 @@
 }
 
 .error-content {
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     padding: 10px;
     font-family: var(--font-mono);

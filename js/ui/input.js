@@ -154,44 +154,49 @@ export function handleAttachFile() {
                 }
             }
 
-            const base64 = await fileToBase64(file);
             const fileCategory = getFileCategory(fileType);
 
-            if (fileCategory === 'image') {
-                // 图片：生成压缩版本
-                const { compressImage } = await import('../utils/images.js');
-                const base64Data = base64.split(',')[1];
-                const compressed = await compressImage(base64Data, fileType, 512);
-                const compressedDataUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
-
-                state.uploadedImages.push({
-                    name: file.name,
-                    type: fileType,
-                    category: 'image',
-                    data: base64,
-                    compressed: compressedDataUrl,
-                });
-                console.log(`已添加图片: ${file.name}`);
-            } else if (fileCategory === 'pdf') {
-                // PDF：直接保存
-                state.uploadedImages.push({
-                    name: file.name,
-                    type: fileType,
-                    category: 'pdf',
-                    data: base64,
-                    size: file.size,
-                });
-                console.log(`已添加 PDF: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-            } else if (fileCategory === 'text') {
-                // TXT/MD：直接保存
+            if (fileCategory === 'text') {
+                // TXT/MD：读取为文本（支持 UTF-8）
+                const textContent = await fileToText(file);
                 state.uploadedImages.push({
                     name: file.name,
                     type: fileType,
                     category: 'text',
-                    data: base64,
+                    data: textContent, // 直接存储文本内容，不是 base64
                     size: file.size,
                 });
                 console.log(`已添加文本文件: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+            } else {
+                // 图片和 PDF 使用 base64
+                const base64 = await fileToBase64(file);
+
+                if (fileCategory === 'image') {
+                    // 图片：生成压缩版本
+                    const { compressImage } = await import('../utils/images.js');
+                    const base64Data = base64.split(',')[1];
+                    const compressed = await compressImage(base64Data, fileType, 512);
+                    const compressedDataUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
+
+                    state.uploadedImages.push({
+                        name: file.name,
+                        type: fileType,
+                        category: 'image',
+                        data: base64,
+                        compressed: compressedDataUrl,
+                    });
+                    console.log(`已添加图片: ${file.name}`);
+                } else if (fileCategory === 'pdf') {
+                    // PDF：直接保存
+                    state.uploadedImages.push({
+                        name: file.name,
+                        type: fileType,
+                        category: 'pdf',
+                        data: base64,
+                        size: file.size,
+                    });
+                    console.log(`已添加 PDF: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+                }
             }
         }
         updateImagePreview();
@@ -211,6 +216,20 @@ function fileToBase64(file) {
         reader.onload = () => resolve(reader.result);
         reader.onerror = reject;
         reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * 读取文本文件内容
+ * @param {File} file - 文件对象
+ * @returns {Promise<string>} 文本内容
+ */
+function fileToText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsText(file, 'UTF-8');
     });
 }
 

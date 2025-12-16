@@ -8,8 +8,8 @@
 html, body {
     height: 100%;
     font-family: var(--font-sans);
-    background: var(--md-cream);
-    color: var(--md-charcoal);
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
 }

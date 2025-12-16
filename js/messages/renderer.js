@@ -1261,11 +1261,36 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
         e.stopPropagation();
     });
 
+    // 🔧 辅助函数：从DOM动态读取当前代码和语言
+    const getCurrentCode = () => {
+        // 优先查找折叠代码块的代码
+        const collapsibleCode = pre.querySelector('.code-collapse-content code');
+        if (collapsibleCode) {
+            const code = collapsibleCode.textContent;
+            const langMatch = collapsibleCode.className.match(/language-(\w+)/);
+            const lang = langMatch ? langMatch[1] : 'text';
+            return { code, language: lang };
+        }
+
+        // 查找普通代码块的代码
+        const normalCode = pre.querySelector('code');
+        if (normalCode) {
+            const code = normalCode.textContent;
+            const langMatch = normalCode.className.match(/language-(\w+)/);
+            const lang = langMatch ? langMatch[1] : 'text';
+            return { code, language: lang };
+        }
+
+        // 降级：使用初始值
+        return { code: codeText, language: language };
+    };
+
     // ✅ 复制按钮
     const copyBtn = actions.querySelector('.copy-code');
     if (copyBtn) {
         copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(codeText).then(() => {
+            const { code } = getCurrentCode();
+            navigator.clipboard.writeText(code).then(() => {
                 const originalHTML = copyBtn.innerHTML;
                 copyBtn.innerHTML = `
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1291,7 +1316,8 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
     const downloadBtn = actions.querySelector('.download-code');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', () => {
-            downloadCodeAsFile(codeText, language);
+            const { code, language: lang } = getCurrentCode();
+            downloadCodeAsFile(code, lang);
         });
     }
 
@@ -1309,8 +1335,11 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
                 // 动态导入编辑器模块
                 const { openCodeEditorModal } = await import('../ui/code-editor-modal.js');
 
+                // 🔧 从DOM读取最新代码
+                const { code, language: lang } = getCurrentCode();
+
                 // 第四个参数 true 表示只读模式
-                openCodeEditorModal(codeText, language, null, true);
+                openCodeEditorModal(code, lang, null, true);
             } catch (error) {
                 console.error('[预览代码] 错误:', error);
                 eventBus.emit('ui:notification', {
@@ -1335,7 +1364,10 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
                 // 动态导入编辑器模块
                 const { openCodeEditorModal } = await import('../ui/code-editor-modal.js');
 
-                openCodeEditorModal(codeText, language, (newCode, newLanguage) => {
+                // 🔧 从DOM读取最新代码
+                const { code, language: lang } = getCurrentCode();
+
+                openCodeEditorModal(code, lang, (newCode, newLanguage) => {
                     updateCodeBlockInMessage(messageEl, pre, newCode, newLanguage);
                 });
             } catch (error) {
@@ -1432,6 +1464,12 @@ export function updateCodeBlockInMessage(messageEl, pre, newCode, newLanguage) {
 
         // ✅ 精确更新：只更新被编辑的代码块，而不是重新渲染整个消息
         updateSingleCodeBlock(pre, newCode, newLanguage);
+
+        // ✅ 发出保存事件，触发会话自动保存
+        eventBus.emit('messages:changed', {
+            action: 'code_block_updated',
+            index
+        });
     }
 }
 

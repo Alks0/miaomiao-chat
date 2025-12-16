@@ -22,7 +22,7 @@
 
 /* ========== 模态框内容 ========== */
 .mcp-settings-content {
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
     border-radius: 12px;
     width: 90%;
@@ -124,7 +124,7 @@
     text-align: center;
     padding: 2rem;
     color: var(--md-muted);
-    border: 2px dashed var(--md-charcoal);
+    border: 2px dashed var(--color-border-primary);
     border-radius: 8px;
 }
 
@@ -248,8 +248,19 @@
 
 /* ========== 工具列表 ========== */
 .mcp-tools-list {
+    --mcp-tools-bg: rgba(14, 165, 233, 0.05);
+    --scroll-shadow-color: rgba(56, 56, 56, 0.35);
     padding: 0.75rem;
-    background: rgba(14, 165, 233, 0.05);
+    /* 添加滚动阴影指示器 */
+    background:
+        linear-gradient(var(--mcp-tools-bg) 30%, transparent),
+        linear-gradient(transparent, var(--mcp-tools-bg) 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, var(--scroll-shadow-color), transparent),
+        radial-gradient(farthest-side at 50% 100%, var(--scroll-shadow-color), transparent) 0 100%;
+    background-repeat: no-repeat;
+    background-color: var(--mcp-tools-bg);
+    background-size: 100% 32px, 100% 32px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
     border: var(--border);
     border-radius: 8px;
     font-size: 0.85rem;
@@ -263,9 +274,13 @@
     color: var(--md-blue);
     position: sticky;
     top: 0;
-    background: rgba(14, 165, 233, 0.05);
+    background: var(--mcp-tools-bg);
     padding-bottom: 0.25rem;
     z-index: 1;
+}
+
+.dark-theme .mcp-tools-list {
+    --scroll-shadow-color: rgba(229, 229, 229, 0.45);
 }
 
 .mcp-tools-list ul {
@@ -291,7 +306,7 @@
     right: 0;
     width: 400px;
     height: 100%;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border-left: var(--border);
     padding: 1.5rem;
     overflow-y: auto;

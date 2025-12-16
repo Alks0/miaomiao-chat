@@ -262,8 +262,8 @@
 }
 
 .permission-type.type-mcp {
-    background: rgba(139, 92, 246, 0.1);
-    color: #8b5cf6;
+    background: rgba(20, 184, 166, 0.12);
+    color: var(--md-teal);
 }
 
 .permission-type.type-custom {

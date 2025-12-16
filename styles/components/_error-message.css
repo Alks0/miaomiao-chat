@@ -47,7 +47,7 @@
 }
 
 .error-technical summary:hover {
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .error-technical .details-hint {

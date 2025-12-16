@@ -5,8 +5,8 @@
     gap: 16px;
     padding: 16px 20px;
     margin: 12px 0;
-    background: var(--md-cream);
-    border: 3px solid var(--md-charcoal);
+    background: var(--color-bg-primary);
+    border: 3px solid var(--color-border-primary);
     box-shadow: var(--shadow-md);
 }
 
@@ -23,8 +23,8 @@
     align-items: center;
     justify-content: center;
     background: var(--md-sky-blue);
-    border: 2px solid var(--md-charcoal);
-    color: var(--md-charcoal);
+    border: 2px solid var(--color-border-primary);
+    color: var(--color-text-primary);
     animation: image-pulse 1.5s ease-in-out infinite;
 }
 
@@ -53,8 +53,8 @@
 
 .image-loading-progress {
     height: 12px;
-    background: var(--md-white);
-    border: 2px solid var(--md-charcoal);
+    background: var(--color-bg-surface);
+    border: 2px solid var(--color-border-primary);
     overflow: hidden;
     margin-bottom: 6px;
 }

@@ -4,7 +4,7 @@
     gap: 6px;
     margin-bottom: 10px;
     padding: 6px;
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
     border: var(--border);
 }
 
@@ -12,8 +12,8 @@
     min-width: 40px;
     height: 40px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     font-family: var(--font-mono);
     font-size: 13px;
     font-weight: 600;
@@ -22,7 +22,7 @@
 }
 
 .reply-tab:hover {
-    background: var(--md-cream);
+    background: var(--color-bg-primary);
 }
 
 .reply-tab.active {
@@ -44,7 +44,7 @@
     content: '';
     width: 14px;
     height: 14px;
-    border: 2px solid var(--md-charcoal);
+    border: 2px solid var(--color-border-primary);
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 1s linear infinite;

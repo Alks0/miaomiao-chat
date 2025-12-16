@@ -1,7 +1,7 @@
 /* ========== 顶部导航栏 ========== */
 .app-header {
-    background: var(--md-charcoal);
-    color: var(--md-white);
+    background: var(--color-bg-accent);
+    color: var(--color-text-inverse);
     z-index: 10;
     flex-shrink: 0;
 }
@@ -23,7 +23,7 @@
     font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 600;
-    color: var(--md-white);
+    color: var(--color-text-inverse);
 }
 
 .header-actions {
@@ -36,13 +36,13 @@
     height: 40px;
     background: transparent;
     border: 2px solid rgba(255,255,255,0.3);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     box-shadow: none;
 }
 
 .header-content .icon-button:hover {
     background: var(--md-yellow);
     border-color: var(--md-yellow);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 

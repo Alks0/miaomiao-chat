@@ -28,10 +28,10 @@
 
 .msg-action-btn {
     padding: 6px 8px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     border: var(--border);
     cursor: pointer;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -50,18 +50,18 @@
     background: var(--md-blue);
     transform: translate(2px, -2px);
     box-shadow: none;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .msg-action-btn.delete-msg:hover {
     background: var(--md-coral);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 /* ✅ 引用按钮特殊样式 */
 .msg-action-btn.quote-msg:hover {
     background: var(--md-teal);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 /* 编辑模式 */
@@ -103,7 +103,7 @@
 
 .edit-save-btn {
     background: var(--md-green);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 .edit-save-btn:hover {
@@ -112,8 +112,8 @@
 }
 
 .edit-cancel-btn {
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
 }
 
 .edit-cancel-btn:hover {
@@ -124,7 +124,7 @@
 
 .edit-send-btn {
     background: var(--md-blue);
-    color: var(--md-white);
+    color: var(--color-text-inverse);
 }
 
 .edit-send-btn:hover {

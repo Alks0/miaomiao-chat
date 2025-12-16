@@ -10,7 +10,7 @@
     padding: 10px 12px;
     font-size: 12px;
     font-weight: 600;
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
     cursor: pointer;
     user-select: none;
     display: flex;
@@ -58,8 +58,8 @@
     border-radius: 4px;
     font-size: 12px;
     font-family: var(--font-mono);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     width: 100%;
     box-sizing: border-box;
 }
@@ -77,7 +77,7 @@
 
 /* 暗色主题 */
 .dark-theme .model-params-details {
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-color: var(--md-border);
 }
 

@@ -3,7 +3,7 @@
     /* ✅ 使用 CSS Grid 叠加：进度条和加载内容占据同一网格单元 */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
-    background: var(--md-charcoal);
+    background: var(--color-bg-accent);
     border-radius: 4px;
     overflow: hidden;
     min-height: 120px;
@@ -32,7 +32,7 @@
 }
 
 .image-progress-text {
-    color: var(--md-white);
+    color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 12px;
     z-index: 2;
@@ -86,8 +86,8 @@
     gap: 6px;
     padding: 10px 12px;
     border: var(--border);
-    background: var(--md-white);
-    color: var(--md-charcoal);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
     font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 500;
@@ -98,7 +98,7 @@
 .export-import-btn:hover {
     background: var(--md-teal);
     transform: translate(2px, -2px);
-    box-shadow: -2px 2px 0 var(--md-charcoal);
+    box-shadow: -2px 2px 0 var(--color-border-primary);
 }
 
 .export-import-btn.import {

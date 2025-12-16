@@ -27,7 +27,7 @@
 .strength-btn.active {
     background: var(--md-blue);
     border-color: var(--md-blue);
-    color: var(--md-charcoal);
+    color: var(--color-text-primary);
 }
 
 /* 自定义思考 token 预算输入 */
@@ -57,7 +57,7 @@
     border-radius: 4px;
     font-family: var(--font-mono);
     font-size: 12px;
-    background: var(--md-white);
+    background: var(--color-bg-surface);
     color: var(--md-text);
 }
 
