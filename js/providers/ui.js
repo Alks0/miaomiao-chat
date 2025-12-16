@@ -13,6 +13,7 @@ import {
     removeModelFromProvider,
     addModelsToProvider,
     fetchProviderModels,
+    clearModelsCache,
     addApiKey,
     removeApiKey,
     setCurrentKey,
@@ -653,6 +654,7 @@ function renderApiKeyItems(provider) {
                     </span>
                 </label>
                 <div class="key-actions">
+                    <button type="button" class="key-edit-btn" data-key-id="${key.id}" title="编辑">✎</button>
                     <button type="button" class="key-toggle-btn" data-key-id="${key.id}" title="${key.enabled ? '禁用' : '启用'}">
                         ${key.enabled ? '✓' : '✗'}
                     </button>
@@ -672,6 +674,114 @@ function maskApiKey(key) {
     if (!key) return '未设置';
     if (key.length <= 8) return '****';
     return key.substring(0, 4) + '...' + key.substring(key.length - 4);
+}
+
+/**
+ * 显示编辑密钥对话框
+ * @param {string} providerId - 提供商ID
+ * @param {string} keyId - 密钥ID
+ */
+async function showEditKeyDialog(providerId, keyId) {
+    const provider = state.providers.find(p => p.id === providerId);
+    if (!provider) return;
+
+    const key = provider.apiKeys?.find(k => k.id === keyId);
+    if (!key) return;
+
+    // 创建对话框
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-overlay active';
+    dialog.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>编辑密钥</h3>
+                <button type="button" class="modal-close" id="close-edit-key">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="edit-key-name">密钥名称（可选）</label>
+                    <input type="text" id="edit-key-name" class="text-input" value="${escapeHtml(key.name || '')}" placeholder="例如：主密钥、备用密钥">
+                </div>
+                <div class="form-group">
+                    <label for="edit-key-value">API 密钥</label>
+                    <input type="password" id="edit-key-value" class="text-input" value="${escapeHtml(key.key)}" placeholder="输入新的 API 密钥">
+                    <button type="button" id="toggle-key-visibility" class="btn-secondary" style="margin-top: 8px;">显示密钥</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancel-edit-key">取消</button>
+                <button type="button" class="btn-primary" id="save-edit-key">保存</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // 绑定事件
+    const closeDialog = () => {
+        dialog.remove();
+    };
+
+    dialog.querySelector('#close-edit-key').addEventListener('click', closeDialog);
+    dialog.querySelector('#cancel-edit-key').addEventListener('click', closeDialog);
+
+    // 点击遮罩关闭
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) closeDialog();
+    });
+
+    // ESC 关闭
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeDialog();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // 切换密钥可见性
+    const keyInput = dialog.querySelector('#edit-key-value');
+    const toggleBtn = dialog.querySelector('#toggle-key-visibility');
+    toggleBtn.addEventListener('click', () => {
+        if (keyInput.type === 'password') {
+            keyInput.type = 'text';
+            toggleBtn.textContent = '隐藏密钥';
+        } else {
+            keyInput.type = 'password';
+            toggleBtn.textContent = '显示密钥';
+        }
+    });
+
+    // 保存
+    dialog.querySelector('#save-edit-key').addEventListener('click', () => {
+        const newName = dialog.querySelector('#edit-key-name').value.trim();
+        const newKey = dialog.querySelector('#edit-key-value').value.trim();
+
+        if (!newKey) {
+            showNotification('密钥不能为空', 'error');
+            return;
+        }
+
+        // 更新密钥
+        updateApiKey(providerId, keyId, {
+            name: newName,
+            key: newKey
+        });
+
+        // 如果是当前密钥，同步更新 provider.apiKey
+        if (provider.currentKeyId === keyId) {
+            provider.apiKey = newKey;
+            // 清除模型缓存（密钥变了，可能需要重新拉取）
+            clearModelsCache(providerId);
+        }
+
+        showNotification('密钥已更新', 'success');
+        closeDialog();
+        refreshApiKeysList(providerId);
+    });
+
+    // 聚焦到名称输入框
+    dialog.querySelector('#edit-key-name').focus();
 }
 
 /**
@@ -723,6 +833,15 @@ function bindApiKeysEvents(providerId) {
             setCurrentKey(providerId, keyId);
             refreshApiKeysList(providerId);
             showNotification('已切换当前密钥', 'success');
+        });
+    });
+
+    // 编辑密钥
+    document.querySelectorAll('.key-edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const keyId = btn.dataset.keyId;
+            showEditKeyDialog(providerId, keyId);
         });
     });
 
@@ -860,11 +979,14 @@ async function showModelsManageModal(providerId) {
     checklist.innerHTML = '';
 
     try {
-        // 拉取模型列表（带缓存）
-        const allModels = await fetchProviderModels(providerId);
+        // 拉取模型列表（强制刷新，确保使用当前密钥）
+        const allModels = await fetchProviderModels(providerId, true);
 
         // 隐藏加载状态
         loading.style.display = 'none';
+
+        // 更新标题显示模型数量
+        title.textContent = `从 API 添加模型 - ${provider.name}（共 ${allModels.length} 个）`;
 
         // 渲染复选框列表
         renderModelsChecklist(providerId, allModels);

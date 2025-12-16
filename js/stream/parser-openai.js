@@ -205,7 +205,27 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 console.log('[Parser] 检测到原生工具调用增量:', delta.tool_calls);
                             }
 
-                            // ✅ 工具调用完成处理
+                            // ✅ 先处理 delta.content（检测 XML 工具调用），再检查 finishReason
+                            // 保存 XML 解析结果供后续使用（避免重复调用 processDelta）
+                            let xmlParseResult = null;
+                            if (delta && typeof delta.content === 'string' && state.xmlToolCallingEnabled) {
+                                try {
+                                    xmlParseResult = xmlToolCallAccumulator.processDelta(delta.content);
+                                    const { hasToolCalls: hasXML, error } = xmlParseResult;
+
+                                    if (error) {
+                                        console.error('[Parser] ⚠️ XML 解析错误:', error);
+                                    } else if (hasXML) {
+                                        hasToolCalls = true;
+                                        console.log('[Parser] 🔧 检测到 XML 工具调用');
+                                    }
+                                } catch (xmlError) {
+                                    console.error('[Parser] ❌ XML 累积器异常:', xmlError);
+                                    xmlParseResult = null;
+                                }
+                            }
+
+                            // ✅ 工具调用完成处理（现在在 XML 检测之后）
                             if (finishReason === 'tool_calls' || (finishReason === 'stop' && hasToolCalls)) {
                                 console.log('[Parser] 工具调用完成，准备执行...');
 
@@ -287,31 +307,16 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                     recordFirstToken();
                                     recordTokens(delta.content);
 
-                                    // ✅ 2. 检测 XML <tool_use>（仅在 XML 模式）
-                                    if (state.xmlToolCallingEnabled) {
-                                        try {
-                                            const result = xmlToolCallAccumulator.processDelta(delta.content);
-                                            const { hasToolCalls: hasXML, displayText, error } = result;
-
-                                            if (error) {
-                                                console.error('[Parser] ⚠️ XML 解析错误:', error);
-                                                // 回退：将当前内容当作普通文本处理
-                                                // （下面的 markdown 解析会处理）
-                                            } else if (hasXML) {
-                                                hasToolCalls = true;
-                                                // 使用去除 XML 标签后的文本
-                                                delta.content = displayText.substring(textContent.length); // 只取新增部分
-                                                console.log('[Parser] 🔧 检测到 XML 工具调用');
-                                            }
-                                        } catch (xmlError) {
-                                            console.error('[Parser] ❌ XML 累积器异常:', xmlError);
-                                            // 回退到纯文本模式
-                                            hasNativeToolCalls = true;  // 标记为已处理，避免后续再次尝试
-                                        }
+                                    // ✅ 使用前面保存的 XML 解析结果（避免重复调用 processDelta）
+                                    let contentToProcess = delta.content;
+                                    if (state.xmlToolCallingEnabled && xmlParseResult) {
+                                        const { displayText } = xmlParseResult;
+                                        // 使用去除 XML 标签后的文本
+                                        contentToProcess = displayText.substring(textContent.length); // 只取新增部分
                                     }
 
-                                    // ✅ 3. 解析 <think> 标签（DeepSeek 等模型的思考内容）
-                                    const { displayText: thinkParsedText, thinkingDelta } = thinkTagParser.processDelta(delta.content);
+                                    // ✅ 解析 <think> 标签（DeepSeek 等模型的思考内容）
+                                    const { displayText: thinkParsedText, thinkingDelta } = thinkTagParser.processDelta(contentToProcess);
 
                                     // 处理提取的思考内容
                                     if (thinkingDelta) {

@@ -86,3 +86,68 @@
     justify-self: start;
 }
 
+/* ========== 消息中的文件附件（PDF/TXT/MD）========== */
+.message-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 13px;
+    transition: background 0.2s ease;
+}
+
+.message-file-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.message-file-item svg {
+    flex-shrink: 0;
+}
+
+.message-file-item .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+}
+
+/* PDF 文件 - 红色 */
+.message-file-item.pdf {
+    border-color: rgba(239, 83, 80, 0.4);
+}
+
+.message-file-item.pdf svg {
+    color: #EF5350;
+}
+
+/* TXT 文件 - 蓝色 */
+.message-file-item.txt {
+    border-color: rgba(66, 165, 245, 0.4);
+}
+
+.message-file-item.txt svg {
+    color: #42A5F5;
+}
+
+/* MD 文件 - 紫色 */
+.message-file-item.md {
+    border-color: rgba(156, 39, 176, 0.4);
+}
+
+.message-file-item.md svg {
+    color: #9C27B0;
+}
+
+/* AI 消息中的文件样式（深色背景上） */
+.message.assistant .message-file-item {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: var(--md-border);
+}
+
+.message.assistant .message-file-item:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+

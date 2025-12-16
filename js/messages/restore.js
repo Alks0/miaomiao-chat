@@ -13,13 +13,26 @@ import { initVirtualScroll } from '../ui/virtual-scroll.js';
 import { renderHumanizedError } from '../utils/errors.js';
 
 /**
+ * 判断附件类型
+ * @param {string} mimeType - MIME 类型
+ * @returns {'image'|'pdf'|'text'|'unknown'}
+ */
+function getAttachmentCategory(mimeType) {
+    if (!mimeType) return 'unknown';
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType === 'application/pdf') return 'pdf';
+    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType.startsWith('text/')) return 'text';
+    return 'unknown';
+}
+
+/**
  * 解析 Gemini 用户消息内容
  * @param {Array} parts - Gemini parts 数组
- * @returns {Object} { text, images }
+ * @returns {Object} { text, attachments }
  */
 function parseGeminiUserContent(parts) {
     let text = '';
-    const images = [];
+    const attachments = [];
 
     if (Array.isArray(parts)) {
         parts.forEach(part => {
@@ -29,16 +42,26 @@ function parseGeminiUserContent(parts) {
                 const inlineData = part.inlineData || part.inline_data;
                 const mimeType = inlineData.mimeType || inlineData.mime_type;
                 const data = inlineData.data;
-                images.push({
-                    name: '已上传图片',
+                const category = getAttachmentCategory(mimeType);
+
+                // 根据类型生成名称
+                let name = '已上传文件';
+                if (category === 'image') name = '已上传图片';
+                else if (category === 'pdf') name = '已上传PDF';
+                else if (category === 'text') name = mimeType === 'text/markdown' ? '已上传MD' : '已上传TXT';
+
+                attachments.push({
+                    name,
                     type: mimeType,
+                    category,
                     data: `data:${mimeType};base64,${data}`,
                 });
             }
         });
     }
 
-    return { text, images };
+    // 返回 images 以保持向后兼容
+    return { text, images: attachments };
 }
 
 /**
@@ -48,25 +71,56 @@ function parseGeminiUserContent(parts) {
  */
 function parseUserContent(content) {
     let text = '';
-    const images = [];
+    const attachments = [];
 
     if (Array.isArray(content)) {
         content.forEach(part => {
             if (part.type === 'text') {
                 text += (text ? '\n' : '') + (part.text || '');
             } else if (part.type === 'image_url' && part.image_url?.url) {
-                images.push({
+                // 图片（OpenAI 格式）
+                attachments.push({
                     name: '已上传图片',
                     type: 'image/*',
+                    category: 'image',
                     data: part.image_url.url,
                 });
+            } else if (part.type === 'image' && part.source?.data) {
+                // 图片（Claude 格式）
+                const mimeType = part.source.media_type || 'image/*';
+                attachments.push({
+                    name: '已上传图片',
+                    type: mimeType,
+                    category: 'image',
+                    data: `data:${mimeType};base64,${part.source.data}`,
+                });
+            } else if (part.type === 'file' && part.file?.file_data) {
+                // PDF（OpenAI 格式）
+                attachments.push({
+                    name: part.file.filename || '已上传PDF',
+                    type: 'application/pdf',
+                    category: 'pdf',
+                    data: part.file.file_data,
+                });
+            } else if (part.type === 'document' && part.source?.data) {
+                // PDF（Claude 格式）
+                const mimeType = part.source.media_type || 'application/pdf';
+                attachments.push({
+                    name: '已上传PDF',
+                    type: mimeType,
+                    category: 'pdf',
+                    data: `data:${mimeType};base64,${part.source.data}`,
+                });
             }
+            // 注意：TXT/MD 文件在 OpenAI/Claude 格式中会被解码为文本内容
+            // 无法从纯文本中恢复为附件形式
         });
     } else if (typeof content === 'string') {
         text = content;
     }
 
-    return { text, images };
+    // 返回 images 以保持向后兼容
+    return { text, images: attachments };
 }
 
 /**

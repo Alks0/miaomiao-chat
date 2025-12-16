@@ -6,6 +6,8 @@
     <title>Web Chat</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="libs/marked-highlight/index.css">
+    <link rel="stylesheet" href="styles/components/_code-collapser.css">
+    <link rel="stylesheet" href="styles/components/_code-editor-modal.css">
 </head>
 <body>
     <!-- 会话侧边栏 -->
@@ -156,10 +158,42 @@
                     </div>
                 </details>
 
-                <!-- Gemini System Parts -->
+            </div>
+
+            <!-- System Instruction Parts (独立显示，不依赖 API 格式) -->
+            <div class="settings-group" id="system-parts-config">
                 <details class="model-params-details">
                     <summary class="model-params-summary">System Instruction Parts <span class="hint">(多段系统提示)</span></summary>
-                    <div class="gemini-system-parts-manager">
+
+                    <!-- 开关 -->
+                    <div class="toggle-row" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="gemini-system-parts-enabled">
+                            <span class="slider"></span>
+                        </label>
+                        <span>启用 System Instruction Parts</span>
+                    </div>
+
+                    <div class="gemini-system-parts-manager" id="gemini-system-parts-content">
+                        <!-- 预设管理 -->
+                        <div class="prefill-preset-row" style="margin-bottom: 12px;">
+                            <select id="gemini-parts-preset-select" class="settings-select">
+                                <option value="">-- 自定义 --</option>
+                            </select>
+                            <button id="save-gemini-parts-preset" class="settings-icon-btn" title="保存预设">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                                    <polyline points="17,21 17,13 7,13 7,21"/>
+                                    <polyline points="7,3 7,8 15,8"/>
+                                </svg>
+                            </button>
+                            <button id="delete-gemini-parts-preset" class="settings-icon-btn danger" title="删除预设">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+
                         <div id="gemini-system-parts-list" class="system-parts-list">
                             <!-- 动态填充 -->
                         </div>
@@ -172,7 +206,7 @@
                             </button>
                         </div>
                     </div>
-                    <p class="settings-hint">Gemini 的 systemInstruction 可包含多个 parts，按顺序处理</p>
+                    <p class="settings-hint">仅 Gemini 格式生效，用于 systemInstruction 的多段 parts</p>
                 </details>
             </div>
 
@@ -375,12 +409,55 @@
                     rows="4"
                 ></textarea>
 
-                <!-- 动态消息列表 -->
-                <label class="prefill-label">预填充对话</label>
-                <div id="prefill-messages-list" class="prefill-messages-list">
-                    <!-- 动态生成 -->
-                </div>
-                <button id="add-prefill-message" class="prefill-add-btn">+ 添加消息</button>
+                <!-- 开场对话（在 System Prompt 之后插入） -->
+                <details class="prefill-details" style="margin-top: 12px;">
+                    <summary class="prefill-summary">
+                        <svg class="details-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                        开场对话 <span class="hint">(System Prompt 之后插入)</span>
+                    </summary>
+                    <div class="prefill-details-content">
+                        <!-- 预设管理 -->
+                        <div class="prefill-preset-row" style="margin-bottom: 8px;">
+                            <select id="system-prefill-preset-select" class="settings-select">
+                                <option value="">-- 自定义 --</option>
+                            </select>
+                            <button id="save-system-prefill-preset" class="settings-icon-btn" title="保存预设">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                                    <polyline points="17,21 17,13 7,13 7,21"/>
+                                    <polyline points="7,3 7,8 15,8"/>
+                                </svg>
+                            </button>
+                            <button id="delete-system-prefill-preset" class="settings-icon-btn danger" title="删除预设">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="system-prefill-messages-list" class="prefill-messages-list">
+                            <!-- 动态生成 -->
+                        </div>
+                        <button id="add-system-prefill-message" class="prefill-add-btn">+ 添加开场消息</button>
+                    </div>
+                </details>
+
+                <!-- 预填充对话（在用户最新输入之后插入） -->
+                <details class="prefill-details" style="margin-top: 12px;">
+                    <summary class="prefill-summary">
+                        <svg class="details-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                        预填充对话 <span class="hint">(用户输入之后插入)</span>
+                    </summary>
+                    <div class="prefill-details-content">
+                        <div id="prefill-messages-list" class="prefill-messages-list">
+                            <!-- 动态生成 -->
+                        </div>
+                        <button id="add-prefill-message" class="prefill-add-btn">+ 添加消息</button>
+                    </div>
+                </details>
 
                 <p class="settings-hint">
                     变量: {{char}}=角色名, {{user}}=用户名, {{date}}=日期, {{time}}=时间

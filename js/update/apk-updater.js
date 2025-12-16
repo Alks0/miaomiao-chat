@@ -16,7 +16,7 @@ const GITHUB_REPO = 'miaomiao-chat';
 const UPDATE_CHECK_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 
 // 当前应用版本（运行时从 Capacitor 获取）
-let CURRENT_VERSION = '1.1.1'; // 默认值
+let CURRENT_VERSION = '1.1.2'; // 默认值
 
 /**
  * 获取当前应用版本号

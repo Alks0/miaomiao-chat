@@ -24,6 +24,42 @@ function scrollToBottom() {
 }
 
 /**
+ * 清理残留的流式状态
+ * 确保流结束后移除所有流式相关的 class 和元素
+ * @param {HTMLElement} container - 消息容器
+ */
+function cleanupStreamingState(container) {
+    if (!container) return;
+
+    // ✅ 移除所有 .streaming class（思维链流式动画）
+    const streamingBlocks = container.querySelectorAll('.thinking-block.streaming');
+    streamingBlocks.forEach(block => {
+        block.classList.remove('streaming');
+    });
+
+    // ✅ 移除所有打字光标
+    const typingCursors = container.querySelectorAll('.typing-cursor');
+    typingCursors.forEach(cursor => {
+        cursor.remove();
+    });
+
+    // ✅ 移除残留的 continuation-loading
+    const continuationLoading = container.querySelectorAll('.continuation-loading');
+    continuationLoading.forEach(loading => {
+        loading.remove();
+    });
+
+    // ✅ 移除残留的 continuation-content 容器
+    const continuationContent = container.querySelectorAll('.continuation-content');
+    continuationContent.forEach(content => {
+        content.remove();
+    });
+
+    // ✅ 清除 continuation 标记
+    delete container.dataset.isContinuation;
+}
+
+/**
  * 实际的渲染函数
  * @param {string} textContent - 文本内容
  * @param {string} thinkingContent - 思维链内容
@@ -77,6 +113,9 @@ function doRender(textContent, thinkingContent) {
         if (thinkingContent) {
             enhanceThinkingBlocks(state.currentAssistantMessage.parentElement);
         }
+
+        // ✅ 增强代码块（流式渲染时折叠）
+        enhanceCodeBlocks(continuationDiv);
     } else {
         // ✅ 正常模式：覆盖整个内容
         // ✅ 保存思维链展开状态（innerHTML 会重置状态）
@@ -125,6 +164,9 @@ function doRender(textContent, thinkingContent) {
                 }
             });
         }
+
+        // ✅ 增强代码块（流式渲染时折叠）
+        enhanceCodeBlocks(state.currentAssistantMessage);
     }
 
     scrollToBottom();
@@ -240,6 +282,9 @@ export function renderFinalTextWithThinking(textContent, thinkingContent, ground
         state.currentAssistantMessage.innerHTML = html;
     }
 
+    // ✅ 清理残留的流式状态（防止状态未重置）
+    cleanupStreamingState(state.currentAssistantMessage);
+
     enhanceCodeBlocks();
     scrollToBottom();
 }
@@ -346,6 +391,9 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
         // ✅ 正常模式：覆盖整个内容
         state.currentAssistantMessage.innerHTML = html;
     }
+
+    // ✅ 清理残留的流式状态（防止状态未重置）
+    cleanupStreamingState(state.currentAssistantMessage);
 
     enhanceCodeBlocks();
     scrollToBottom();

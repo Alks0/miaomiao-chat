@@ -130,8 +130,16 @@ function buildConfigObject() {
         savedPrefillPresets: JSON.parse(JSON.stringify(state.savedPrefillPresets)),
         currentPrefillPresetName: state.currentPrefillPresetName,
 
+        // System 预填充消息（开场对话）
+        systemPrefillMessages: JSON.parse(JSON.stringify(state.systemPrefillMessages)),
+        savedSystemPrefillPresets: JSON.parse(JSON.stringify(state.savedSystemPrefillPresets)),
+        currentSystemPrefillPresetName: state.currentSystemPrefillPresetName,
+
         // Gemini System Parts（深拷贝）
+        geminiSystemPartsEnabled: state.geminiSystemPartsEnabled,
         geminiSystemParts: JSON.parse(JSON.stringify(state.geminiSystemParts)),
+        savedGeminiPartsPresets: JSON.parse(JSON.stringify(state.savedGeminiPartsPresets)),
+        currentGeminiPartsPresetName: state.currentGeminiPartsPresetName,
 
         // 提供商管理（深拷贝）
         providers: JSON.parse(JSON.stringify(state.providers || [])),
@@ -438,8 +446,16 @@ function applyConfigToState(config) {
     state.savedPrefillPresets = config.savedPrefillPresets ?? [];
     state.currentPrefillPresetName = config.currentPrefillPresetName ?? '';
 
+    // System 预填充消息（开场对话）
+    state.systemPrefillMessages = config.systemPrefillMessages ?? [];
+    state.savedSystemPrefillPresets = config.savedSystemPrefillPresets ?? [];
+    state.currentSystemPrefillPresetName = config.currentSystemPrefillPresetName ?? '';
+
     // Gemini System Parts
+    state.geminiSystemPartsEnabled = config.geminiSystemPartsEnabled ?? false;
     state.geminiSystemParts = config.geminiSystemParts ?? [];
+    state.savedGeminiPartsPresets = config.savedGeminiPartsPresets ?? [];
+    state.currentGeminiPartsPresetName = config.currentGeminiPartsPresetName ?? '';
 
     // 提供商管理
     state.providers = config.providers ?? [];
@@ -464,6 +480,33 @@ function applyConfigToState(config) {
                 provider.models.push(provider.customModel);
             }
         }
+
+        // ✅ 自动迁移：添加多密钥管理字段（v1.1.12+）
+        if (!provider.apiKeys) {
+            provider.apiKeys = [];
+            // 如果有旧的 apiKey，迁移到 apiKeys[]
+            if (provider.apiKey) {
+                const keyId = 'key-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                provider.apiKeys.push({
+                    id: keyId,
+                    key: provider.apiKey,
+                    name: '密钥 1',
+                    enabled: true,
+                    usageCount: 0,
+                    lastUsed: null,
+                    errorCount: 0
+                });
+                provider.currentKeyId = keyId;
+            }
+        }
+        if (!provider.keyRotation) {
+            provider.keyRotation = {
+                enabled: false,
+                strategy: 'round-robin',
+                rotateOnError: true,
+                currentIndex: 0
+            };
+        }
     });
 
     // API 格式直接设置（不通过事件，避免时序问题）
@@ -481,12 +524,9 @@ function applyConfigToState(config) {
             btn?.classList.toggle('active', fmt === config.apiFormat);
         });
 
-        // 更新配置面板显示
-        // 注意：gemini-config 始终显示，不受格式切换影响
+        // 更新配置面板显示：只显示当前格式对应的配置面板
         document.querySelectorAll('.api-config').forEach(panel => {
-            if (panel.id !== 'gemini-config') {
-                panel.style.display = 'none';
-            }
+            panel.style.display = 'none';
         });
         const configPanel = document.getElementById(`${config.apiFormat}-config`);
         if (configPanel) {
@@ -571,7 +611,7 @@ export function importConfigData(configData) {
  */
 export function generateExportFilename(type) {
     const date = new Date().toISOString().slice(0, 10);
-    return `miaomiao-chat-${type}-${date}.json`;
+    return `webchat-${type}-${date}.json`;
 }
 
 /**

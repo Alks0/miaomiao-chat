@@ -12,7 +12,7 @@ async function loadEruda() {
         script.src = 'libs/eruda/eruda.js';
         script.onload = () => {
             if (window.eruda) {
-                // 初始化 Eruda 并显示悬浮窗
+                // 初始化 Eruda（自动显示悬浮按钮，但不展开控制台面板）
                 window.eruda.init({
                     tool: ['console', 'elements', 'network', 'resources', 'info', 'snippets', 'sources'],
                     useShadowDom: true,
@@ -23,9 +23,6 @@ async function loadEruda() {
                         theme: 'dark'
                     }
                 });
-
-                // ✅ 显式显示 Eruda 悬浮窗（确保在所有设备上都能看到）
-                window.eruda.show();
 
                 console.log('🔧 Eruda 调试工具已启动（Android 专用）');
                 console.log('📱 Eruda 版本:', window.eruda.version);
@@ -120,7 +117,7 @@ import { initKeyboard } from './ui/keyboard.js';
 import { initQuickToggles, exposeToggleFunctions } from './ui/quick-toggles.js';
 import { initEndpointInputListeners, initThinkingControls, initConfigManagement, initOtherConfigInputs } from './ui/config-helpers.js';
 import { initInputResize, initPanelResize } from './ui/resize.js';
-import { initPrefillControls, initGeminiSystemParts } from './ui/prefill.js';
+import { initPrefillControls, initSystemPrefillControls, initGeminiSystemParts } from './ui/prefill.js';
 import { initPasswordToggles, initCustomHeaders, initRippleEffects } from './ui/enhancements.js';
 import { initQuickMessagesUI } from './ui/quick-messages.js';
 import { initSessionSearch } from './ui/session-search.js';
@@ -366,6 +363,7 @@ async function init() {
 
         // 高级功能
         initPrefillControls();
+        initSystemPrefillControls();
         initGeminiSystemParts();
         initCustomHeaders();
 

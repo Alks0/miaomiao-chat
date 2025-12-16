@@ -25,7 +25,7 @@ export function convertToolsToXML(tools) {
 
     // 提示过长警告
     if (tools.length > 20) {
-        console.warn('[XML Formatter] ⚠️ 工具数量过多 (>20)，可能导致 system prompt 超长');
+        console.warn('[XML Formatter] 工具数量过多 (>20)，可能导致 system prompt 超长');
     }
 
     let xml = '\n\nIn this environment you have access to a set of tools you can use to answer the user\'s question.\n\n';
@@ -37,7 +37,7 @@ export function convertToolsToXML(tools) {
     xml += '  <arguments>{json_arguments}</arguments>\n';
     xml += '</tool_use>\n\n';
 
-    // ✅ 工具列表
+    // 工具列表
     xml += '## Available Tools\n\n';
     tools.forEach(tool => {
         // 提取工具信息（兼容不同格式）
@@ -54,7 +54,7 @@ export function convertToolsToXML(tools) {
         xml += `</tool>\n\n`;
     });
 
-    // ✅ 详细示例
+    // 详细示例
     xml += '## Tool Use Examples\n\n';
     xml += 'Here are some examples demonstrating proper tool use:\n\n';
     xml += '---\n';
@@ -78,7 +78,7 @@ export function convertToolsToXML(tools) {
     xml += '</tool_use>\n\n';
     xml += '---\n\n';
 
-    // ✅ Extended Thinking 支持
+    // Extended Thinking 支持
     xml += '## Extended Thinking with Tools\n\n';
     xml += 'You can use <thinking> tags to show your reasoning process BEFORE calling tools:\n\n';
     xml += '<thinking>I need to check the weather in Tokyo, so I will call the weather tool.</thinking>\n';
@@ -87,7 +87,7 @@ export function convertToolsToXML(tools) {
     xml += '  <arguments>{"location": "Tokyo"}</arguments>\n';
     xml += '</tool_use>\n\n';
 
-    // ✅ 明确的规则
+    // 明确的规则
     xml += '## Tool Use Rules\n\n';
     xml += 'Here are the rules you MUST follow:\n';
     xml += '1. Always use the correct parameter values. Never use variable names, use actual values.\n';
@@ -97,7 +97,7 @@ export function convertToolsToXML(tools) {
     xml += '5. **CRITICAL**: Simply mentioning a tool in <thinking> does NOT execute it. You MUST output the <tool_use> XML block.\n';
     xml += '6. Use the EXACT format shown above. Do not use any other format.\n\n';
 
-    // ✅ 激励语句
+    // 激励语句
     xml += 'Now Begin! If you use tools correctly, you will be rewarded.\n';
 
     return xml;
@@ -105,6 +105,11 @@ export function convertToolsToXML(tools) {
 
 /**
  * 从文本中提取 XML 工具调用（完整匹配，非流式）
+ * 支持多种 XML 格式：
+ * 1. tool_use 格式 (CherryStudio)
+ * 2. invoke 格式 (Claude native)
+ * 3. function_call 格式 (一些代理)
+ * 4. antml:invoke 格式 (Anthropic 官方)
  * @param {string} text - 模型响应文本
  * @returns {Array} 工具调用列表 [{ id, name, arguments }, ...]
  */
@@ -112,28 +117,86 @@ export function extractXMLToolCalls(text) {
     if (!text || typeof text !== 'string') return [];
 
     const toolCalls = [];
-
-    // 正则表达式：匹配 <tool_use>...</tool_use>
-    const regex = /<tool_use>\s*<name>(.*?)<\/name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_use>/gs;
-
-    let match;
     let index = 0;
-    while ((match = regex.exec(text)) !== null) {
+
+    // 格式 1: tool_use 格式 (CherryStudio 风格)
+    // 使用更严格的正则：arguments 内容不能包含 <tool_use> 或 </tool_use>（防止嵌套匹配错误）
+    const toolUseRegex = /<tool_use>\s*<name>([^<]*)<\/name>\s*<arguments>((?:(?!<\/?tool_use)[\s\S])*?)<\/arguments>\s*<\/tool_use>/gi;
+    let match;
+    while ((match = toolUseRegex.exec(text)) !== null) {
         const name = match[1].trim();
         const argsText = match[2].trim();
-
         try {
             const args = JSON.parse(argsText);
             toolCalls.push({
-                id: `xml_tool_${Date.now()}_${index}`,  // 生成唯一 ID
+                id: `xml_tool_${Date.now()}_${index++}`,
                 name,
                 arguments: args
             });
-            index++;
+            console.log('[XML Parser] 提取到 tool_use 格式工具调用:', name);
         } catch (error) {
-            console.error('[XML Parser] ❌ 解析工具参数失败:', argsText, error);
-            // 继续解析下一个
+            console.error('[XML Parser] tool_use 格式解析参数失败:', argsText.substring(0, 100), error);
         }
+    }
+
+    // 格式 2: function_call 格式 (一些代理使用)
+    // 使用更严格的正则：arguments 内容不能包含 <function_call> 或 </function_call>
+    const functionCallRegex = /<function_call>\s*<name>([^<]*)<\/name>\s*<arguments>((?:(?!<\/?function_call)[\s\S])*?)<\/arguments>\s*<\/function_call>/gi;
+    while ((match = functionCallRegex.exec(text)) !== null) {
+        const name = match[1].trim();
+        const argsText = match[2].trim();
+        try {
+            const args = JSON.parse(argsText);
+            toolCalls.push({
+                id: `xml_tool_${Date.now()}_${index++}`,
+                name,
+                arguments: args
+            });
+            console.log('[XML Parser] 提取到 function_call 格式工具调用:', name);
+        } catch (error) {
+            console.error('[XML Parser] function_call 格式解析参数失败:', argsText.substring(0, 100), error);
+        }
+    }
+
+    // 格式 3: invoke 格式 (Claude native XML)
+    // 匹配: <invoke name="xxx"> <parameter name="yyy">value</parameter>... </invoke>
+    const invokeRegex = /<invoke\s+name="([^"]+)">([\s\S]*?)<\/invoke>/gi;
+    while ((match = invokeRegex.exec(text)) !== null) {
+        const name = match[1].trim();
+        const paramsContent = match[2];
+        const args = {};
+
+        // 解析 parameter 标签
+        const paramRegex = /<parameter\s+name="([^"]+)">([\s\S]*?)<\/parameter>/gi;
+        let paramMatch;
+        while ((paramMatch = paramRegex.exec(paramsContent)) !== null) {
+            const paramName = paramMatch[1].trim();
+            let paramValue = paramMatch[2].trim();
+            // 尝试解析 JSON 值
+            try {
+                paramValue = JSON.parse(paramValue);
+            } catch (e) {
+                // 保留字符串值
+            }
+            args[paramName] = paramValue;
+        }
+
+        if (Object.keys(args).length > 0 || paramsContent.trim() === '') {
+            toolCalls.push({
+                id: `xml_tool_${Date.now()}_${index++}`,
+                name,
+                arguments: args
+            });
+            console.log('[XML Parser] 提取到 invoke 格式工具调用:', name);
+        }
+    }
+
+    // 格式 4: antml:invoke 格式 - 使用与 invoke 相同的正则，因为标签名相同
+    // 已由格式 3 处理
+
+    // 输出解析结果日志
+    if (toolCalls.length > 0) {
+        console.log('[XML Parser] 共提取到', toolCalls.length, '个工具调用');
     }
 
     return toolCalls;
@@ -142,22 +205,18 @@ export function extractXMLToolCalls(text) {
 /**
  * XML 流式累积器（流式解析）
  * 处理流式响应中可能截断的 XML 标签
- * ✅ P1 改进：支持 <thinking> 标签（Claude 4 Extended Thinking with Tools）
- *
- * 注意：与 tool-call-handler.js 中的 ToolCallAccumulator 不同
- * - ToolCallAccumulator: 处理原生 tool_calls 格式
- * - XMLStreamAccumulator: 处理 XML <tool_use> 格式
+ * 支持 thinking 标签（Claude Extended Thinking with Tools）
  */
 export class XMLStreamAccumulator {
     constructor() {
         this.buffer = '';           // 累积的文本
         this.displayText = '';      // 展示给用户的文本（不含 XML 标签）
-        this.inToolUse = false;     // 是否在 <tool_use> 标签内
-        this.inThinking = false;    // ✅ P1: 是否在 <thinking> 标签内
+        this.inToolUse = false;     // 是否在 tool_use/invoke 标签内
+        this.inThinking = false;    // 是否在 thinking 标签内
         this.currentToolXML = '';   // 当前工具的 XML
-        this.currentThinking = '';  // ✅ P1: 当前思考的 XML
+        this.currentThinking = '';  // 当前思考的内容
         this.completedCalls = [];   // 已完成的工具调用
-        this.thinkingBlocks = [];   // ✅ P1: 已完成的思考块
+        this.thinkingBlocks = [];   // 已完成的思考块
     }
 
     /**
@@ -171,10 +230,9 @@ export class XMLStreamAccumulator {
         try {
             this.buffer += deltaText;
 
-            // ✅ P0: 错误边界 - 检测过长的 buffer（防止内存泄漏）
+            // 错误边界 - 检测过长的 buffer（防止内存泄漏）
             if (this.buffer.length > 50000) {
-                console.error('[XMLStreamAccumulator] ⚠️ Buffer 过长，可能存在格式错误');
-                // 恢复策略：保留最后 1000 字符，丢弃前面的内容
+                console.error('[XMLStreamAccumulator] Buffer 过长，可能存在格式错误');
                 this.buffer = this.buffer.slice(-1000);
                 this.inToolUse = false;
                 this.currentToolXML = '';
@@ -185,41 +243,34 @@ export class XMLStreamAccumulator {
                 };
             }
 
-            // ✅ P1: 检测 <thinking> 开始（Claude 4 Extended Thinking with Tools）
+            // 检测 thinking 开始
             const thinkingStartMatch = this.buffer.match(/<thinking>/);
             if (thinkingStartMatch && !this.inThinking && !this.inToolUse) {
                 this.inThinking = true;
-
-                // 提取标签前的文本作为展示内容
                 const beforeTag = this.buffer.substring(0, thinkingStartMatch.index);
                 this.displayText += beforeTag;
-
-                // 重置 buffer，保留标签及之后的内容
-                this.buffer = this.buffer.substring(thinkingStartMatch.index);
-                this.currentThinking = '';
+                // 保留开始标签到 currentThinking
+                this.currentThinking = this.buffer.substring(thinkingStartMatch.index);
+                this.buffer = '';
             }
 
-            // 检测 <tool_use> 开始
-            const startMatch = this.buffer.match(/<tool_use>/);
-            if (startMatch && !this.inToolUse && !this.inThinking) {
+            // 检测 tool_use 或 invoke 开始
+            const toolStartMatch = this.buffer.match(/<(tool_use|invoke\s+name="[^"]+")/);
+            if (toolStartMatch && !this.inToolUse && !this.inThinking) {
                 this.inToolUse = true;
-
-                // 提取标签前的文本作为展示内容
-                const beforeTag = this.buffer.substring(0, startMatch.index);
+                const beforeTag = this.buffer.substring(0, toolStartMatch.index);
                 this.displayText += beforeTag;
-
-                // 重置 buffer，保留标签及之后的内容
-                this.buffer = this.buffer.substring(startMatch.index);
-                this.currentToolXML = '';
+                // 保留开始标签到 currentToolXML
+                this.currentToolXML = this.buffer.substring(toolStartMatch.index);
+                this.buffer = '';
             }
 
-            // ✅ P1: 累积思考 XML
+            // 累积思考内容
             if (this.inThinking) {
                 this.currentThinking += deltaText;
 
-                // 检测过长的思考块（单个思考块不应超过 20KB）
                 if (this.currentThinking.length > 20000) {
-                    console.error('[XMLStreamAccumulator] ⚠️ 单个思考块过长，跳过');
+                    console.error('[XMLStreamAccumulator] 单个思考块过长，跳过');
                     this.inThinking = false;
                     this.currentThinking = '';
                     this.buffer = '';
@@ -230,12 +281,10 @@ export class XMLStreamAccumulator {
                     };
                 }
 
-                // 检测 </thinking> 结束
+                // 检测 thinking 结束
                 const thinkingEndMatch = this.currentThinking.match(/<\/thinking>/);
                 if (thinkingEndMatch) {
                     this.inThinking = false;
-
-                    // 提取思考内容（去除标签）
                     const thinkingContent = this.currentThinking
                         .replace(/<thinking>/, '')
                         .replace(/<\/thinking>/, '')
@@ -243,10 +292,9 @@ export class XMLStreamAccumulator {
 
                     if (thinkingContent) {
                         this.thinkingBlocks.push(thinkingContent);
-                        console.log('[XMLStreamAccumulator] 🧠 检测到思考块:', thinkingContent.substring(0, 50) + '...');
+                        console.log('[XMLStreamAccumulator] 检测到思考块:', thinkingContent.substring(0, 50) + '...');
                     }
 
-                    // 清空 buffer，保留标签后的内容
                     const afterTag = this.currentThinking.substring(thinkingEndMatch.index + '</thinking>'.length);
                     this.buffer = afterTag;
                     this.currentThinking = '';
@@ -256,10 +304,8 @@ export class XMLStreamAccumulator {
             else if (this.inToolUse) {
                 this.currentToolXML += deltaText;
 
-                // ✅ P0: 错误边界 - 检测过长的工具调用（单个工具不应超过 10KB）
                 if (this.currentToolXML.length > 10000) {
-                    console.error('[XMLStreamAccumulator] ⚠️ 单个工具调用过长，跳过');
-                    // 恢复策略：放弃当前工具，继续解析后续内容
+                    console.error('[XMLStreamAccumulator] 单个工具调用过长，跳过');
                     this.inToolUse = false;
                     this.currentToolXML = '';
                     this.buffer = '';
@@ -270,33 +316,34 @@ export class XMLStreamAccumulator {
                     };
                 }
 
-                // 检测 </tool_use> 结束
-                const endMatch = this.currentToolXML.match(/<\/tool_use>/);
+                // 检测 tool_use 或 invoke 结束
+                const endMatch = this.currentToolXML.match(/<\/(tool_use|invoke)>/);
                 if (endMatch) {
                     this.inToolUse = false;
 
-                    // ✅ P0: 错误处理 - 解析失败时不崩溃
                     try {
+                        // 调试日志：显示原始 XML 内容
+                        console.log('[XMLStreamAccumulator] 原始 XML 内容:', this.currentToolXML);
+
                         const toolCalls = extractXMLToolCalls(this.currentToolXML);
                         if (toolCalls.length > 0) {
                             this.completedCalls.push(...toolCalls);
                         } else {
-                            console.warn('[XMLStreamAccumulator] ⚠️ 解析 XML 未提取到工具调用');
+                            console.warn('[XMLStreamAccumulator] 解析 XML 未提取到工具调用，XML:', this.currentToolXML.substring(0, 500));
                         }
                     } catch (parseError) {
-                        console.error('[XMLStreamAccumulator] ❌ 解析 XML 失败:', parseError);
-                        // 不阻塞流程，继续处理后续内容
+                        console.error('[XMLStreamAccumulator] 解析 XML 失败:', parseError, 'XML:', this.currentToolXML.substring(0, 500));
                     }
 
-                    // 清空 buffer，保留标签后的内容
-                    const afterTag = this.currentToolXML.substring(endMatch.index + '</tool_use>'.length);
+                    const closingTag = endMatch[0];
+                    const afterTag = this.currentToolXML.substring(endMatch.index + closingTag.length);
                     this.buffer = afterTag;
                     this.currentToolXML = '';
                 }
             } else {
-                // 不在工具标签或思考标签内，累积为展示文本
+                // 不在标签内，累积为展示文本
                 this.displayText += deltaText;
-                this.buffer = ''; // 清空 buffer
+                this.buffer = '';
             }
 
             return {
@@ -306,9 +353,7 @@ export class XMLStreamAccumulator {
             };
 
         } catch (error) {
-            // ✅ P0: 顶层错误边界 - 捕获所有异常
-            console.error('[XMLStreamAccumulator] ❌ processDelta 异常:', error);
-            // 恢复策略：重置状态，返回当前结果
+            console.error('[XMLStreamAccumulator] processDelta 异常:', error);
             this.inToolUse = false;
             this.buffer = '';
             this.currentToolXML = '';
@@ -328,8 +373,8 @@ export class XMLStreamAccumulator {
     }
 
     /**
-     * ✅ P1: 获取已完成的思考块（Claude 4 Extended Thinking with Tools）
-     * @returns {Array<string>} 思考内容数组
+     * 获取已完成的思考块
+     * @returns {Array} 思考内容数组
      */
     getThinkingBlocks() {
         return this.thinkingBlocks;
@@ -342,10 +387,10 @@ export class XMLStreamAccumulator {
         this.buffer = '';
         this.displayText = '';
         this.inToolUse = false;
-        this.inThinking = false;  // ✅ P1: 重置思考状态
+        this.inThinking = false;
         this.currentToolXML = '';
-        this.currentThinking = '';  // ✅ P1: 重置当前思考
+        this.currentThinking = '';
         this.completedCalls = [];
-        this.thinkingBlocks = [];  // ✅ P1: 重置思考块
+        this.thinkingBlocks = [];
     }
 }

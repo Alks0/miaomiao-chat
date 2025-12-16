@@ -8,9 +8,36 @@ import { state } from '../core/state.js';
 import { elements } from '../core/elements.js';
 import { eventBus } from '../core/events.js';
 import { safeMarkedParse } from '../utils/markdown.js';
-import { generateMessageId } from '../utils/helpers.js';
+import { generateMessageId, escapeHtml } from '../utils/helpers.js';
 import { getCurrentModelCapabilities } from '../providers/manager.js';
 import { renderCapabilityBadgesText } from '../utils/capability-badges.js';
+
+/**
+ * 判断附件类型
+ * @param {string} mimeType - MIME 类型
+ * @returns {'image'|'pdf'|'text'|'unknown'}
+ */
+function getAttachmentCategory(mimeType) {
+    if (!mimeType) return 'unknown';
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType === 'application/pdf') return 'pdf';
+    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType.startsWith('text/')) return 'text';
+    return 'unknown';
+}
+
+/**
+ * 截断文件名
+ * @param {string} name - 文件名
+ * @param {number} maxLen - 最大长度
+ * @returns {string}
+ */
+function truncateFileName(name, maxLen) {
+    if (!name || name.length <= maxLen) return name || '';
+    const ext = name.split('.').pop();
+    const baseName = name.slice(0, name.length - ext.length - 1);
+    const truncated = baseName.slice(0, maxLen - ext.length - 4) + '...';
+    return `${truncated}.${ext}`;
+}
 
 /**
  * 添加消息到 DOM
@@ -82,23 +109,53 @@ export function createMessageElement(role, content, images = null, messageId = n
         contentDiv.textContent = content;
     }
 
-    // 添加图片（用户消息）
+    // 添加附件（用户消息）- 支持图片、PDF、TXT
     if (images && images.length > 0) {
-        const imagesContainer = document.createElement('div');
-        imagesContainer.className = 'message-images';
-        images.forEach(img => {
-            const imgEl = document.createElement('img');
-            // ✅ 显示压缩图（如果有），否则显示原图
-            imgEl.src = img.compressed || img.data;
-            imgEl.alt = img.name;
-            imgEl.title = '点击查看大图';
-            imgEl.onclick = () => {
-                // ✅ 查看原图（不是压缩图）
-                eventBus.emit('ui:open-image-viewer', { url: img.data });
-            };
-            imagesContainer.appendChild(imgEl);
+        const attachmentsContainer = document.createElement('div');
+        attachmentsContainer.className = 'message-images';
+        images.forEach(file => {
+            const category = file.category || getAttachmentCategory(file.type);
+
+            if (category === 'image') {
+                // 图片：显示缩略图
+                const imgEl = document.createElement('img');
+                imgEl.src = file.compressed || file.data;
+                imgEl.alt = file.name;
+                imgEl.title = '点击查看大图';
+                imgEl.onclick = () => {
+                    eventBus.emit('ui:open-image-viewer', { url: file.data });
+                };
+                attachmentsContainer.appendChild(imgEl);
+            } else if (category === 'pdf') {
+                // PDF：显示文件图标
+                const fileEl = document.createElement('div');
+                fileEl.className = 'message-file-item pdf';
+                fileEl.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <span class="file-name" title="${file.name}">${truncateFileName(file.name, 20)}</span>
+                `;
+                attachmentsContainer.appendChild(fileEl);
+            } else if (category === 'text') {
+                // TXT/MD：显示文件图标
+                const isMarkdown = file.type === 'text/markdown' || file.name.endsWith('.md');
+                const fileEl = document.createElement('div');
+                fileEl.className = `message-file-item ${isMarkdown ? 'md' : 'txt'}`;
+                fileEl.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <span class="file-name" title="${file.name}">${truncateFileName(file.name, 20)}</span>
+                `;
+                attachmentsContainer.appendChild(fileEl);
+            }
         });
-        contentDiv.appendChild(imagesContainer);
+        contentDiv.appendChild(attachmentsContainer);
     }
 
     contentWrapper.appendChild(contentDiv);
@@ -510,15 +567,30 @@ export function enhanceCodeBlocks(container = null) {
         const pre = codeBlock.parentElement;
 
         // 如果已经处理过，跳过
-        if (pre.querySelector('.code-block-header')) return;
+        if (pre.querySelector('.code-block-header') || pre.querySelector('.code-collapse-header')) return;
 
         // 获取代码内容
         const codeText = codeBlock.textContent;
+        const lineCount = codeText.split('\n').length;
 
         // ✅ 智能语言检测
         const languageClass = Array.from(codeBlock.classList).find(cls => cls.startsWith('language-'));
         const hintedLang = languageClass ? languageClass.replace('language-', '') : null;
         const detectedLang = detectCodeLanguage(codeText, hintedLang);
+
+        // ✅ 检测流式状态
+        const messageEl = pre.closest('.message.assistant');
+        const isStreaming = messageEl?.classList.contains('generating') || state.isLoading;
+
+        // ✅ 折叠条件：流式渲染 OR 代码超过 20 行
+        const shouldCollapse = isStreaming || lineCount > 20;
+
+        if (shouldCollapse) {
+            createCollapsibleCodeBlock(pre, codeBlock, detectedLang, codeText, lineCount);
+            return;
+        }
+
+        // 普通代码块处理（原有逻辑）
 
         // 创建头部
         const header = document.createElement('div');
@@ -975,3 +1047,524 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
         type: 'success'
     });
 });
+
+// ========== 代码块折叠功能 ==========
+
+/**
+ * 语言显示名称映射
+ */
+const languageDisplayNames = {
+    javascript: 'JavaScript',
+    typescript: 'TypeScript',
+    python: 'Python',
+    java: 'Java',
+    cpp: 'C++',
+    c: 'C',
+    csharp: 'C#',
+    go: 'Go',
+    rust: 'Rust',
+    php: 'PHP',
+    ruby: 'Ruby',
+    bash: 'Shell',
+    sql: 'SQL',
+    html: 'HTML',
+    css: 'CSS',
+    json: 'JSON',
+    yaml: 'YAML',
+    markdown: 'Markdown',
+    text: 'Text'
+};
+
+/**
+ * 智能生成代码块标题
+ * @param {string} code - 代码内容
+ * @param {string} language - 语言
+ * @returns {string} 标题
+ */
+function generateCodeTitle(code, language) {
+    const firstLine = code.trim().split('\n')[0].trim();
+
+    // ✅ 策略1: 从注释中提取标题
+    if (firstLine.startsWith('//') || firstLine.startsWith('#')) {
+        const title = firstLine.replace(/^[\/\/#]+\s*/, '').trim();
+        if (title.length > 0 && title.length < 60) {
+            return title;
+        }
+    }
+
+    // ✅ 策略2: 从函数/类定义中提取
+    const patterns = {
+        javascript: /(?:function|class|const|let)\s+([a-zA-Z_$][\w$]*)/,
+        typescript: /(?:function|class|const|let|interface|type)\s+([a-zA-Z_$][\w$]*)/,
+        python: /(?:def|class)\s+([a-zA-Z_][\w]*)/,
+        java: /(?:public|private|protected)?\s*(?:static)?\s*(?:class|interface)\s+([A-Z][\w]*)/,
+        cpp: /(?:class|struct|namespace)\s+([a-zA-Z_][\w]*)/,
+        go: /func\s+([a-zA-Z_][\w]*)/,
+        rust: /(?:fn|struct|enum|trait)\s+([a-zA-Z_][\w]*)/
+    };
+
+    const pattern = patterns[language];
+    if (pattern) {
+        const match = code.match(pattern);
+        if (match) {
+            return `${match[1]} - ${languageDisplayNames[language] || language}`;
+        }
+    }
+
+    // ✅ 策略3: 从文件路径中提取
+    const fileMatch = code.match(/\/([a-zA-Z0-9_\-]+\.[a-z]+)/);
+    if (fileMatch) {
+        return fileMatch[1];
+    }
+
+    // ✅ 策略4: 默认标题
+    return `${languageDisplayNames[language] || language} 代码`;
+}
+
+/**
+ * 创建可折叠代码块
+ * @param {HTMLElement} pre - pre元素
+ * @param {HTMLElement} codeBlock - code元素
+ * @param {string} language - 语言
+ * @param {string} codeText - 代码文本
+ * @param {number} lineCount - 行数
+ */
+function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCount) {
+    // 生成智能标题
+    const title = generateCodeTitle(codeText, language);
+
+    pre.className = 'code-block-collapsible collapsed';
+    pre.innerHTML = '';
+
+    // ✅ 折叠头部
+    const header = document.createElement('div');
+    header.className = 'code-collapse-header';
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', 'false');
+    header.innerHTML = `
+        <span class="code-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+        </span>
+        <span class="code-title">${escapeHtml(title)}</span>
+        <span class="code-meta">
+            <span class="code-language-badge">${language.toUpperCase()}</span>
+            <span class="code-line-count">${lineCount} 行</span>
+        </span>
+        <span class="code-toggle-icon" aria-hidden="true">▶</span>
+    `;
+
+    // ✅ 操作按钮组
+    const actions = document.createElement('div');
+    actions.className = 'code-collapse-actions';
+    actions.innerHTML = `
+        <button class="code-action-btn preview-code" title="预览代码" aria-label="预览代码">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+        </button>
+        <button class="code-action-btn edit-code" title="编辑代码" aria-label="编辑代码">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        </button>
+        <button class="code-action-btn copy-code" title="复制代码" aria-label="复制代码">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+            </svg>
+        </button>
+        <button class="code-action-btn download-code" title="下载代码" aria-label="下载代码">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+        </button>
+    `;
+
+    // ✅ 代码内容容器（默认折叠）
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'code-collapse-content';
+
+    const clonedCode = codeBlock.cloneNode(true);
+    clonedCode.className = `language-${language}`;
+
+    const newPre = document.createElement('pre');
+    newPre.appendChild(clonedCode);
+    contentWrapper.appendChild(newPre);
+
+    // 组装
+    pre.appendChild(header);
+    pre.appendChild(actions);
+    pre.appendChild(contentWrapper);
+
+    // ✅ 绑定折叠/展开事件
+    bindCollapseEvents(pre, header);
+
+    // ✅ 绑定操作按钮事件
+    bindCodeBlockActions(pre, actions, codeText, language);
+
+    // ✅ 应用语法高亮
+    if (typeof hljs !== 'undefined') {
+        hljs.highlightElement(clonedCode);
+    }
+}
+
+/**
+ * 绑定折叠/展开事件
+ * @param {HTMLElement} pre - pre元素
+ * @param {HTMLElement} header - 头部元素
+ */
+function bindCollapseEvents(pre, header) {
+    const toggle = () => {
+        const isCollapsed = pre.classList.toggle('collapsed');
+        header.setAttribute('aria-expanded', !isCollapsed);
+
+        const icon = header.querySelector('.code-toggle-icon');
+        if (icon) {
+            icon.textContent = isCollapsed ? '▶' : '▼';
+        }
+    };
+
+    // 点击事件
+    header.addEventListener('click', toggle);
+
+    // 键盘事件（可访问性）
+    header.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggle();
+        }
+    });
+}
+
+/**
+ * 绑定代码块操作按钮事件
+ * @param {HTMLElement} pre - pre元素
+ * @param {HTMLElement} actions - 操作按钮容器
+ * @param {string} codeText - 代码文本
+ * @param {string} language - 语言
+ */
+function bindCodeBlockActions(pre, actions, codeText, language) {
+    // ✅ 防止重复绑定事件
+    if (actions.dataset.eventsBound === 'true') {
+        return;
+    }
+    actions.dataset.eventsBound = 'true';
+
+    // ✅ 阻止操作按钮的事件冒泡（避免触发折叠）
+    actions.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    // ✅ 复制按钮
+    const copyBtn = actions.querySelector('.copy-code');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(codeText).then(() => {
+                const originalHTML = copyBtn.innerHTML;
+                copyBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                `;
+                copyBtn.classList.add('copied');
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalHTML;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                eventBus.emit('ui:notification', {
+                    message: '复制失败',
+                    type: 'error'
+                });
+            });
+        });
+    }
+
+    // ✅ 下载按钮
+    const downloadBtn = actions.querySelector('.download-code');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => {
+            downloadCodeAsFile(codeText, language);
+        });
+    }
+
+    // ✅ 预览按钮（打开编辑器模态框，只读模式）
+    const previewBtn = actions.querySelector('.preview-code');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', async () => {
+            try {
+                const messageEl = pre.closest('.message');
+                if (!messageEl) {
+                    console.error('[预览代码] 找不到消息元素');
+                    return;
+                }
+
+                // 动态导入编辑器模块
+                const { openCodeEditorModal } = await import('../ui/code-editor-modal.js');
+
+                // 第四个参数 true 表示只读模式
+                openCodeEditorModal(codeText, language, null, true);
+            } catch (error) {
+                console.error('[预览代码] 错误:', error);
+                eventBus.emit('ui:notification', {
+                    message: '打开预览失败: ' + error.message,
+                    type: 'error'
+                });
+            }
+        });
+    }
+
+    // ✅ 编辑按钮
+    const editBtn = actions.querySelector('.edit-code');
+    if (editBtn) {
+        editBtn.addEventListener('click', async () => {
+            try {
+                const messageEl = pre.closest('.message');
+                if (!messageEl) {
+                    console.error('[编辑代码] 找不到消息元素');
+                    return;
+                }
+
+                // 动态导入编辑器模块
+                const { openCodeEditorModal } = await import('../ui/code-editor-modal.js');
+
+                openCodeEditorModal(codeText, language, (newCode, newLanguage) => {
+                    updateCodeBlockInMessage(messageEl, pre, newCode, newLanguage);
+                });
+            } catch (error) {
+                console.error('[编辑代码] 错误:', error);
+                eventBus.emit('ui:notification', {
+                    message: '打开编辑器失败: ' + error.message,
+                    type: 'error'
+                });
+            }
+        });
+    }
+}
+
+/**
+ * 下载代码为文件
+ * @param {string} code - 代码内容
+ * @param {string} language - 语言
+ */
+function downloadCodeAsFile(code, language) {
+    const extensions = {
+        javascript: 'js',
+        typescript: 'ts',
+        python: 'py',
+        java: 'java',
+        cpp: 'cpp',
+        c: 'c',
+        csharp: 'cs',
+        go: 'go',
+        rust: 'rs',
+        php: 'php',
+        ruby: 'rb',
+        bash: 'sh',
+        sql: 'sql',
+        html: 'html',
+        css: 'css',
+        json: 'json',
+        yaml: 'yaml',
+        markdown: 'md',
+        text: 'txt'
+    };
+
+    const ext = extensions[language] || 'txt';
+    const filename = `code-${Date.now()}.${ext}`;
+
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    eventBus.emit('ui:notification', {
+        message: `已下载为 ${filename}`,
+        type: 'success'
+    });
+}
+
+// ========== 代码块内容更新功能 ==========
+
+/**
+ * 更新消息中的代码块
+ * @param {HTMLElement} messageEl - 消息元素
+ * @param {HTMLElement} pre - pre元素
+ * @param {string} newCode - 新代码
+ * @param {string} newLanguage - 新语言
+ */
+export function updateCodeBlockInMessage(messageEl, pre, newCode, newLanguage) {
+    // 获取消息索引
+    const index = Array.from(elements.messagesArea.children).indexOf(messageEl);
+    if (index === -1) {
+        console.error('[更新代码块] 找不到消息索引');
+        return;
+    }
+
+    // 获取原始 Markdown
+    let originalMarkdown = getMessageMarkdown(index);
+    if (!originalMarkdown) {
+        console.error('[更新代码块] 找不到原始 Markdown');
+        return;
+    }
+
+    // 定位代码块在 Markdown 中的位置
+    const codeBlocks = originalMarkdown.match(/```[\s\S]*?```/g) || [];
+    const preIndex = getCodeBlockIndex(messageEl, pre);
+
+    if (preIndex >= 0 && preIndex < codeBlocks.length) {
+        const oldBlock = codeBlocks[preIndex];
+        const newBlock = `\`\`\`${newLanguage}\n${newCode}\n\`\`\``;
+        originalMarkdown = originalMarkdown.replace(oldBlock, newBlock);
+
+        // 更新状态（同步三种格式）
+        updateMessageMarkdown(index, originalMarkdown);
+
+        // ✅ 精确更新：只更新被编辑的代码块，而不是重新渲染整个消息
+        updateSingleCodeBlock(pre, newCode, newLanguage);
+    }
+}
+
+/**
+ * 更新单个代码块的内容（不触发重新增强）
+ * @param {HTMLElement} pre - pre元素
+ * @param {string} newCode - 新代码
+ * @param {string} newLanguage - 新语言
+ */
+function updateSingleCodeBlock(pre, newCode, newLanguage) {
+    // 检查是否是折叠的代码块
+    const isCollapsible = pre.classList.contains('code-block-collapsible');
+
+    if (isCollapsible) {
+        // 更新折叠卡片中的代码
+        const contentWrapper = pre.querySelector('.code-collapse-content');
+        const codeBlock = contentWrapper?.querySelector('code');
+
+        if (codeBlock) {
+            codeBlock.textContent = newCode;
+            codeBlock.className = `language-${newLanguage}`;
+
+            // 重新应用语法高亮
+            if (typeof hljs !== 'undefined') {
+                hljs.highlightElement(codeBlock);
+            }
+        }
+
+        // 更新语言标签
+        const langBadge = pre.querySelector('.code-language-badge');
+        if (langBadge) {
+            langBadge.textContent = newLanguage.toUpperCase();
+        }
+
+        // 更新行数
+        const lineCount = newCode.split('\n').length;
+        const lineCountSpan = pre.querySelector('.code-line-count');
+        if (lineCountSpan) {
+            lineCountSpan.textContent = `${lineCount} 行`;
+        }
+    } else {
+        // 普通代码块，更新代码内容
+        const codeBlock = pre.querySelector('code');
+        if (codeBlock) {
+            codeBlock.textContent = newCode;
+            codeBlock.className = `language-${newLanguage}`;
+
+            // 重新应用语法高亮
+            if (typeof hljs !== 'undefined') {
+                hljs.highlightElement(codeBlock);
+            }
+        }
+
+        // 更新语言选择器
+        const langSelector = pre.querySelector('.code-language-selector');
+        if (langSelector) {
+            langSelector.value = newLanguage;
+        }
+    }
+}
+
+/**
+ * 获取代码块在消息中的索引
+ */
+function getCodeBlockIndex(messageEl, pre) {
+    const allPres = messageEl.querySelectorAll('pre');
+    return Array.from(allPres).indexOf(pre);
+}
+
+/**
+ * 获取消息的Markdown文本
+ */
+function getMessageMarkdown(index) {
+    const message = state.messages[index];
+    if (!message) return '';
+
+    // 提取文本内容
+    if (typeof message.content === 'string') {
+        return message.content;
+    } else if (Array.isArray(message.content)) {
+        const textParts = message.content.filter(p => p.type === 'text');
+        return textParts.map(p => p.text).join('\n');
+    }
+
+    return '';
+}
+
+/**
+ * 更新消息的Markdown文本
+ */
+function updateMessageMarkdown(index, newMarkdown) {
+    // OpenAI格式
+    if (state.messages[index]) {
+        if (typeof state.messages[index].content === 'string') {
+            state.messages[index].content = newMarkdown;
+        } else if (Array.isArray(state.messages[index].content)) {
+            const textPart = state.messages[index].content.find(p => p.type === 'text');
+            if (textPart) {
+                textPart.text = newMarkdown;
+            } else {
+                // 如果没有文本部分，添加一个
+                state.messages[index].content.push({ type: 'text', text: newMarkdown });
+            }
+        }
+    }
+
+    // Gemini格式
+    if (state.geminiContents[index]) {
+        const textPart = state.geminiContents[index].parts?.find(p => p.text !== undefined);
+        if (textPart) {
+            textPart.text = newMarkdown;
+        } else if (state.geminiContents[index].parts) {
+            state.geminiContents[index].parts.push({ text: newMarkdown });
+        }
+    }
+
+    // Claude格式
+    if (state.claudeContents[index]) {
+        if (Array.isArray(state.claudeContents[index].content)) {
+            const textPart = state.claudeContents[index].content.find(p => p.type === 'text');
+            if (textPart) {
+                textPart.text = newMarkdown;
+            } else {
+                state.claudeContents[index].content.push({ type: 'text', text: newMarkdown });
+            }
+        } else {
+            state.claudeContents[index].content = [{ type: 'text', text: newMarkdown }];
+        }
+    }
+
+    // 发出保存事件
+    eventBus.emit('messages:changed', {
+        action: 'updated',
+        index
+    });
+}

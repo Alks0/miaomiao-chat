@@ -611,6 +611,9 @@ async function sendToAPI() {
             eventBus.emit('sessions:updated', { sessions: state.sessions });
         }
 
+        // ✅ 清理 continuation 标志（防止残留导致消息嵌套）
+        state.isSavingContinuation = false;
+
         // ✅ 只有当前会话还是这个会话时，才重置状态
         // ⚠️ 但如果有工具调用进行中，跳过重置（等待 continuation 完成）
         if (state.currentSessionId === sessionId && !state.isToolCallPending) {
@@ -700,8 +703,9 @@ export async function resendWithToolResults(toolResultMessages, apiConfig, assis
         // 但我们需要确保原数组引用被恢复
         state.messages = originalMessages;
 
-        // ✅ 清除工具调用标志
+        // ✅ 清除工具调用标志和 continuation 标志
         state.isToolCallPending = false;
+        state.isSavingContinuation = false;
 
         // ✅ 修复：重置按钮状态（因为 sendToAPI 的 finally 跳过了重置）
         if (state.currentSessionId === sessionId) {

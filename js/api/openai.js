@@ -5,7 +5,7 @@
 
 import { state } from '../core/state.js';
 import { buildModelParams, buildThinkingConfig, buildVerbosityConfig, getCustomHeadersObject } from './params.js';
-import { getPrefillMessages } from '../utils/prefill.js';
+import { getPrefillMessages, getOpeningMessages } from '../utils/prefill.js';
 import { processVariables } from '../utils/variables.js';
 import { filterMessagesByCapabilities } from '../utils/message-filter.js';
 import { getCurrentModelCapabilities, getCurrentProvider } from '../providers/manager.js';
@@ -47,6 +47,17 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
             role: 'system',
             content: processVariables(state.systemPrompt)
         });
+    }
+
+    // ✅ 开场对话插入到 System Prompt 之后、对话历史之前
+    if (state.prefillEnabled) {
+        const opening = getOpeningMessages();
+        if (opening.length > 0) {
+            // 找到 system 消息后的位置插入
+            const systemIndex = messages.findIndex(m => m.role === 'system');
+            const insertIndex = systemIndex >= 0 ? systemIndex + 1 : 0;
+            messages.splice(insertIndex, 0, ...opening);
+        }
     }
 
     // ✅ 预填充消息追加到末尾（用户最新消息之后）
@@ -153,10 +164,44 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
  * @returns {Array} 包含工具结果的消息数组
  */
 export function buildToolResultMessages(toolCalls, toolResults) {
+    // ✅ XML 模式：使用 XML 格式而不是原生 tool_calls
+    if (state.xmlToolCallingEnabled) {
+        // 构建 XML 格式的工具调用文本
+        let toolCallXML = '';
+        for (const tc of toolCalls) {
+            toolCallXML += `<tool_use>\n  <name>${tc.name}</name>\n  <arguments>${JSON.stringify(tc.arguments)}</arguments>\n</tool_use>\n`;
+        }
+
+        // 构建 XML 格式的工具结果
+        let toolResultXML = '';
+        for (let i = 0; i < toolResults.length; i++) {
+            const result = toolResults[i];
+            const toolCall = toolCalls[i] || toolCalls.find(tc => tc.id === result.tool_call_id);
+            const toolName = toolCall?.name || 'unknown';
+            toolResultXML += `<tool_use_result>\n  <name>${toolName}</name>\n  <result>${result.content}</result>\n</tool_use_result>\n`;
+        }
+
+        return [
+            // 1. assistant 消息：包含 XML 工具调用
+            {
+                role: 'assistant',
+                content: toolCallXML.trim()
+            },
+            // 2. user 消息：包含 XML 工具结果
+            {
+                role: 'user',
+                content: toolResultXML.trim()
+            }
+        ];
+    }
+
+    // 原生模式：使用 tool_calls 格式
     const messages = [
         // 1. 添加助手消息（包含工具调用）
+        // ✅ content 字段必须存在（OpenAI API 要求）
         {
             role: 'assistant',
+            content: '',  // ✅ 修复：添加 content 字段（空字符串）
             tool_calls: toolCalls.map(tc => ({
                 id: tc.id,
                 type: 'function',

@@ -5,7 +5,7 @@
 
 import { state, elements } from '../core/state.js';
 import { buildModelParams, buildThinkingConfig, getCustomHeadersObject } from './params.js';
-import { getPrefillMessages } from '../utils/prefill.js';
+import { getPrefillMessages, getOpeningMessages } from '../utils/prefill.js';
 import { processVariables } from '../utils/variables.js';
 import { compressImage } from '../utils/images.js';
 import { filterMessagesByCapabilities } from '../utils/message-filter.js';
@@ -115,7 +115,7 @@ function convertOpenAIMessageToGemini(msg) {
                 // 或者可以在外层添加 thoughtSignature 标记
                 parts.push({ text: `[Thinking]\n${part.text}` });
             } else if (part.type === 'image_url') {
-                // 提取 base64 数据
+                // 提取 base64 数据（图片）
                 const url = part.image_url?.url || part.url;
                 if (url) {
                     const match = url.match(/^data:([^;]+);base64,(.+)$/);
@@ -127,6 +127,18 @@ function convertOpenAIMessageToGemini(msg) {
                             }
                         });
                     }
+                }
+            } else if (part.type === 'file' && part.file?.file_data) {
+                // 提取 base64 数据（PDF 等文件）
+                const fileData = part.file.file_data;
+                const match = fileData.match(/^data:([^;]+);base64,(.+)$/);
+                if (match) {
+                    parts.push({
+                        inlineData: {
+                            mimeType: match[1],
+                            data: match[2]
+                        }
+                    });
                 }
             }
         }
@@ -330,11 +342,19 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     // 压缩历史图片以减小请求体积
     const processedContents = await processContentsForRequest(geminiContents);
 
-    // ✅ 预填充消息追加到末尾（用户最新消息之后）
+    // ✅ 开场对话插入到对话历史之前（Gemini 的 systemInstruction 是独立参数）
     let finalContents = processedContents;
     if (state.prefillEnabled) {
+        const opening = getOpeningMessages('gemini');
+        if (opening.length > 0) {
+            finalContents = [...opening, ...processedContents];
+        }
+    }
+
+    // ✅ 预填充消息追加到末尾（用户最新消息之后）
+    if (state.prefillEnabled) {
         const prefill = getPrefillMessages('gemini');
-        finalContents = [...processedContents, ...prefill];
+        finalContents = [...finalContents, ...prefill];
     }
 
     // 构建带 thoughtSignature 的 contents
@@ -349,8 +369,8 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     // ✅ 添加 System Instruction (独立于预填充开关)
     const systemParts = [];
 
-    // 1. 优先使用 geminiSystemParts（多段系统提示）
-    if (state.geminiSystemParts && state.geminiSystemParts.length > 0) {
+    // 1. 优先使用 geminiSystemParts（多段系统提示）- 仅在开关启用时
+    if (state.geminiSystemPartsEnabled && state.geminiSystemParts && state.geminiSystemParts.length > 0) {
         state.geminiSystemParts.forEach(part => {
             if (part.text && part.text.trim()) {
                 systemParts.push({ text: processVariables(part.text) });
@@ -450,12 +470,46 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
  * @returns {Array} OpenAI 格式的消息数组（存储在 state.messages 中）
  */
 export function buildToolResultMessages(toolCalls, toolResults) {
+    // ✅ XML 模式：使用 XML 格式而不是原生 tool_calls
+    if (state.xmlToolCallingEnabled) {
+        // 构建 XML 格式的工具调用文本
+        let toolCallXML = '';
+        for (const tc of toolCalls) {
+            toolCallXML += `<tool_use>\n  <name>${tc.name}</name>\n  <arguments>${JSON.stringify(tc.arguments)}</arguments>\n</tool_use>\n`;
+        }
+
+        // 构建 XML 格式的工具结果
+        let toolResultXML = '';
+        for (let i = 0; i < toolResults.length; i++) {
+            const result = toolResults[i];
+            const toolCall = toolCalls[i] || toolCalls.find(tc => tc.id === result.tool_call_id);
+            const toolName = toolCall?.name || 'unknown';
+            toolResultXML += `<tool_use_result>\n  <name>${toolName}</name>\n  <result>${result.content}</result>\n</tool_use_result>\n`;
+        }
+
+        return [
+            // 1. assistant 消息：包含 XML 工具调用
+            {
+                role: 'assistant',
+                content: toolCallXML.trim()
+            },
+            // 2. user 消息：包含 XML 工具结果
+            {
+                role: 'user',
+                content: toolResultXML.trim()
+            }
+        ];
+    }
+
+    // 原生模式：使用 tool_calls 格式
     // ✅ 与 OpenAI 保持一致：返回 OpenAI 格式
     // sendGeminiRequest 会将这些消息转换为 Gemini 格式
     const messages = [
         // 1. 添加助手消息（包含工具调用）- OpenAI 格式
+        // ✅ content 字段必须存在（OpenAI API 要求）
         {
             role: 'assistant',
+            content: '',  // ✅ 修复：添加 content 字段（空字符串）
             tool_calls: toolCalls.map(tc => ({
                 id: tc.id || `gemini_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 type: 'function',

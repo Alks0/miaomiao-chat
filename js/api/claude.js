@@ -5,7 +5,7 @@
 
 import { state } from '../core/state.js';
 import { buildModelParams, buildThinkingConfig, getCustomHeadersObject } from './params.js';
-import { getPrefillMessages } from '../utils/prefill.js';
+import { getPrefillMessages, getOpeningMessages } from '../utils/prefill.js';
 import { processVariables } from '../utils/variables.js';
 import { filterMessagesByCapabilities } from '../utils/message-filter.js';
 import { getCurrentModelCapabilities } from '../providers/manager.js';
@@ -97,11 +97,24 @@ function convertToClaudeMessages(messages) {
                         // 但由于我们的内部格式使用 OpenAI 风格，这里跳过即可
                         return null;
                     } else if (part.type === 'image_url') {
-                        // 提取 base64 数据
+                        // 提取 base64 数据（图片）
                         const matches = part.image_url.url.match(/^data:([^;]+);base64,(.+)$/);
                         if (matches) {
                             return {
                                 type: 'image',
+                                source: {
+                                    type: 'base64',
+                                    media_type: matches[1],
+                                    data: matches[2]
+                                }
+                            };
+                        }
+                    } else if (part.type === 'file' && part.file?.file_data) {
+                        // 提取 base64 数据（PDF 文件）
+                        const matches = part.file.file_data.match(/^data:([^;]+);base64,(.+)$/);
+                        if (matches) {
+                            return {
+                                type: 'document',
                                 source: {
                                     type: 'base64',
                                     media_type: matches[1],
@@ -171,6 +184,14 @@ export async function sendClaudeRequest(endpoint, apiKey, model, signal = null) 
 
     // 转换为 Claude 格式（使用过滤后的消息）
     let claudeMessages = convertToClaudeMessages(messages);
+
+    // ✅ 开场对话插入到对话历史之前（Claude 的 system 是独立参数，所以这里直接插入到最前面）
+    if (state.prefillEnabled) {
+        const opening = getOpeningMessages();
+        if (opening.length > 0) {
+            claudeMessages = [...opening, ...claudeMessages];
+        }
+    }
 
     // ✅ 预填充消息追加到末尾（用户最新消息之后）
     if (state.prefillEnabled) {
@@ -258,12 +279,46 @@ export async function sendClaudeRequest(endpoint, apiKey, model, signal = null) 
  * @returns {Array} OpenAI 格式的消息数组（存储在 state.messages 中）
  */
 export function buildToolResultMessages(toolCalls, toolResults) {
+    // ✅ XML 模式：使用 XML 格式而不是原生 tool_calls
+    if (state.xmlToolCallingEnabled) {
+        // 构建 XML 格式的工具调用文本
+        let toolCallXML = '';
+        for (const tc of toolCalls) {
+            toolCallXML += `<tool_use>\n  <name>${tc.name}</name>\n  <arguments>${JSON.stringify(tc.arguments)}</arguments>\n</tool_use>\n`;
+        }
+
+        // 构建 XML 格式的工具结果
+        let toolResultXML = '';
+        for (let i = 0; i < toolResults.length; i++) {
+            const result = toolResults[i];
+            const toolCall = toolCalls[i] || toolCalls.find(tc => tc.id === result.tool_call_id);
+            const toolName = toolCall?.name || 'unknown';
+            toolResultXML += `<tool_use_result>\n  <name>${toolName}</name>\n  <result>${result.content}</result>\n</tool_use_result>\n`;
+        }
+
+        return [
+            // 1. assistant 消息：包含 XML 工具调用
+            {
+                role: 'assistant',
+                content: toolCallXML.trim()
+            },
+            // 2. user 消息：包含 XML 工具结果
+            {
+                role: 'user',
+                content: toolResultXML.trim()
+            }
+        ];
+    }
+
+    // 原生模式：使用 tool_calls 格式
     // ✅ 与 OpenAI/Gemini 保持一致：返回 OpenAI 格式
     // convertToClaudeMessages 会将这些消息转换为 Claude 格式
     const messages = [
         // 1. 添加助手消息（包含工具调用）- OpenAI 格式
+        // ✅ content 字段必须存在（OpenAI API 要求）
         {
             role: 'assistant',
+            content: '',  // ✅ 修复：添加 content 字段（空字符串）
             tool_calls: toolCalls.map(tc => ({
                 id: tc.id,
                 type: 'function',

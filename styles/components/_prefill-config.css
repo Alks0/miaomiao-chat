@@ -169,3 +169,49 @@
     pointer-events: none;
 }
 
+/* 可折叠的预填充区块 */
+.prefill-details {
+    border: none;
+    margin: 0;
+}
+
+.prefill-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--md-muted);
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    padding: 4px 0;
+}
+
+.prefill-summary::-webkit-details-marker {
+    display: none;
+}
+
+.prefill-summary .details-arrow {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.prefill-details[open] > .prefill-summary .details-arrow {
+    transform: rotate(90deg);
+}
+
+.prefill-summary:hover {
+    color: var(--md-text);
+}
+
+.prefill-summary .hint {
+    font-weight: 400;
+    text-transform: none;
+}
+
+.prefill-details-content {
+    padding-top: 8px;
+}
+

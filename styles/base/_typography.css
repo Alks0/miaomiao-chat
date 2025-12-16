@@ -233,14 +233,15 @@
     font-size: 13px;
 }
 
-/* 代码块顶部栏 */
+/* 代码块顶部栏 - 优化版 */
 .code-block-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(74, 144, 226, 0.1);
+    border-bottom: 2px solid rgba(74, 144, 226, 0.3);
 }
 
 .code-language {
@@ -250,6 +251,44 @@
     color: var(--md-blue);
     letter-spacing: 0.05em;
     font-weight: 600;
+}
+
+/* 语言选择器 - 美化版 */
+.code-language-selector {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 6px 32px 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    /* 自定义下拉箭头 */
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l4 4 4-4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+}
+
+.code-language-selector:hover {
+    background-color: rgba(74, 144, 226, 0.2);
+    border-color: var(--md-blue);
+}
+
+.code-language-selector:focus {
+    outline: 2px solid var(--md-blue);
+    outline-offset: 2px;
+    border-color: var(--md-blue);
+}
+
+.code-language-selector option {
+    background: var(--md-charcoal);
+    color: var(--md-white);
+    padding: 8px;
 }
 
 /* 复制按钮 */
@@ -285,10 +324,40 @@
     color: var(--md-charcoal);
 }
 
-/* 代码块内容 */
+/* 代码块内容 - 优化版（自动换行） */
 .code-block-content {
-    padding: 12px;
+    padding: 0;
     overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.code-block-content code {
+    display: block;
+    padding: 16px;
+    white-space: pre-wrap;        /* 保留空格和换行，允许自动换行 */
+    word-wrap: break-word;        /* 长单词换行 */
+    overflow-wrap: break-word;    /* 更好的换行支持 */
+    line-height: 1.6;
+}
+
+/* 代码块滚动条美化 */
+.code-block-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.code-block-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.code-block-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.code-block-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 /* 行内代码 */

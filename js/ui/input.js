@@ -12,8 +12,44 @@ import { showNotification } from './notifications.js';
 import { generateMessageId } from '../utils/helpers.js';
 import { pushMessage } from '../core/state-mutations.js';
 
-// 图片附件限制
-const MAX_IMAGES = 10;
+// 附件限制
+const MAX_ATTACHMENTS = 10;
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+// 支持的文件类型
+const SUPPORTED_TYPES = {
+    image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    pdf: ['application/pdf'],
+    text: ['text/plain', 'text/markdown']
+};
+
+// 所有支持的 MIME 类型
+const ALL_SUPPORTED_MIMES = [
+    ...SUPPORTED_TYPES.image,
+    ...SUPPORTED_TYPES.pdf,
+    ...SUPPORTED_TYPES.text
+];
+
+/**
+ * 判断文件类型是否支持
+ * @param {string} mimeType - MIME 类型
+ * @returns {boolean}
+ */
+function isSupportedFileType(mimeType) {
+    return ALL_SUPPORTED_MIMES.includes(mimeType);
+}
+
+/**
+ * 获取文件类别
+ * @param {string} mimeType - MIME 类型
+ * @returns {'image'|'pdf'|'text'|'unknown'}
+ */
+function getFileCategory(mimeType) {
+    if (SUPPORTED_TYPES.image.includes(mimeType)) return 'image';
+    if (SUPPORTED_TYPES.pdf.includes(mimeType)) return 'pdf';
+    if (SUPPORTED_TYPES.text.includes(mimeType)) return 'text';
+    return 'unknown';
+}
 
 // ✅ 消息长度限制（防止内存溢出和 API 拒绝）
 const MAX_MESSAGE_LENGTH = 100000; // 10万字符（约 25k tokens）
@@ -67,47 +103,95 @@ export function autoResizeTextarea() {
 
 /**
  * 处理文件附件
+ * 支持图片、PDF、TXT 文件
  */
 export function handleAttachFile() {
-    // 检查是否已达到图片数量限制
-    if (state.uploadedImages.length >= MAX_IMAGES) {
-        showNotification(`最多只能添加 ${MAX_IMAGES} 张图片`, 'error');
+    // 检查是否已达到附件数量限制
+    if (state.uploadedImages.length >= MAX_ATTACHMENTS) {
+        showNotification(`最多只能添加 ${MAX_ATTACHMENTS} 个附件`, 'error');
         return;
     }
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    // 支持图片、PDF、TXT、MD
+    input.accept = 'image/*,.pdf,.txt,.md,text/plain,text/markdown,application/pdf';
     input.multiple = true;
 
     input.onchange = async (e) => {
         const files = Array.from(e.target.files);
-        const remaining = MAX_IMAGES - state.uploadedImages.length;
+        const remaining = MAX_ATTACHMENTS - state.uploadedImages.length;
 
         if (files.length > remaining) {
-            showNotification(`只能再添加 ${remaining} 张图片`, 'error');
+            showNotification(`只能再添加 ${remaining} 个附件`, 'warning');
         }
 
-        // 只处理剩余可添加数量的图片
+        // 只处理剩余可添加数量的文件
         const filesToProcess = files.slice(0, remaining);
 
         for (const file of filesToProcess) {
-            if (file.type.startsWith('image/')) {
-                const base64 = await fileToBase64(file);
+            // 检查文件大小
+            if (file.size > MAX_FILE_SIZE) {
+                showNotification(`文件 "${file.name}" 超过 20MB 限制`, 'error');
+                continue;
+            }
 
-                // ✅ 生成压缩版本（512px，用于 API 请求和显示）
+            // 检查文件类型
+            let fileType = file.type;
+            const category = getFileCategory(fileType);
+            if (category === 'unknown') {
+                // 尝试通过扩展名判断
+                const ext = file.name.split('.').pop()?.toLowerCase();
+                if (ext === 'txt') {
+                    fileType = 'text/plain';
+                } else if (ext === 'md') {
+                    fileType = 'text/markdown';
+                } else if (ext === 'pdf') {
+                    fileType = 'application/pdf';
+                } else {
+                    showNotification(`不支持的文件类型: ${file.name}`, 'error');
+                    continue;
+                }
+            }
+
+            const base64 = await fileToBase64(file);
+            const fileCategory = getFileCategory(fileType);
+
+            if (fileCategory === 'image') {
+                // 图片：生成压缩版本
                 const { compressImage } = await import('../utils/images.js');
-                const base64Data = base64.split(',')[1]; // 提取 base64 部分
-                const compressed = await compressImage(base64Data, file.type, 512);
+                const base64Data = base64.split(',')[1];
+                const compressed = await compressImage(base64Data, fileType, 512);
                 const compressedDataUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
 
                 state.uploadedImages.push({
                     name: file.name,
-                    type: file.type,
-                    data: base64,           // ✅ 保存原图（用于下载）
-                    compressed: compressedDataUrl, // ✅ 保存压缩图（用于 API 和显示）
+                    type: fileType,
+                    category: 'image',
+                    data: base64,
+                    compressed: compressedDataUrl,
                 });
-                console.log(`已添加图片: ${file.name} (原图 + 压缩版)`);
+                console.log(`已添加图片: ${file.name}`);
+            } else if (fileCategory === 'pdf') {
+                // PDF：直接保存
+                state.uploadedImages.push({
+                    name: file.name,
+                    type: fileType,
+                    category: 'pdf',
+                    data: base64,
+                    size: file.size,
+                });
+                console.log(`已添加 PDF: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+            } else if (fileCategory === 'text') {
+                // TXT/MD：直接保存
+                state.uploadedImages.push({
+                    name: file.name,
+                    type: fileType,
+                    category: 'text',
+                    data: base64,
+                    size: file.size,
+                });
+                console.log(`已添加文本文件: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
             }
         }
         updateImagePreview();
@@ -131,11 +215,8 @@ function fileToBase64(file) {
 }
 
 /**
- * 更新图片预览
- */
-/**
- * 更新图片预览栏
- * ✅ 完全照搬 app.js 的实现（3396-3428行）
+ * 更新附件预览栏
+ * 支持图片、PDF、TXT 文件的预览
  */
 export function updateImagePreview() {
     const previewContainer = document.getElementById('image-preview-container');
@@ -152,20 +233,65 @@ export function updateImagePreview() {
 
     previewContainer.classList.add('has-images');
 
-    state.uploadedImages.forEach((img, index) => {
+    state.uploadedImages.forEach((file, index) => {
         const previewItem = document.createElement('div');
         previewItem.className = 'image-preview-item';
-        // ✅ 显示压缩图（如果有），否则显示原图
-        const displayUrl = img.compressed || img.data;
-        previewItem.innerHTML = `
-            <img src="${displayUrl}" alt="${img.name}" title="点击查看大图">
-            <button class="remove-image" data-index="${index}" title="移除">×</button>
-        `;
 
-        // ✅ 点击图片查看原图
-        previewItem.querySelector('img').onclick = () => eventBus.emit('ui:open-image-viewer', { url: img.data });
+        const category = file.category || getFileCategory(file.type);
 
-        // 删除按钮事件（与app.js完全一致）
+        if (category === 'image') {
+            // 图片预览
+            const displayUrl = file.compressed || file.data;
+            previewItem.innerHTML = `
+                <img src="${displayUrl}" alt="${file.name}" title="点击查看大图">
+                <button class="remove-image" data-index="${index}" title="移除">×</button>
+            `;
+            // 点击图片查看原图
+            previewItem.querySelector('img').onclick = () => eventBus.emit('ui:open-image-viewer', { url: file.data });
+        } else if (category === 'pdf') {
+            // PDF 预览（显示图标和文件名）
+            const sizeStr = file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '';
+            previewItem.className = 'image-preview-item file-preview-item';
+            previewItem.innerHTML = `
+                <div class="file-preview-icon pdf-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <path d="M10 12h4"/>
+                        <path d="M10 16h4"/>
+                    </svg>
+                </div>
+                <div class="file-preview-info">
+                    <span class="file-name" title="${file.name}">${truncateFileName(file.name, 15)}</span>
+                    <span class="file-size">${sizeStr}</span>
+                </div>
+                <button class="remove-image" data-index="${index}" title="移除">×</button>
+            `;
+        } else if (category === 'text') {
+            // TXT/MD 预览（显示图标和文件名）
+            const sizeStr = file.size ? `${(file.size / 1024).toFixed(2)} KB` : '';
+            const isMarkdown = file.type === 'text/markdown' || file.name.endsWith('.md');
+            const iconClass = isMarkdown ? 'md-icon' : 'txt-icon';
+            previewItem.className = 'image-preview-item file-preview-item';
+            previewItem.innerHTML = `
+                <div class="file-preview-icon ${iconClass}">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                </div>
+                <div class="file-preview-info">
+                    <span class="file-name" title="${file.name}">${truncateFileName(file.name, 15)}</span>
+                    <span class="file-size">${sizeStr}</span>
+                </div>
+                <button class="remove-image" data-index="${index}" title="移除">×</button>
+            `;
+        }
+
+        // 删除按钮事件
         previewItem.querySelector('.remove-image').onclick = (e) => {
             e.stopPropagation();
             state.uploadedImages.splice(index, 1);
@@ -177,6 +303,20 @@ export function updateImagePreview() {
 
     // 模块化版本额外功能：更新引用预览样式
     updateQuotePreviewStyle();
+}
+
+/**
+ * 截断文件名
+ * @param {string} name - 文件名
+ * @param {number} maxLen - 最大长度
+ * @returns {string}
+ */
+function truncateFileName(name, maxLen) {
+    if (name.length <= maxLen) return name;
+    const ext = name.split('.').pop();
+    const baseName = name.slice(0, name.length - ext.length - 1);
+    const truncated = baseName.slice(0, maxLen - ext.length - 4) + '...';
+    return `${truncated}.${ext}`;
 }
 
 /**
@@ -289,60 +429,28 @@ function saveEdit() {
     if (state.editingIndex === null) return;
 
     const textContent = elements.userInput.value.trim();
-    const hasImages = state.uploadedImages.length > 0;
+    const hasAttachments = state.uploadedImages.length > 0;
 
-    // 验证：至少需要文本或图片
-    if (!textContent && !hasImages) {
-        showNotification('消息不能为空（至少需要文本或图片）', 'warning');
+    // 验证：至少需要文本或附件
+    if (!textContent && !hasAttachments) {
+        showNotification('消息不能为空（至少需要文本或附件）', 'warning');
         return;
     }
 
-    // 转换图片格式（从上传的格式转换为消息存储格式）
-    // ✅ 使用压缩图发送 API，但保存原图 URL
-    const imageDataUrls = hasImages ? state.uploadedImages.map(img => img.compressed || img.data) : [];
-    const originalImageUrls = hasImages ? state.uploadedImages.map(img => img.data) : null;
-    let messageImages = [];
+    // 转换附件格式（从上传的格式转换为消息存储格式）
+    // ✅ 图片使用压缩版发送 API，PDF/TXT 直接发送
+    const attachmentDataUrls = hasAttachments ? state.uploadedImages.map(file => file.compressed || file.data) : [];
+    const originalDataUrls = hasAttachments ? state.uploadedImages.map(file => file.data) : null;
+    let messageAttachments = [];
 
-    if (hasImages) {
-        if (state.apiFormat === 'gemini') {
-            // Gemini 格式
-            messageImages = state.uploadedImages.map(img => {
-                const compressedUrl = img.compressed || img.data;
-                const base64Data = compressedUrl.split(',')[1];
-                return {
-                    inlineData: {
-                        mimeType: img.type,
-                        data: base64Data
-                    }
-                };
-            });
-        } else if (state.apiFormat === 'claude') {
-            // Claude 格式
-            messageImages = state.uploadedImages.map(img => {
-                const compressedUrl = img.compressed || img.data;
-                const base64Data = compressedUrl.split(',')[1];
-                return {
-                    type: 'image',
-                    source: {
-                        type: 'base64',
-                        media_type: img.type,
-                        data: base64Data
-                    }
-                };
-            });
-        } else {
-            // OpenAI 格式
-            messageImages = state.uploadedImages.map(img => ({
-                type: 'image_url',
-                image_url: {
-                    url: img.compressed || img.data
-                }
-            }));
-        }
+    if (hasAttachments) {
+        // 使用统一的转换器处理所有附件类型
+        // converters.js 中的函数会根据 MIME 类型自动处理图片/PDF/TXT
+        messageAttachments = attachmentDataUrls;
     }
 
     // 更新消息内容（三种格式同步）
-    updateMessageContentWithImages(state.editingIndex, textContent, messageImages, 'user');
+    updateMessageContentWithImages(state.editingIndex, textContent, messageAttachments, 'user');
 
     // 触发 DOM 更新事件
     if (state.editingElement) {
@@ -487,11 +595,11 @@ export async function handleSend() {
     console.log('[input.js] handleSend 被调用, state.isLoading =', state.isLoading, ', state.isSending =', state.isSending, ', state.currentSessionId =', state.currentSessionId);
 
     let textContent = elements.userInput.value.trim();
-    const hasImages = state.uploadedImages.length > 0;
+    const hasAttachments = state.uploadedImages.length > 0;
     const isEditing = state.editingIndex !== null;
 
-    if (!textContent && !hasImages) {
-        console.log('[input.js] handleSend 被阻止: 没有文本或图片');
+    if (!textContent && !hasAttachments) {
+        console.log('[input.js] handleSend 被阻止: 没有文本或附件');
         return;
     }
     if (state.isLoading) {
@@ -529,35 +637,35 @@ export async function handleSend() {
     }, 30000);
 
     // 构建三种格式的用户消息
-    // ✅ 使用压缩图发送 API（节省带宽），但保留原图引用（用于下载）
-    const imageDataUrls = hasImages ? state.uploadedImages.map(img => img.compressed || img.data) : null;
-    const originalImageUrls = hasImages ? state.uploadedImages.map(img => img.data) : null;
+    // ✅ 图片使用压缩版发送 API（节省带宽），PDF/TXT 直接发送，保留原数据引用
+    const attachmentDataUrls = hasAttachments ? state.uploadedImages.map(file => file.compressed || file.data) : null;
+    const originalDataUrls = hasAttachments ? state.uploadedImages.map(file => file.data) : null;
 
     // 🔑 生成唯一消息ID
     const messageId = generateMessageId();
 
     // OpenAI 格式
-    const openaiMessage = toOpenAIMessage('user', textContent, imageDataUrls);
+    const openaiMessage = toOpenAIMessage('user', textContent, attachmentDataUrls);
     openaiMessage.id = messageId;
-    // ✅ 保存原图 URL 引用（用于下载）
-    if (originalImageUrls) {
-        openaiMessage.originalImageUrls = originalImageUrls;
+    // ✅ 保存原始数据 URL 引用（用于下载）
+    if (originalDataUrls) {
+        openaiMessage.originalImageUrls = originalDataUrls;
     }
 
     // Gemini 格式
-    const geminiMessage = toGeminiMessage('user', textContent, imageDataUrls);
+    const geminiMessage = toGeminiMessage('user', textContent, attachmentDataUrls);
     geminiMessage.id = messageId;
-    // ✅ 保存原图 URL 引用（用于下载）
-    if (originalImageUrls) {
-        geminiMessage.originalImageUrls = originalImageUrls;
+    // ✅ 保存原始数据 URL 引用（用于下载）
+    if (originalDataUrls) {
+        geminiMessage.originalImageUrls = originalDataUrls;
     }
 
     // Claude 格式
-    const claudeMessage = toClaudeMessage('user', textContent, imageDataUrls);
+    const claudeMessage = toClaudeMessage('user', textContent, attachmentDataUrls);
     claudeMessage.id = messageId;
-    // ✅ 保存原图 URL 引用（用于下载）
-    if (originalImageUrls) {
-        claudeMessage.originalImageUrls = originalImageUrls;
+    // ✅ 保存原始数据 URL 引用（用于下载）
+    if (originalDataUrls) {
+        claudeMessage.originalImageUrls = originalDataUrls;
     }
 
     // 保存用户消息到历史栈（支持多级撤销）
@@ -589,7 +697,7 @@ export async function handleSend() {
         }
 
         if (state.editingElement) {
-            updateUserMessageDOM(state.editingElement, textContent, hasImages ? state.uploadedImages : null);
+            updateUserMessageDOM(state.editingElement, textContent, hasAttachments ? state.uploadedImages : null);
         }
 
         // 移除编辑位置之后的所有消息（所有格式）
@@ -600,7 +708,7 @@ export async function handleSend() {
 
         const messageIndex = state.messages.length - 1;
         // ✅ 传递 messageId 到 DOM 元素
-        const messageEl = createMessageElement('user', textContent, hasImages ? state.uploadedImages : null, messageId);
+        const messageEl = createMessageElement('user', textContent, hasAttachments ? state.uploadedImages : null, messageId);
         elements.messagesArea.appendChild(messageEl);
         if (messageEl) {
             messageEl.dataset.messageIndex = messageIndex; // 向后兼容，保留索引
@@ -654,17 +762,17 @@ async function handlePaste(e) {
     // 阻止默认粘贴行为（避免粘贴图片 URL 或文件名）
     e.preventDefault();
 
-    // 检查是否已达到图片数量限制
-    if (state.uploadedImages.length >= MAX_IMAGES) {
-        showNotification(`最多只能添加 ${MAX_IMAGES} 张图片`, 'error');
+    // 检查是否已达到附件数量限制
+    if (state.uploadedImages.length >= MAX_ATTACHMENTS) {
+        showNotification(`最多只能添加 ${MAX_ATTACHMENTS} 个附件`, 'error');
         return;
     }
 
-    const remaining = MAX_IMAGES - state.uploadedImages.length;
+    const remaining = MAX_ATTACHMENTS - state.uploadedImages.length;
     const itemsToProcess = imageItems.slice(0, remaining);
 
     if (imageItems.length > remaining) {
-        showNotification(`只能再添加 ${remaining} 张图片`, 'warning');
+        showNotification(`只能再添加 ${remaining} 个附件`, 'warning');
     }
 
     for (const item of itemsToProcess) {
@@ -687,6 +795,7 @@ async function handlePaste(e) {
             state.uploadedImages.push({
                 name: fileName,
                 type: file.type,
+                category: 'image',
                 data: base64,
                 compressed: compressedDataUrl,
             });

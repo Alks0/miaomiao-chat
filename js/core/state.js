@@ -221,7 +221,7 @@ export const state = {
         isFirstToken: true
     },
 
-    // 预填充消息
+    // 预填充消息（在用户最新输入之后插入）
     systemPrompt: '',
     prefillMessages: [],
     charName: 'Assistant',
@@ -229,8 +229,16 @@ export const state = {
     savedPrefillPresets: [],
     currentPrefillPresetName: '',
 
+    // System 预填充消息（在 System Prompt 之后、对话历史之前插入）
+    systemPrefillMessages: [],
+    savedSystemPrefillPresets: [],
+    currentSystemPrefillPresetName: '',
+
     // Gemini System Parts
+    geminiSystemPartsEnabled: false,
     geminiSystemParts: [],
+    savedGeminiPartsPresets: [],
+    currentGeminiPartsPresetName: '',
 
     // 防抖控制
     isSending: false,

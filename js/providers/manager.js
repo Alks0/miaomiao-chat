@@ -232,6 +232,9 @@ export function setCurrentKey(providerId, keyId) {
     provider.currentKeyId = keyId;
     provider.apiKey = key.key; // 同步到兼容字段
 
+    // ✅ 切换密钥时清除模型缓存，确保下次拉取使用新密钥
+    clearModelsCache(providerId);
+
     saveCurrentConfig();
     eventBus.emit('providers:key-changed', { providerId, keyId });
 

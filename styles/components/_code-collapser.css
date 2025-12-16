@@ -1,0 +1,217 @@
+/* ========== 代码块折叠卡片 ========== */
+
+.code-block-collapsible {
+    border: var(--border);
+    border-radius: 4px;
+    background: var(--md-charcoal);
+    box-shadow: var(--shadow-md);
+    margin: 16px 0;
+    overflow: hidden;
+    transition: all 0.2s var(--ease);
+}
+
+.code-block-collapsible:hover {
+    transform: var(--hover-offset-sm);
+    box-shadow: var(--shadow-lg), var(--glow-blue);
+}
+
+/* ========== 折叠头部 ========== */
+
+.code-collapse-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(74, 144, 226, 0.1);
+    border-bottom: 2px solid rgba(74, 144, 226, 0.3);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.code-collapse-header:hover {
+    background: rgba(74, 144, 226, 0.2);
+}
+
+.code-collapse-header:focus {
+    outline: 2px solid var(--md-blue);
+    outline-offset: -2px;
+}
+
+.code-icon {
+    display: flex;
+    align-items: center;
+    color: var(--md-blue);
+    flex-shrink: 0;
+}
+
+.code-title {
+    flex: 1;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--md-white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.code-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.code-language-badge {
+    padding: 4px 8px;
+    background: var(--md-blue);
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+}
+
+.code-line-count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--md-muted);
+}
+
+.code-toggle-icon {
+    transition: transform 0.2s;
+    font-size: 12px;
+    color: var(--md-white);
+    flex-shrink: 0;
+}
+
+.code-block-collapsible:not(.collapsed) .code-toggle-icon {
+    transform: rotate(90deg);
+}
+
+/* ========== 操作按钮组 ========== */
+
+.code-collapse-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.code-action-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-white);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.code-action-btn svg {
+    flex-shrink: 0;
+}
+
+.code-action-btn:hover {
+    background: var(--md-blue);
+    border-color: var(--md-blue);
+    color: var(--md-charcoal);
+    transform: translateY(-1px);
+}
+
+.code-action-btn:active {
+    transform: translateY(0);
+}
+
+.code-action-btn:focus {
+    outline: 2px solid var(--md-blue);
+    outline-offset: 2px;
+}
+
+.code-action-btn.copied {
+    background: var(--md-teal);
+    border-color: var(--md-teal);
+    color: var(--md-white);
+}
+
+/* ========== 折叠内容 ========== */
+
+.code-collapse-content {
+    padding: 0;
+    max-height: 600px;
+    overflow-y: auto;
+    background: var(--md-charcoal);
+}
+
+.code-block-collapsible.collapsed .code-collapse-content {
+    display: none;
+}
+
+.code-collapse-content pre {
+    margin: 0;
+    border-radius: 0;
+}
+
+.code-collapse-content code {
+    display: block;
+    padding: 16px;
+}
+
+/* ========== 移动端优化 ========== */
+
+@media (max-width: 768px) {
+    .code-collapse-header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    .code-title {
+        flex-basis: 100%;
+        order: -1;
+        margin-bottom: 4px;
+    }
+
+    .code-meta {
+        flex: 1;
+    }
+
+    .code-collapse-actions {
+        flex-wrap: wrap;
+        padding: 6px 12px;
+    }
+
+    .code-action-btn {
+        font-size: 10px;
+        padding: 5px 10px;
+    }
+}
+
+/* ========== 滚动条样式 ========== */
+
+.code-collapse-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.code-collapse-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.code-collapse-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.code-collapse-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}

@@ -429,7 +429,7 @@ export class MCPClient {
                             capabilities: {},
                             clientInfo: {
                                 name: 'miaomiao-chat',
-                                version: '1.1.1'
+                                version: '1.1.2'
                             }
                         }
                     };
@@ -541,7 +541,7 @@ export class MCPClient {
                             capabilities: {},
                             clientInfo: {
                                 name: 'miaomiao-chat',
-                                version: '1.1.1'
+                                version: '1.1.2'
                             }
                         }
                     })
