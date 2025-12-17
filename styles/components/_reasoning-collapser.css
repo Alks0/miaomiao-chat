@@ -70,7 +70,6 @@
     padding: 14px;
     border-top: 1px dashed var(--md-yellow);
     font-size: 13px;
-    opacity: 0.85;
     max-height: 400px;
     overflow-y: auto;
     line-height: 1.6;

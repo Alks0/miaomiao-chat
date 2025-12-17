@@ -324,7 +324,8 @@
 
 .form-group input[type="text"],
 .form-group input[type="password"],
-.form-group select {
+.form-group select,
+.text-input {
     width: 100%;
     padding: 10px 14px;
     border: var(--border);
@@ -336,7 +337,8 @@
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.text-input:focus {
     outline: none;
     border-color: var(--md-blue);
 }
@@ -703,6 +705,7 @@
     gap: 4px;
 }
 
+.key-edit-btn,
 .key-toggle-btn,
 .key-delete-btn {
     width: 28px;
@@ -717,6 +720,11 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
+}
+
+.key-edit-btn:hover {
+    background: var(--md-surface);
+    color: var(--md-blue);
 }
 
 .key-toggle-btn:hover {
@@ -1094,11 +1102,39 @@
     flex-shrink: 0;  /* 防止被压缩 */
 }
 
-.modal-header h2 {
+.modal-header h2,
+.modal-header h3 {
     margin: 0;
     font-size: 18px;
     font-weight: 600;
     color: var(--md-text);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--md-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: var(--md-surface);
+    color: var(--md-text);
+}
+
+.modal-body {
+    padding: 24px;
+    overflow-y: auto;
 }
 
 .modal-footer {

@@ -688,10 +688,12 @@ async function showEditKeyDialog(providerId, keyId) {
     const key = provider.apiKeys?.find(k => k.id === keyId);
     if (!key) return;
 
-    // 创建对话框
+    // 创建对话框（三级弹窗，需要更高的 z-index）
     const dialog = document.createElement('div');
-    dialog.className = 'modal-overlay active';
+    dialog.className = 'modal active';
+    dialog.style.zIndex = '10001'; // 高于提供商管理面板的 9999
     dialog.innerHTML = `
+        <div class="modal-overlay"></div>
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
                 <h3>编辑密钥</h3>
@@ -726,9 +728,7 @@ async function showEditKeyDialog(providerId, keyId) {
     dialog.querySelector('#cancel-edit-key').addEventListener('click', closeDialog);
 
     // 点击遮罩关闭
-    dialog.addEventListener('click', (e) => {
-        if (e.target === dialog) closeDialog();
-    });
+    dialog.querySelector('.modal-overlay').addEventListener('click', closeDialog);
 
     // ESC 关闭
     const escHandler = (e) => {
@@ -826,58 +826,77 @@ function bindApiKeysEvents(providerId) {
         }
     });
 
-    // 选择当前密钥
-    document.querySelectorAll('input[name="current-key"]').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            const keyId = e.target.value;
-            setCurrentKey(providerId, keyId);
-            refreshApiKeysList(providerId);
-            showNotification('已切换当前密钥', 'success');
-        });
-    });
+    // ✅ 使用事件委托（event delegation）避免重复绑定
+    const listContainer = document.getElementById('api-keys-list');
+    if (listContainer) {
+        // 存储当前提供商 ID 到 dataset 中
+        listContainer.dataset.providerId = providerId;
 
-    // 编辑密钥
-    document.querySelectorAll('.key-edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const keyId = btn.dataset.keyId;
-            showEditKeyDialog(providerId, keyId);
-        });
-    });
+        // 只在第一次绑定事件
+        if (!listContainer.dataset.eventsBound) {
+            listContainer.dataset.eventsBound = 'true';
 
-    // 删除密钥
-    document.querySelectorAll('.key-delete-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const keyId = btn.dataset.keyId;
-            const key = provider.apiKeys?.find(k => k.id === keyId);
+            // 在父容器上监听所有按钮点击
+            listContainer.addEventListener('click', async (e) => {
+                const target = e.target.closest('button, input');
+                if (!target) return;
 
-            const confirmed = await showConfirmDialog(
-                `确定删除密钥 "${key?.name || maskApiKey(key?.key)}"？`,
-                '确认删除'
-            );
+                // 从 dataset 获取当前提供商 ID（避免闭包问题）
+                const currentProviderId = listContainer.dataset.providerId;
+                const currentProvider = state.providers.find(p => p.id === currentProviderId);
+                if (!currentProvider) return;
 
-            if (confirmed) {
-                removeApiKey(providerId, keyId);
-                refreshApiKeysList(providerId);
-                showNotification('密钥已删除', 'success');
-            }
-        });
-    });
+                // 编辑密钥按钮
+                if (target.classList.contains('key-edit-btn')) {
+                    e.stopPropagation();
+                    const keyId = target.dataset.keyId;
+                    showEditKeyDialog(currentProviderId, keyId);
+                    return;
+                }
 
-    // 启用/禁用密钥
-    document.querySelectorAll('.key-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const keyId = btn.dataset.keyId;
-            const key = provider.apiKeys?.find(k => k.id === keyId);
-            if (key) {
-                updateApiKey(providerId, keyId, { enabled: !key.enabled });
-                refreshApiKeysList(providerId);
-                showNotification(key.enabled ? '密钥已禁用' : '密钥已启用', 'success');
-            }
-        });
-    });
+                // 删除密钥按钮
+                if (target.classList.contains('key-delete-btn')) {
+                    e.stopPropagation();
+                    const keyId = target.dataset.keyId;
+                    const key = currentProvider.apiKeys?.find(k => k.id === keyId);
+
+                    const confirmed = await showConfirmDialog(
+                        `确定删除密钥 "${key?.name || maskApiKey(key?.key)}"？`,
+                        '确认删除'
+                    );
+
+                    if (confirmed) {
+                        removeApiKey(currentProviderId, keyId);
+                        refreshApiKeysList(currentProviderId);
+                        showNotification('密钥已删除', 'success');
+                    }
+                    return;
+                }
+
+                // 启用/禁用密钥按钮
+                if (target.classList.contains('key-toggle-btn')) {
+                    e.stopPropagation();
+                    const keyId = target.dataset.keyId;
+                    const key = currentProvider.apiKeys?.find(k => k.id === keyId);
+                    if (key) {
+                        updateApiKey(currentProviderId, keyId, { enabled: !key.enabled });
+                        refreshApiKeysList(currentProviderId);
+                        showNotification(key.enabled ? '密钥已禁用' : '密钥已启用', 'success');
+                    }
+                    return;
+                }
+
+                // 选择当前密钥（单选按钮）
+                if (target.name === 'current-key' && target.type === 'radio') {
+                    const keyId = target.value;
+                    setCurrentKey(currentProviderId, keyId);
+                    refreshApiKeysList(currentProviderId);
+                    showNotification('已切换当前密钥', 'success');
+                    return;
+                }
+            });
+        }
+    }
 
     // 轮询开关
     document.getElementById('rotation-enabled')?.addEventListener('change', (e) => {

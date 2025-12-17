@@ -19,14 +19,24 @@ const DOMPURIFY_CONFIG = {
         // ✅ KaTeX MathML 支持（数学公式渲染）
         'math', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mfrac', 'msup', 'msub',
         'munder', 'mover', 'munderover', 'msqrt', 'mroot', 'mtext', 'mspace',
-        'mtable', 'mtr', 'mtd', 'annotation', 'annotation-xml'
+        'mtable', 'mtr', 'mtd', 'annotation', 'annotation-xml',
+        // ✅ SVG 支持（图标、图形渲染）
+        'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
+        'ellipse', 'g', 'defs', 'use', 'symbol', 'marker', 'clipPath',
+        'linearGradient', 'radialGradient', 'stop', 'text', 'tspan'
     ],
     ALLOWED_ATTR: [
         'href', 'src', 'alt', 'title', 'class', 'style',
         'id', 'data-*', 'aria-*', 'role', 'target', 'rel',
         // ✅ KaTeX 需要的 MathML 属性
         'xmlns', 'encoding', 'mathvariant', 'mathsize', 'mathcolor',
-        'mathbackground', 'displaystyle', 'scriptlevel'
+        'mathbackground', 'displaystyle', 'scriptlevel',
+        // ✅ SVG 需要的属性
+        'viewBox', 'width', 'height', 'fill', 'stroke', 'stroke-width',
+        'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray',
+        'd', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
+        'points', 'transform', 'opacity', 'fill-opacity', 'stroke-opacity',
+        'gradientUnits', 'gradientTransform', 'offset', 'stop-color'
     ],
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'style', 'form', 'input', 'button'],
