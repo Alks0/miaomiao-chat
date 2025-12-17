@@ -15,11 +15,18 @@ const DOMPURIFY_CONFIG = {
         'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3',
         'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr',
         'th', 'td', 'img', 'hr', 'del', 'span', 'div',
-        'sup', 'sub', 'mark', 'small', 'b', 'i', 'u', 's'
+        'sup', 'sub', 'mark', 'small', 'b', 'i', 'u', 's',
+        // ✅ KaTeX MathML 支持（数学公式渲染）
+        'math', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mfrac', 'msup', 'msub',
+        'munder', 'mover', 'munderover', 'msqrt', 'mroot', 'mtext', 'mspace',
+        'mtable', 'mtr', 'mtd', 'annotation', 'annotation-xml'
     ],
     ALLOWED_ATTR: [
         'href', 'src', 'alt', 'title', 'class', 'style',
-        'id', 'data-*', 'aria-*', 'role', 'target', 'rel'
+        'id', 'data-*', 'aria-*', 'role', 'target', 'rel',
+        // ✅ KaTeX 需要的 MathML 属性
+        'xmlns', 'encoding', 'mathvariant', 'mathsize', 'mathcolor',
+        'mathbackground', 'displaystyle', 'scriptlevel'
     ],
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'style', 'form', 'input', 'button'],
@@ -203,7 +210,7 @@ function extractLatexFormulas(text) {
     result = result.replace(/\$\$([^$]+?)\$\$/g, (match, formula) => {
         const index = formulas.length;
         formulas.push({ formula: formula.trim(), display: true });
-        return `<!--LATEX_PLACEHOLDER_${index}-->`;
+        return `<span class="latex-placeholder" data-index="${index}"></span>`;
     });
 
     // 2. 提取行内公式 $...$ （避免与货币符号冲突，要求公式前后有空格或标点）
@@ -220,7 +227,7 @@ function extractLatexFormulas(text) {
 
         // 保留前导字符（空格或括号）
         const prefix = match.charAt(0) === '$' ? '' : match.charAt(0);
-        return `${prefix}<!--LATEX_PLACEHOLDER_${index}-->`;
+        return `${prefix}<span class="latex-placeholder" data-index="${index}"></span>`;
     });
 
     return { text: result, formulas };
@@ -239,7 +246,8 @@ function restoreLatexFormulas(html, formulas) {
         // 降级：还原原始公式文本
         formulas.forEach((item, index) => {
             const original = item.display ? `$$${item.formula}$$` : `$${item.formula}$`;
-            html = html.replace(`<!--LATEX_PLACEHOLDER_${index}-->`, `<code class="latex-fallback">${escapeHtml(original)}</code>`);
+            const placeholder = `<span class="latex-placeholder" data-index="${index}"></span>`;
+            html = html.replace(placeholder, `<code class="latex-fallback">${escapeHtml(original)}</code>`);
         });
         return html;
     }
@@ -259,13 +267,15 @@ function restoreLatexFormulas(html, formulas) {
                 ? `<div class="katex-display-wrapper">${rendered}</div>`
                 : `<span class="katex-inline-wrapper">${rendered}</span>`;
 
-            html = html.replace(`<!--LATEX_PLACEHOLDER_${index}-->`, wrapper);
+            const placeholder = `<span class="latex-placeholder" data-index="${index}"></span>`;
+            html = html.replace(placeholder, wrapper);
         } catch (e) {
             console.error('LaTeX 渲染失败:', e, '公式:', item.formula);
             // 降级：显示原始公式
             const original = item.display ? `$$${item.formula}$$` : `$${item.formula}$`;
+            const placeholder = `<span class="latex-placeholder" data-index="${index}"></span>`;
             html = html.replace(
-                `<!--LATEX_PLACEHOLDER_${index}-->`,
+                placeholder,
                 `<code class="latex-error" title="公式渲染失败: ${escapeHtml(e.message)}">${escapeHtml(original)}</code>`
             );
         }

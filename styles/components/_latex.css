@@ -1,0 +1,84 @@
+/**
+ * LaTeX 数学公式样式
+ * 使用 KaTeX 渲染
+ */
+
+/* 占位符（应该在渲染后被替换，如果还在就隐藏它） */
+.latex-placeholder {
+    display: none !important;
+}
+
+/* 行内公式包装器 */
+.katex-inline-wrapper {
+    display: inline;
+    margin: 0 2px;
+}
+
+/* 块级公式包装器 */
+.katex-display-wrapper {
+    display: block;
+    margin: 16px 0;
+    padding: 12px 16px;
+    background: var(--color-bg-code);
+    border: var(--border);
+    border-radius: 4px;
+    overflow-x: auto;
+    text-align: center;
+}
+
+/* KaTeX 容器 */
+.katex {
+    font-size: 1.1em;
+    text-rendering: auto;
+}
+
+/* 块级公式 */
+.katex-display {
+    display: block;
+    margin: 0;
+    text-align: center;
+}
+
+/* 降级显示（KaTeX 未加载时） */
+.latex-fallback {
+    font-family: var(--font-mono);
+    background: var(--color-bg-code);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--md-blue);
+    border: 1px dashed var(--color-border-primary);
+}
+
+/* 渲染失败的公式 */
+.latex-error {
+    font-family: var(--font-mono);
+    background: rgba(239, 68, 68, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--md-coral);
+    border: 1px dashed var(--md-coral);
+    cursor: help;
+}
+
+/* 暗色主题适配 */
+.dark-theme .katex-display-wrapper {
+    background: var(--color-bg-code);
+    border-color: var(--color-border-primary);
+}
+
+.dark-theme .latex-fallback {
+    background: var(--color-bg-code);
+    color: var(--md-blue);
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+    .katex {
+        font-size: 1em;
+    }
+
+    .katex-display-wrapper {
+        padding: 8px 12px;
+        margin: 12px 0;
+    }
+}

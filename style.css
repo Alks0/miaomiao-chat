@@ -51,6 +51,7 @@
 @import "styles/components/_mcp-settings.css";
 @import "styles/components/_tool-manager.css";
 @import "styles/components/_tools-quick-selector.css";
+@import "styles/components/_latex.css";
 
 /* Utilities */
 @import "styles/utilities/_accessibility.css";
