@@ -879,9 +879,24 @@ function bindApiKeysEvents(providerId) {
                     const keyId = target.dataset.keyId;
                     const key = currentProvider.apiKeys?.find(k => k.id === keyId);
                     if (key) {
+                        const willDisable = key.enabled; // 即将禁用
+
                         updateApiKey(currentProviderId, keyId, { enabled: !key.enabled });
+
+                        // ✅ 修复: 如果禁用的是当前密钥，自动切换到下一个可用密钥
+                        if (willDisable && currentProvider.currentKeyId === keyId) {
+                            const nextEnabledKey = currentProvider.apiKeys.find(k => k.enabled && k.id !== keyId);
+                            if (nextEnabledKey) {
+                                setCurrentKey(currentProviderId, nextEnabledKey.id);
+                                showNotification(`密钥已禁用，已自动切换到：${nextEnabledKey.name}`, 'info');
+                            } else {
+                                showNotification('⚠️ 密钥已禁用，当前无其他可用密钥', 'warning');
+                            }
+                        } else {
+                            showNotification(willDisable ? '密钥已禁用' : '密钥已启用', 'success');
+                        }
+
                         refreshApiKeysList(currentProviderId);
-                        showNotification(key.enabled ? '密钥已禁用' : '密钥已启用', 'success');
                     }
                     return;
                 }
@@ -1015,17 +1030,35 @@ async function showModelsManageModal(providerId) {
 
     } catch (error) {
         loading.style.display = 'none';
+
+        // ✅ 添加详细的错误提示
+        let errorHint = '';
+        if (error.status === 401) {
+            errorHint = '<p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 8px;">提示: 请检查 API 密钥是否正确</p>';
+        } else if (error.status === 429) {
+            errorHint = '<p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 8px;">提示: API 速率限制，请稍后重试</p>';
+        }
+
         checklist.innerHTML = `
             <div style="padding: 40px; text-align: center; color: var(--text-error);">
                 <p>拉取模型失败: ${escapeHtml(error.message)}</p>
+                ${errorHint}
                 <button type="button" class="btn-secondary" id="retry-fetch-models">重试</button>
             </div>
         `;
 
-        // 绑定关闭按钮（确保即使失败也能关闭窗口）
+        // ✅ 修复: 统一的关闭处理器
         const closeHandler = () => {
             modal.classList.remove('active');
-            // 移除 ESC 键监听器
+            // 清理搜索框绑定标记
+            if (searchInput) {
+                searchInput.value = '';
+                delete searchInput._searchBound;
+            }
+            // 隐藏全选/反选按钮
+            const bulkActions = document.getElementById('models-bulk-actions');
+            if (bulkActions) bulkActions.style.display = 'none';
+            // ✅ 清理 ESC 监听器
             if (modal._escHandler) {
                 document.removeEventListener('keydown', modal._escHandler);
                 modal._escHandler = null;
@@ -1048,8 +1081,10 @@ async function showModelsManageModal(providerId) {
         const closeBtn = document.getElementById('close-models-manage');
         const cancelBtn = document.getElementById('cancel-models-manage');
 
+        // ✅ 先移除旧事件再绑定（使用 replaceWith 技巧）
         closeBtn?.replaceWith(closeBtn.cloneNode(true));
         document.getElementById('close-models-manage')?.addEventListener('click', closeHandler);
+
         cancelBtn?.replaceWith(cancelBtn.cloneNode(true));
         document.getElementById('cancel-models-manage')?.addEventListener('click', closeHandler);
 
@@ -1153,7 +1188,11 @@ function bindModelsManageEvents(providerId) {
     // 关闭按钮
     const closeHandler = () => {
         modal.classList.remove('active');
-        searchInput.value = '';
+        if (searchInput) {
+            searchInput.value = '';
+            // ✅ 清理搜索框绑定标记，确保下次打开时能重新绑定
+            delete searchInput._searchBound;
+        }
         // 隐藏全选/反选按钮
         const bulkActions = document.getElementById('models-bulk-actions');
         if (bulkActions) bulkActions.style.display = 'none';
@@ -1182,13 +1221,30 @@ function bindModelsManageEvents(providerId) {
     cancelBtn?.replaceWith(cancelBtn.cloneNode(true));
     document.getElementById('cancel-models-manage')?.addEventListener('click', closeHandler);
 
-    // 搜索框
-    searchInput?.replaceWith(searchInput.cloneNode(true));
-    document.getElementById('models-search-input')?.addEventListener('input', async () => {
-        const allModels = await fetchProviderModels(providerId);
-        renderModelsChecklist(providerId, allModels);
-        bindModelsManageEvents(providerId); // 重新绑定事件
-    });
+    // 搜索框 - 添加防抖，避免频繁触发
+    // ✅ 不使用 replaceWith，保持焦点
+    if (searchInput && !searchInput._searchBound) {
+        let searchTimeout = null;
+        searchInput.addEventListener('input', async (e) => {
+            // 清除之前的延时
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+
+            // 300ms 防抖
+            searchTimeout = setTimeout(async () => {
+                const allModels = await fetchProviderModels(providerId);
+                renderModelsChecklist(providerId, allModels);
+                // ❌ 不再重新绑定事件，避免焦点丢失
+                // 只需要重新绑定复选框的 change 事件
+                const checklist = document.getElementById('models-checklist');
+                checklist?.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                    checkbox.addEventListener('change', updateSelectedCount);
+                });
+            }, 300);
+        });
+        searchInput._searchBound = true; // 标记已绑定，防止重复
+    }
 
     // 复选框变化监听
     checklist?.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {

@@ -98,6 +98,11 @@ export class MCPClient {
         }
 
         try {
+            // 禁止自动重连（防止断开后又自动连接）
+            if (connection.shouldReconnect !== undefined) {
+                connection.shouldReconnect = false;
+            }
+
             if (connection.type === 'local' && this.platform === 'electron') {
                 // Electron: 通过 IPC 通知主进程停止 MCP 子进程
                 await window.electron.ipcRenderer.invoke('mcp:disconnect', { serverId });
@@ -396,14 +401,40 @@ export class MCPClient {
      * @private
      */
     async _connectRemote(config) {
-        const { id, url, apiKey, headers = {} } = config;
+        const { id, url, apiKey, headers = {}, transportType } = config;
 
         if (!url) {
             throw new Error('远程 MCP 需要提供 url 参数');
         }
 
-        // 判断是否使用 WebSocket
-        const isWebSocket = url.startsWith('ws://') || url.startsWith('wss://');
+        // 判断传输类型
+        let isWebSocket = false;
+        let protocol = 'http'; // 默认协议
+
+        if (transportType) {
+            // 显式指定了传输类型
+            if (transportType === 'websocket') {
+                isWebSocket = true;
+                protocol = 'websocket';
+            } else if (transportType === 'streamable-http') {
+                isWebSocket = false;
+                protocol = 'streamable-http';
+            } else if (transportType === 'sse') {
+                isWebSocket = false;
+                protocol = 'sse';
+            } else if (transportType === 'http') {
+                isWebSocket = false;
+                protocol = 'http';
+            } else {
+                console.warn(`[MCP] ⚠️ 未知的传输类型: ${transportType}，将根据 URL 自动检测`);
+                isWebSocket = url.startsWith('ws://') || url.startsWith('wss://');
+                protocol = isWebSocket ? 'websocket' : 'http';
+            }
+        } else {
+            // 根据 URL 自动检测
+            isWebSocket = url.startsWith('ws://') || url.startsWith('wss://');
+            protocol = isWebSocket ? 'websocket' : 'http';
+        }
 
         if (isWebSocket) {
             // WebSocket 连接
@@ -411,10 +442,15 @@ export class MCPClient {
 
             // ✅ 等待 WebSocket 连接并发送初始化请求
             await new Promise((resolve, reject) => {
-                const timeout = setTimeout(
-                    () => reject(new Error(`WebSocket 连接超时 (${this.retryConfig.connectionTimeout}ms)`)),
-                    this.retryConfig.connectionTimeout
-                );
+                let initHandler = null; // 保存处理器引用，便于清理
+
+                const timeout = setTimeout(() => {
+                    // 超时时移除监听器
+                    if (initHandler) {
+                        ws.removeEventListener('message', initHandler);
+                    }
+                    reject(new Error(`WebSocket 连接超时 (${this.retryConfig.connectionTimeout}ms)`));
+                }, this.retryConfig.connectionTimeout);
 
                 ws.onopen = async () => {
                     console.log(`[MCP] 🔗 WebSocket 已连接，发送初始化请求`);
@@ -428,14 +464,14 @@ export class MCPClient {
                             protocolVersion: '2024-11-05',
                             capabilities: {},
                             clientInfo: {
-                                name: 'miaomiao-chat',
-                                version: '1.1.5'
+                                name: 'webchat',
+                                version: '1.1.6'
                             }
                         }
                     };
 
                     // 等待 initialize 响应
-                    const initHandler = (event) => {
+                    initHandler = (event) => {
                         const response = JSON.parse(event.data);
                         if (response.id === 1) {
                             console.log(`[MCP] ✅ WebSocket 初始化成功:`, response);
@@ -457,6 +493,10 @@ export class MCPClient {
                 };
 
                 ws.onerror = (error) => {
+                    // 错误时移除监听器
+                    if (initHandler) {
+                        ws.removeEventListener('message', initHandler);
+                    }
                     clearTimeout(timeout);
                     reject(error);
                 };
@@ -476,13 +516,15 @@ export class MCPClient {
 
                     // 延迟 5 秒后自动重连
                     setTimeout(async () => {
-                        // 再次检查连接是否还在状态中（防止在延迟期间被删除）
-                        if (this.connections.has(id)) {
-                            console.log(`[MCP] 🔄 尝试自动重连: ${config.name}`);
+                        const connection = this.connections.get(id);
 
-                            // 获取最新的服务器配置
+                        // 检查连接是否还存在 && 允许重连 && 服务器配置还存在
+                        if (connection && connection.shouldReconnect && this.connections.has(id)) {
                             const server = state.mcpServers.find(s => s.id === id);
+
                             if (server) {
+                                console.log(`[MCP] 🔄 尝试自动重连: ${config.name}`);
+
                                 const result = await this.connect(server);
                                 if (result.success) {
                                     console.log(`[MCP] ✅ 自动重连成功: ${config.name}`);
@@ -494,7 +536,11 @@ export class MCPClient {
                                         error: result.error
                                     });
                                 }
+                            } else {
+                                console.log(`[MCP] ⚠️ 服务器配置已删除，取消重连: ${id}`);
                             }
+                        } else {
+                            console.log(`[MCP] ⚠️ 连接已手动断开或删除，取消重连: ${id}`);
                         }
                     }, 5000);
                 }
@@ -506,7 +552,8 @@ export class MCPClient {
                 url,
                 ws,
                 apiKey,
-                headers
+                headers,
+                shouldReconnect: true // 标志位：是否允许自动重连
             };
         } else {
             // HTTP 连接
@@ -540,8 +587,8 @@ export class MCPClient {
                             protocolVersion: '2024-11-05',
                             capabilities: {},
                             clientInfo: {
-                                name: 'miaomiao-chat',
-                                version: '1.1.5'
+                                name: 'webchat',
+                                version: '1.1.6'
                             }
                         }
                     })
@@ -588,7 +635,7 @@ export class MCPClient {
 
             return {
                 type: 'remote',
-                protocol: 'http',
+                protocol: protocol, // 使用实际检测到的协议（http/sse/streamable-http）
                 url,
                 apiKey,
                 headers: requestHeaders
@@ -659,6 +706,8 @@ export class MCPClient {
 
                 // ✅ 使用配置的超时时间
                 const timeout = setTimeout(() => {
+                    // ✅ 修复: 超时后清理 handler，避免内存泄漏
+                    ws.removeEventListener('message', handler);
                     reject(new Error(`WebSocket 列表工具超时 (${this.retryConfig.connectionTimeout}ms)`));
                 }, this.retryConfig.connectionTimeout);
 
@@ -691,45 +740,63 @@ export class MCPClient {
 
             console.log(`[MCP] 📤 发送请求到 ${url}:`, requestBody);
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json, text/event-stream',
-                    ...headers
-                },
-                body: JSON.stringify(requestBody)
-            });
+            // ✅ 修复: 添加 HTTP 请求超时控制
+            const abortController = new AbortController();
+            const timeoutId = setTimeout(() => {
+                abortController.abort();
+            }, this.retryConfig.connectionTimeout);
 
-            console.log(`[MCP] 📥 收到响应: ${response.status} ${response.statusText}`);
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json, text/event-stream',
+                        ...headers
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: abortController.signal
+                });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`[MCP] ❌ HTTP 错误响应:`, errorText);
-                throw new Error(`HTTP 请求失败: ${response.status} ${response.statusText}`);
+                clearTimeout(timeoutId);
+
+                console.log(`[MCP] 📥 收到响应: ${response.status} ${response.statusText}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[MCP] ❌ HTTP 错误响应:`, errorText);
+                    throw new Error(`HTTP 请求失败: ${response.status} ${response.statusText}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                console.log(`[MCP] Content-Type: ${contentType}`);
+
+                // ✅ 根据 Content-Type 解析响应
+                let data;
+                if (contentType && contentType.includes('text/event-stream')) {
+                    console.log('[MCP] 解析 SSE 格式响应');
+                    const text = await response.text();
+                    data = this._parseSSE(text);
+                } else {
+                    data = await response.json();
+                }
+
+                console.log(`[MCP] 📦 响应数据:`, data);
+
+                // 处理 JSON-RPC 错误
+                if (data.error) {
+                    throw new Error(`MCP 错误 [${data.error.code}]: ${data.error.message || JSON.stringify(data.error)}`);
+                }
+
+                return data.result?.tools || [];
+            } catch (error) {
+                clearTimeout(timeoutId);
+                // ✅ 修复: 将 AbortError 转换为有意义的超时错误
+                if (error.name === 'AbortError') {
+                    throw new Error(`HTTP 列表工具超时 (${this.retryConfig.connectionTimeout}ms)`);
+                }
+                throw error;
             }
-
-            const contentType = response.headers.get('content-type');
-            console.log(`[MCP] Content-Type: ${contentType}`);
-
-            // ✅ 根据 Content-Type 解析响应
-            let data;
-            if (contentType && contentType.includes('text/event-stream')) {
-                console.log('[MCP] 解析 SSE 格式响应');
-                const text = await response.text();
-                data = this._parseSSE(text);
-            } else {
-                data = await response.json();
-            }
-
-            console.log(`[MCP] 📦 响应数据:`, data);
-
-            // 处理 JSON-RPC 错误
-            if (data.error) {
-                throw new Error(`MCP 错误 [${data.error.code}]: ${data.error.message || JSON.stringify(data.error)}`);
-            }
-
-            return data.result?.tools || [];
         }
     }
 
@@ -747,6 +814,8 @@ export class MCPClient {
 
                 // ✅ 使用配置的超时时间
                 const timeout = setTimeout(() => {
+                    // ✅ 修复: 超时后清理 handler，避免内存泄漏
+                    ws.removeEventListener('message', handler);
                     reject(new Error(`WebSocket 工具调用超时 (${this.retryConfig.toolCallTimeout}ms)`));
                 }, this.retryConfig.toolCallTimeout);
 
@@ -779,46 +848,65 @@ export class MCPClient {
         } else {
             // HTTP: 发送 POST 请求（标准 JSON-RPC 2.0 格式）
             // 注意：POST 到基础 URL，而不是 /tools/call
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json, text/event-stream',
-                    ...headers
-                },
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: Date.now(),
-                    method: 'tools/call',
-                    params: {
-                        name: toolName,
-                        arguments: args
-                    }
-                })
-            });
 
-            if (!response.ok) {
-                throw new Error(`HTTP 请求失败: ${response.status}`);
+            // ✅ 修复: 添加 HTTP 请求超时控制
+            const abortController = new AbortController();
+            const timeoutId = setTimeout(() => {
+                abortController.abort();
+            }, this.retryConfig.toolCallTimeout);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json, text/event-stream',
+                        ...headers
+                    },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: Date.now(),
+                        method: 'tools/call',
+                        params: {
+                            name: toolName,
+                            arguments: args
+                        }
+                    }),
+                    signal: abortController.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP 请求失败: ${response.status}`);
+                }
+
+                // ✅ 根据 Content-Type 解析响应
+                const contentType = response.headers.get('content-type');
+                let data;
+
+                if (contentType && contentType.includes('text/event-stream')) {
+                    console.log('[MCP] 解析 SSE 格式响应 (tools/call)');
+                    const text = await response.text();
+                    data = this._parseSSE(text);
+                } else {
+                    data = await response.json();
+                }
+
+                // 处理 JSON-RPC 错误
+                if (data.error) {
+                    throw new Error(`MCP 错误: ${data.error.message || JSON.stringify(data.error)}`);
+                }
+
+                return data.result;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                // ✅ 修复: 将 AbortError 转换为有意义的超时错误
+                if (error.name === 'AbortError') {
+                    throw new Error(`HTTP 工具调用超时 (${this.retryConfig.toolCallTimeout}ms)`);
+                }
+                throw error;
             }
-
-            // ✅ 根据 Content-Type 解析响应
-            const contentType = response.headers.get('content-type');
-            let data;
-
-            if (contentType && contentType.includes('text/event-stream')) {
-                console.log('[MCP] 解析 SSE 格式响应 (tools/call)');
-                const text = await response.text();
-                data = this._parseSSE(text);
-            } else {
-                data = await response.json();
-            }
-
-            // 处理 JSON-RPC 错误
-            if (data.error) {
-                throw new Error(`MCP 错误: ${data.error.message || JSON.stringify(data.error)}`);
-            }
-
-            return data.result;
         }
     }
 
@@ -839,19 +927,22 @@ export class MCPClient {
             // data: line2
 
             const lines = text.trim().split('\n');
-            let jsonData = '';
+            const dataLines = [];
 
             for (const line of lines) {
                 if (line.startsWith('data: ')) {
                     // 提取 data: 后面的内容
                     const dataContent = line.substring(6);
-                    jsonData += dataContent;
+                    dataLines.push(dataContent);
                 } else if (line.startsWith('data:')) {
                     // 没有空格的情况
                     const dataContent = line.substring(5);
-                    jsonData += dataContent;
+                    dataLines.push(dataContent);
                 }
             }
+
+            // 多行 data 用换行符连接（符合 SSE 规范）
+            const jsonData = dataLines.join('\n');
 
             if (!jsonData) {
                 throw new Error('SSE 响应中没有找到 data 字段');

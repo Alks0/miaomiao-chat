@@ -694,13 +694,28 @@ export async function saveMCPServer(server) {
             const store = transaction.objectStore(STORES.MCP_SERVERS);
             const request = store.put(serverData);
 
+            // 监听请求成功
             request.onsuccess = () => {
                 console.log(`[Storage] ✅ 保存 MCP 服务器: ${server.id}`);
                 resolve();
             };
+
+            // 监听请求错误
             request.onerror = () => {
                 console.error('[Storage] ❌ 保存 MCP 服务器失败:', request.error);
                 reject(request.error);
+            };
+
+            // 监听事务错误（事务级别的错误）
+            transaction.onerror = () => {
+                console.error('[Storage] ❌ 事务错误:', transaction.error);
+                reject(transaction.error);
+            };
+
+            // 监听事务中止
+            transaction.onabort = () => {
+                console.error('[Storage] ❌ 事务被中止');
+                reject(new Error('事务被中止'));
             };
         } catch (error) {
             console.error('[Storage] ❌ 保存 MCP 服务器异常:', error);
@@ -797,6 +812,18 @@ export async function deleteMCPServer(serverId) {
             request.onerror = () => {
                 console.error('[Storage] ❌ 删除 MCP 服务器失败:', request.error);
                 reject(request.error);
+            };
+
+            // 监听事务错误
+            transaction.onerror = () => {
+                console.error('[Storage] ❌ 事务错误:', transaction.error);
+                reject(transaction.error);
+            };
+
+            // 监听事务中止
+            transaction.onabort = () => {
+                console.error('[Storage] ❌ 事务被中止');
+                reject(new Error('事务被中止'));
             };
         } catch (error) {
             console.error('[Storage] ❌ 删除 MCP 服务器异常:', error);

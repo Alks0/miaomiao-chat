@@ -9,6 +9,21 @@ import { eventBus } from '../core/events.js';
 import { saveCurrentConfig, getDefaultCapabilities } from '../state/config.js';
 import { setApiFormat } from '../ui/format-switcher.js';
 
+// ✅ 密钥统计数据保存防抖
+let statsUpdateTimeout = null;
+
+/**
+ * 防抖保存密钥统计数据
+ */
+function saveKeyStatsDebounced() {
+    if (statsUpdateTimeout) {
+        clearTimeout(statsUpdateTimeout);
+    }
+    statsUpdateTimeout = setTimeout(() => {
+        saveCurrentConfig();
+    }, 2000);  // 2秒防抖
+}
+
 /**
  * 生成唯一 ID
  * @param {string} prefix - ID 前缀
@@ -89,6 +104,17 @@ export function updateProvider(id, updates) {
     if (index === -1) return null;
 
     Object.assign(state.providers[index], updates);
+
+    // ✅ 修复: 如果更新的是当前提供商，立即同步全局状态
+    const provider = state.providers[index];
+    if (state.currentProviderId === id ||
+        (provider.models && provider.models.some(m => {
+            const modelId = typeof m === 'string' ? m : m.id;
+            return modelId === state.selectedModel;
+        }))) {
+        syncProviderState(provider);
+        console.log(`[updateProvider] ⚡ 立即同步提供商状态到全局 state`);
+    }
 
     saveCurrentConfig();
     eventBus.emit('providers:updated', { id, provider: state.providers[index] });
@@ -208,6 +234,10 @@ export function removeApiKey(providerId, keyId) {
         const nextKey = provider.apiKeys.find(k => k.enabled);
         provider.currentKeyId = nextKey?.id || null;
         provider.apiKey = nextKey?.key || '';
+
+        // ✅ 修复: 清除模型缓存，确保下次拉取使用新密钥
+        clearModelsCache(providerId);
+        console.log(`[removeApiKey] 删除了当前密钥，已切换到 ${nextKey?.name || '无'}，并清除缓存`);
     }
 
     saveCurrentConfig();
@@ -260,6 +290,8 @@ export function updateApiKey(providerId, keyId, updates) {
     // 如果更新的是当前密钥的 key 值，同步到兼容字段
     if (provider.currentKeyId === keyId && updates.key) {
         provider.apiKey = updates.key;
+        // ✅ 修复: 清除模型缓存，确保下次拉取使用新密钥
+        clearModelsCache(providerId);
     }
 
     saveCurrentConfig();
@@ -343,6 +375,8 @@ function getRotatedKey(provider) {
     // 更新使用统计
     selectedKey.usageCount++;
     selectedKey.lastUsed = Date.now();
+    // ✅ 修复: 保存统计数据（防抖）
+    saveKeyStatsDebounced();
 
     return selectedKey.key;
 }
@@ -366,6 +400,8 @@ export function rotateToNextKey(providerId, markError = false) {
         const currentKey = provider.apiKeys.find(k => k.id === provider.currentKeyId);
         if (currentKey) {
             currentKey.errorCount++;
+            // ✅ 修复: 保存错误统计（防抖）
+            saveKeyStatsDebounced();
         }
     }
 
@@ -377,13 +413,25 @@ export function rotateToNextKey(providerId, markError = false) {
 
     // 选择下一个密钥
     const nextKey = enabledKeys[0];
+    const previousKeyId = provider.currentKeyId;  // ✅ 保存旧密钥ID
+
     provider.currentKeyId = nextKey.id;
     provider.apiKey = nextKey.key;
+
+    // ✅ 修复: 清除模型缓存，确保下次拉取使用新密钥
+    clearModelsCache(providerId);
 
     saveCurrentConfig();
     eventBus.emit('providers:key-rotated', { providerId, keyId: nextKey.id });
 
-    console.log(`[KeyRotation] 切换到密钥: ${nextKey.name} (${nextKey.id})`);
+    // ✅ 修复: 发送通知给用户
+    eventBus.emit('ui:notification', {
+        message: `已自动切换到备用密钥: ${nextKey.name}`,
+        type: 'info',
+        duration: 5000
+    });
+
+    console.log(`[KeyRotation] 切换密钥: ${previousKeyId} → ${nextKey.id} (${nextKey.name})`);
 
     return nextKey.key;
 }
@@ -409,6 +457,26 @@ export function setKeyRotationConfig(providerId, config) {
 }
 
 /**
+ * 同步提供商状态到全局 state
+ * @param {Object} provider - 提供商对象
+ */
+function syncProviderState(provider) {
+    if (!provider) return;
+
+    // ✅ 同步 apiFormat
+    if (state.apiFormat !== provider.apiFormat) {
+        state.apiFormat = provider.apiFormat;
+        console.log(`[syncProviderState] 同步 apiFormat: ${provider.apiFormat}`);
+    }
+
+    // ✅ 同步 Gemini 特有配置
+    if (provider.apiFormat === 'gemini' && provider.geminiApiKeyInHeader !== undefined) {
+        state.geminiApiKeyInHeader = provider.geminiApiKeyInHeader;
+        console.log(`[syncProviderState] 同步 geminiApiKeyInHeader: ${provider.geminiApiKeyInHeader}`);
+    }
+}
+
+/**
  * 获取当前提供商（根据选中的模型自动判断）
  * @returns {Object|undefined} 当前提供商对象
  */
@@ -418,6 +486,8 @@ export function getCurrentProvider() {
         const provider = state.providers.find(p => p.id === state.currentProviderId);
         if (provider && provider.enabled) {
             console.log(`[getCurrentProvider] 使用 currentProviderId: ${provider.name} (${provider.id})`);
+            // ✅ 修复: 同步全局状态
+            syncProviderState(provider);
             return provider;
         } else {
             console.warn(`[getCurrentProvider] currentProviderId 无效或已禁用: ${state.currentProviderId}`);
@@ -460,6 +530,8 @@ export function getCurrentProvider() {
             if (matchingProviders.length > 1) {
                 console.warn(`[getCurrentProvider] 多个提供商包含模型 ${selectedModel}, 使用: ${provider.name} (apiFormat: ${provider.apiFormat})`);
             }
+            // ✅ 修复: 同步全局状态
+            syncProviderState(provider);
             return provider;
         }
     }
@@ -468,12 +540,16 @@ export function getCurrentProvider() {
     const firstEnabled = state.providers.find(p => p.enabled);
     if (firstEnabled) {
         console.log(`[getCurrentProvider] 使用第一个启用的提供商: ${firstEnabled.name}`);
+        // ✅ 修复: 同步全局状态
+        syncProviderState(firstEnabled);
         return firstEnabled;
     }
 
     // 5. 最后返回第一个提供商（即使未启用）
     const fallback = state.providers[0];
     console.warn(`[getCurrentProvider] 使用第一个提供商（可能未启用）: ${fallback?.name || 'none'}`);
+    // ✅ 修复: 同步全局状态
+    syncProviderState(fallback);
     return fallback;
 }
 
@@ -598,7 +674,7 @@ function getDefaultProviderName(format) {
 
 // 模型缓存 (5分钟有效期)
 const modelsCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5分钟
+const CACHE_DURATION = 30 * 60 * 1000; // ✅ 延长到 30分钟（减少API请求频率）
 
 /**
  * 添加单个模型到提供商
@@ -787,7 +863,11 @@ export function clearModelsCache(providerId) {
  * @returns {Promise<Array<Object>>} 模型对象数组（v2格式）
  */
 async function fetchModelsFromAPI(provider) {
-    const { apiFormat, endpoint, apiKey, geminiApiKeyInHeader } = provider;
+    const { apiFormat, endpoint, geminiApiKeyInHeader } = provider;
+
+    // ✅ 修复: 使用 getActiveApiKey 获取当前活动的密钥
+    const apiKey = getActiveApiKey(provider.id);
+
     let allModels = [];
 
     try {
@@ -795,6 +875,7 @@ async function fetchModelsFromAPI(provider) {
             // Gemini API 格式 - 支持分页获取所有模型
             const baseModelsEndpoint = `${endpoint.replace(/\/$/, '')}/v1beta/models`;
             console.log('Fetching Gemini models from:', baseModelsEndpoint);
+            console.log('[Gemini] geminiApiKeyInHeader:', geminiApiKeyInHeader, 'apiKey:', apiKey ? '***' + apiKey.slice(-4) : 'undefined');
 
             let pageToken = null;
 

@@ -109,23 +109,38 @@ function convertOpenAIMessageToGemini(msg) {
         // 多模态内容数组
         for (const part of msg.content) {
             if (part.type === 'text' && part.text) {
-                parts.push({ text: part.text });
+                const textPart = { text: part.text };
+                // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                if (part.thoughtSignature) {
+                    textPart.thoughtSignature = part.thoughtSignature;
+                }
+                parts.push(textPart);
             } else if (part.type === 'thinking' && part.text) {
                 // ⚠️ Gemini 的思维链格式不同，暂时作为普通文本处理
                 // 或者可以在外层添加 thoughtSignature 标记
-                parts.push({ text: `[Thinking]\n${part.text}` });
+                const thinkingPart = { text: `[Thinking]\n${part.text}` };
+                // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                if (part.thoughtSignature) {
+                    thinkingPart.thoughtSignature = part.thoughtSignature;
+                }
+                parts.push(thinkingPart);
             } else if (part.type === 'image_url') {
                 // 提取 base64 数据（图片）
                 const url = part.image_url?.url || part.url;
                 if (url) {
                     const match = url.match(/^data:([^;]+);base64,(.+)$/);
                     if (match) {
-                        parts.push({
+                        const imagePart = {
                             inlineData: {
                                 mimeType: match[1],
                                 data: match[2]
                             }
-                        });
+                        };
+                        // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                        if (part.thoughtSignature) {
+                            imagePart.thoughtSignature = part.thoughtSignature;
+                        }
+                        parts.push(imagePart);
                     }
                 }
             } else if (part.type === 'file' && part.file?.file_data) {
@@ -133,12 +148,17 @@ function convertOpenAIMessageToGemini(msg) {
                 const fileData = part.file.file_data;
                 const match = fileData.match(/^data:([^;]+);base64,(.+)$/);
                 if (match) {
-                    parts.push({
+                    const filePart = {
                         inlineData: {
                             mimeType: match[1],
                             data: match[2]
                         }
-                    });
+                    };
+                    // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                    if (part.thoughtSignature) {
+                        filePart.thoughtSignature = part.thoughtSignature;
+                    }
+                    parts.push(filePart);
                 }
             }
         }
@@ -211,35 +231,52 @@ async function processContentsForRequest(contents) {
 
 /**
  * 构建带 thoughtSignature 的 Gemini contents
- * ✅ 只传播从 API 响应中接收到的签名，不自动生成新签名
+ * ✅ 全局传播签名：如果任何 content 有签名，所有 contents 都必须有
  * @param {Array} contents - Gemini 格式的消息数组
  * @returns {Array} 处理后的消息数组
  */
 function buildGeminiContentsWithSignatures(contents) {
-    return contents.map(content => {
-        // ✅ 修复：检查消息级别或任何 part 是否有 thoughtSignature
-        const messageSignature = content.thoughtSignature;
-        const anyPartHasSignature = content.parts.some(part => part.thoughtSignature);
+    // ✅ 第一遍扫描：检查是否有任何 content 或 part 包含 thoughtSignature
+    let globalSignature = null;
 
-        if (messageSignature || anyPartHasSignature) {
-            // 获取签名（优先使用消息级别，否则使用第一个有签名的 part）
-            const signature = messageSignature || content.parts.find(part => part.thoughtSignature)?.thoughtSignature;
-
-            // ✅ Gemini thinking 模式要求：如果任何 part 有签名，所有 parts 都必须有相同的签名
-            // 否则会报错 "Image part is missing a thought_signature"
-            return {
-                role: content.role,
-                parts: content.parts.map(part => ({
-                    ...part,
-                    thoughtSignature: signature
-                }))
-            };
+    for (const content of contents) {
+        // 检查消息级别的签名
+        if (content.thoughtSignature) {
+            globalSignature = content.thoughtSignature;
+            console.log('[Gemini] 🔍 找到消息级别的 thoughtSignature');
+            break;
         }
 
-        // ✅ 没有签名的消息保持原样（不自动生成签名）
-        // 根据 Gemini 官方文档：签名应该从 API 响应中接收并原样传回，而不是客户端生成
-        return { role: content.role, parts: content.parts };
-    });
+        // 检查 part 级别的签名
+        if (content.parts) {
+            const partSignature = content.parts.find(p => p.thoughtSignature)?.thoughtSignature;
+            if (partSignature) {
+                globalSignature = partSignature;
+                console.log('[Gemini] 🔍 找到 part 级别的 thoughtSignature');
+                break;
+            }
+        }
+    }
+
+    // ✅ 第二遍处理：如果找到签名，应用到所有 contents 的所有 parts
+    if (globalSignature) {
+        console.log('[Gemini] ✅ 将 thoughtSignature 应用到所有', contents.length, '个 contents');
+        return contents.map(content => ({
+            role: content.role,
+            parts: content.parts.map(part => ({
+                ...part,
+                thoughtSignature: globalSignature  // 所有 part 都获得相同的签名
+            }))
+        }));
+    }
+
+    // ✅ 没有找到签名：保持原样（不自动生成签名）
+    // 根据 Gemini 官方文档：签名应该从 API 响应中接收并原样传回，而不是客户端生成
+    console.log('[Gemini] ℹ️ 未找到 thoughtSignature，保持原样');
+    return contents.map(content => ({
+        role: content.role,
+        parts: content.parts
+    }));
 }
 
 /**

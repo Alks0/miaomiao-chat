@@ -3,16 +3,55 @@
  * 用于将工具转换为 CherryStudio 风格的 XML 格式
  */
 
+// ✅ 修复: 工具 ID 生成计数器（避免短时间内重复）
+let toolIdCounter = 0;
+
+/**
+ * 生成唯一的工具调用 ID
+ * @returns {string} 唯一 ID
+ */
+function generateToolCallId() {
+    // 使用时间戳 + 计数器 + 随机数三重保障
+    const timestamp = Date.now();
+    const counter = (toolIdCounter++ % 10000).toString().padStart(4, '0');
+    const random = Math.random().toString(36).substring(2, 11);
+    return `xml_tool_${timestamp}_${counter}_${random}`;
+}
+
 /**
  * 转义 XML 特殊字符
  */
 function escapeXML(str) {
+    if (typeof str !== 'string') return '';
+
+    // ✅ 修复1: 过滤非法 XML 字符（控制字符，除了 \t \n \r）
+    str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+
+    // ✅ 修复2: 转义顺序很重要（& 必须最先处理）
     return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
+        .replace(/'/g, '&apos;')
+        .replace(/\r/g, '&#xD;'); // ✅ 修复3: 转义回车符
+}
+
+/**
+ * 解码 XML 实体
+ */
+function unescapeXML(str) {
+    if (typeof str !== 'string') return '';
+
+    // ✅ 修复4: 添加解码函数（顺序与编码相反，& 必须最后）
+    return str
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&gt;/g, '>')
+        .replace(/&lt;/g, '<')
+        .replace(/&#xD;/g, '\r')
+        .replace(/&#13;/g, '\r')
+        .replace(/&amp;/g, '&'); // 必须最后处理
 }
 
 /**
@@ -120,41 +159,71 @@ export function extractXMLToolCalls(text) {
     let index = 0;
 
     // 格式 1: tool_use 格式 (CherryStudio 风格)
-    // 使用更严格的正则：arguments 内容不能包含 <tool_use> 或 </tool_use>（防止嵌套匹配错误）
-    const toolUseRegex = /<tool_use>\s*<name>([^<]*)<\/name>\s*<arguments>((?:(?!<\/?tool_use)[\s\S])*?)<\/arguments>\s*<\/tool_use>/gi;
+    // ✅ 修复 ReDoS: 使用两步解析避免灾难性回溯
+    const toolUseBlockRegex = /<tool_use>([\s\S]*?)<\/tool_use>/gi;
     let match;
-    while ((match = toolUseRegex.exec(text)) !== null) {
-        const name = match[1].trim();
-        const argsText = match[2].trim();
-        try {
-            const args = JSON.parse(argsText);
-            toolCalls.push({
-                id: `xml_tool_${Date.now()}_${index++}`,
-                name,
-                arguments: args
-            });
-            console.log('[XML Parser] 提取到 tool_use 格式工具调用:', name);
-        } catch (error) {
-            console.error('[XML Parser] tool_use 格式解析参数失败:', argsText.substring(0, 100), error);
+    while ((match = toolUseBlockRegex.exec(text)) !== null) {
+        const block = match[1];
+        // 在块内解析 name 和 arguments（简单正则，无回溯风险）
+        const nameMatch = /<name>([^<]+)<\/name>/.exec(block);
+        const argsMatch = /<arguments>([\s\S]*?)<\/arguments>/.exec(block);
+
+        if (nameMatch && argsMatch) {
+            const name = nameMatch[1].trim();
+            const argsText = argsMatch[1].trim();
+            try {
+                const args = JSON.parse(argsText);
+                toolCalls.push({
+                    id: generateToolCallId(),
+                    name,
+                    arguments: args
+                });
+                console.log('[XML Parser] 提取到 tool_use 格式工具调用:', name);
+            } catch (error) {
+                console.error('[XML Parser] tool_use 格式解析参数失败:', argsText.substring(0, 100), error);
+                // ✅ 修复: 返回错误对象而不是跳过
+                toolCalls.push({
+                    id: generateToolCallId(),
+                    name,
+                    arguments: {},
+                    _parseError: error.message,
+                    _originalText: argsText.substring(0, 200)
+                });
+            }
         }
     }
 
     // 格式 2: function_call 格式 (一些代理使用)
-    // 使用更严格的正则：arguments 内容不能包含 <function_call> 或 </function_call>
-    const functionCallRegex = /<function_call>\s*<name>([^<]*)<\/name>\s*<arguments>((?:(?!<\/?function_call)[\s\S])*?)<\/arguments>\s*<\/function_call>/gi;
-    while ((match = functionCallRegex.exec(text)) !== null) {
-        const name = match[1].trim();
-        const argsText = match[2].trim();
-        try {
-            const args = JSON.parse(argsText);
-            toolCalls.push({
-                id: `xml_tool_${Date.now()}_${index++}`,
-                name,
-                arguments: args
-            });
-            console.log('[XML Parser] 提取到 function_call 格式工具调用:', name);
-        } catch (error) {
-            console.error('[XML Parser] function_call 格式解析参数失败:', argsText.substring(0, 100), error);
+    // ✅ 修复 ReDoS: 使用两步解析避免灾难性回溯
+    const functionCallBlockRegex = /<function_call>([\s\S]*?)<\/function_call>/gi;
+    while ((match = functionCallBlockRegex.exec(text)) !== null) {
+        const block = match[1];
+        // 在块内解析 name 和 arguments（简单正则，无回溯风险）
+        const nameMatch = /<name>([^<]+)<\/name>/.exec(block);
+        const argsMatch = /<arguments>([\s\S]*?)<\/arguments>/.exec(block);
+
+        if (nameMatch && argsMatch) {
+            const name = nameMatch[1].trim();
+            const argsText = argsMatch[1].trim();
+            try {
+                const args = JSON.parse(argsText);
+                toolCalls.push({
+                    id: generateToolCallId(),
+                    name,
+                    arguments: args
+                });
+                console.log('[XML Parser] 提取到 function_call 格式工具调用:', name);
+            } catch (error) {
+                console.error('[XML Parser] function_call 格式解析参数失败:', argsText.substring(0, 100), error);
+                // ✅ 修复: 返回错误对象而不是跳过
+                toolCalls.push({
+                    id: generateToolCallId(),
+                    name,
+                    arguments: {},
+                    _parseError: error.message,
+                    _originalText: argsText.substring(0, 200)
+                });
+            }
         }
     }
 
@@ -183,7 +252,7 @@ export function extractXMLToolCalls(text) {
 
         if (Object.keys(args).length > 0 || paramsContent.trim() === '') {
             toolCalls.push({
-                id: `xml_tool_${Date.now()}_${index++}`,
+                id: generateToolCallId(),
                 name,
                 arguments: args
             });

@@ -10,6 +10,13 @@ import { saveMCPServer, deleteMCPServer } from '../state/storage.js';
 import { showNotification } from './notifications.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
 import { getIcon } from '../utils/icons.js';
+import {
+    standardToInternal,
+    internalToStandard,
+    validateStandardConfig,
+    generateTemplate,
+    getAvailableTemplates
+} from '../tools/mcp/config-converter.js';
 
 const platform = detectPlatform();
 
@@ -17,6 +24,7 @@ const platform = detectPlatform();
 let modal = null;
 let isFormOpen = false;
 let removeFocusTrap = null;
+let isInitialized = false; // 防止重复初始化
 
 // ========== 辅助函数 ==========
 
@@ -67,6 +75,12 @@ function createFocusTrap(container) {
  * 初始化 MCP 设置 UI
  */
 export function initMCPSettings() {
+    // 防止重复初始化
+    if (isInitialized) {
+        console.log('[MCP Settings] ⚠️ 已初始化，跳过');
+        return;
+    }
+
     console.log('[MCP Settings] ⚙️ 初始化...');
 
     modal = document.getElementById('mcp-settings-modal');
@@ -97,6 +111,7 @@ export function initMCPSettings() {
         state.mcpServers = [];
     }
 
+    isInitialized = true; // 标记为已初始化
     console.log('[MCP Settings] ✅ 初始化完成');
 }
 
@@ -293,6 +308,18 @@ function bindFormEvents() {
         // 取消按钮
         else if (e.target.id === 'mcp-cancel-server-btn' || e.target.closest('#mcp-cancel-server-btn')) {
             hideServerForm();
+        }
+        // 导入配置按钮
+        else if (e.target.id === 'mcp-import-config-btn' || e.target.closest('#mcp-import-config-btn')) {
+            importMCPConfig();
+        }
+        // 导出配置按钮
+        else if (e.target.id === 'mcp-export-config-btn' || e.target.closest('#mcp-export-config-btn')) {
+            exportMCPConfig();
+        }
+        // 快速模板按钮
+        else if (e.target.id === 'mcp-template-btn' || e.target.closest('#mcp-template-btn')) {
+            showTemplateDialog();
         }
     });
 
@@ -736,9 +763,14 @@ async function deleteServer(serverId) {
         return;
     }
 
-    // 先断开连接
+    // 先断开连接（必须等待断开完成，避免资源泄漏）
     if (mcpClient.connections.has(serverId)) {
-        mcpClient.disconnect(serverId);
+        try {
+            await mcpClient.disconnect(serverId);
+        } catch (error) {
+            console.error('[MCP Settings] 断开连接失败:', error);
+            // 即使断开失败，也继续删除（用户主动删除）
+        }
     }
 
     // 从状态中移除
@@ -871,6 +903,637 @@ function getErrorMessage(errorType, rawError) {
     };
 
     return errorMessages[errorType] || errorMessages['unknown_error'];
+}
+
+// ========== 配置导入/导出功能 ==========
+
+/**
+ * 导出 MCP 配置为 JSON 文件
+ */
+export async function exportMCPConfig() {
+    try {
+        // 转换为标准格式
+        const standardConfig = internalToStandard(state.mcpServers || []);
+
+        // 生成 JSON 字符串（格式化，2 空格缩进）
+        const jsonString = JSON.stringify(standardConfig, null, 2);
+
+        // 创建 Blob
+        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        // 生成文件名（带时间戳）
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const filename = `mcp-config-${timestamp}.json`;
+
+        // 下载文件
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+
+        // 清理 URL
+        setTimeout(() => URL.revokeObjectURL(link.href), 100);
+
+        showNotification(`${getIcon('download', { size: 14 })} 配置已导出: ${filename}`, 'success');
+    } catch (error) {
+        console.error('[MCP Settings] 导出配置失败:', error);
+        showNotification(`${getIcon('xCircle', { size: 14 })} 导出配置失败: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * 导入 MCP 配置 JSON 文件
+ */
+export async function importMCPConfig() {
+    // 显示导入方式选择对话框
+    const importMethod = await showImportMethodDialog();
+
+    if (!importMethod) return;
+
+    let jsonText;
+
+    if (importMethod === 'file') {
+        // 文件上传方式
+        jsonText = await selectJsonFile();
+    } else if (importMethod === 'paste') {
+        // 粘贴 JSON 方式
+        jsonText = await showJsonPasteDialog();
+    }
+
+    if (!jsonText) return;
+
+    // 处理导入的 JSON
+    await processImportedJson(jsonText);
+}
+
+/**
+ * 显示导入方式选择对话框
+ * @returns {Promise<'file'|'paste'|null>}
+ */
+async function showImportMethodDialog() {
+    return new Promise((resolve) => {
+        const dialog = document.createElement('div');
+        dialog.className = 'modal active';
+        dialog.style.zIndex = '10002';
+
+        dialog.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>${getIcon('upload', { size: 18 })} 导入 MCP 配置</h3>
+                    <button class="modal-close" aria-label="关闭">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>请选择导入方式：</p>
+                    <div class="import-method-options" style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+                        <button class="btn btn-primary" id="import-from-file" style="padding: 16px; text-align: left;">
+                            ${getIcon('fileText', { size: 18 })} <strong>从文件上传</strong>
+                            <small style="display: block; margin-top: 4px; opacity: 0.8;">选择本地 JSON 配置文件</small>
+                        </button>
+                        <button class="btn btn-primary" id="import-from-paste" style="padding: 16px; text-align: left;">
+                            ${getIcon('clipboard', { size: 18 })} <strong>粘贴 JSON 内容</strong>
+                            <small style="display: block; margin-top: 4px; opacity: 0.8;">直接粘贴或输入 JSON 配置</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        const cleanup = () => {
+            document.body.removeChild(dialog);
+        };
+
+        dialog.querySelector('#import-from-file').addEventListener('click', () => {
+            cleanup();
+            resolve('file');
+        });
+
+        dialog.querySelector('#import-from-paste').addEventListener('click', () => {
+            cleanup();
+            resolve('paste');
+        });
+
+        dialog.querySelector('.modal-close').addEventListener('click', () => {
+            cleanup();
+            resolve(null);
+        });
+
+        dialog.querySelector('.modal-overlay').addEventListener('click', () => {
+            cleanup();
+            resolve(null);
+        });
+    });
+}
+
+/**
+ * 选择 JSON 文件
+ * @returns {Promise<string|null>}
+ */
+async function selectJsonFile() {
+    return new Promise((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json,.json';
+
+        input.onchange = async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) {
+                resolve(null);
+                return;
+            }
+
+            try {
+                const text = await file.text();
+                resolve(text);
+            } catch (error) {
+                showNotification(`${getIcon('xCircle', { size: 14 })} 读取文件失败: ${error.message}`, 'error');
+                resolve(null);
+            }
+        };
+
+        input.click();
+    });
+}
+
+/**
+ * 显示 JSON 粘贴对话框
+ * @returns {Promise<string|null>}
+ */
+async function showJsonPasteDialog() {
+    return new Promise((resolve) => {
+        const dialog = document.createElement('div');
+        dialog.className = 'modal active';
+        dialog.style.zIndex = '10002';
+
+        // 生成示例 JSON
+        const exampleJson = `// 示例 JSON (stdio):
+// {
+//   "mcpServers": {
+//     "stdio-server-example": {
+//       "command": "npx",
+//       "args": ["-y", "mcp-server-example"]
+//     }
+//   }
+// }
+
+// 示例 JSON (sse):
+// {
+//   "mcpServers": {
+//     "sse-server-example": {
+//       "type": "sse",
+//       "url": "http://localhost:3000"
+//     }
+//   }
+// }
+
+// 示例 JSON (streamableHttp):
+// {
+//   "mcpServers": {
+//     "streamable-http-example": {
+//       "type": "streamableHttp",
+//       "url": "http://localhost:3001/mcp",
+//       "headers": {
+//         "Content-Type": "application/json",
+//         "Authorization": "Bearer your-token"
+//       }
+//     }
+//   }
+// }`;
+
+        dialog.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content" style="max-width: 800px; max-height: 90vh;">
+                <div class="modal-header">
+                    <h3>${getIcon('clipboard', { size: 18 })} 从 JSON 导入</h3>
+                    <button class="modal-close" aria-label="关闭">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 12px;">请从 MCP Servers 的介绍页面复制配置 JSON（优先使用 NPX 或 UVX 配置），并粘贴到输入框中</p>
+                    <textarea
+                        id="json-paste-textarea"
+                        placeholder="粘贴 JSON 内容到这里..."
+                        style="
+                            width: 100%;
+                            height: 400px;
+                            padding: 12px;
+                            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                            font-size: 13px;
+                            line-height: 1.5;
+                            background: var(--color-bg-code, #1e1e1e);
+                            color: var(--md-text, #e0e0e0);
+                            border: var(--border);
+                            border-radius: 6px;
+                            resize: vertical;
+                            tab-size: 2;
+                        "
+                    >${exampleJson}</textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="json-paste-cancel">取消</button>
+                    <button class="btn btn-primary" id="json-paste-confirm">确定</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        const textarea = dialog.querySelector('#json-paste-textarea');
+        const cleanup = () => {
+            document.body.removeChild(dialog);
+        };
+
+        // 聚焦并选中示例文本
+        setTimeout(() => {
+            textarea.focus();
+            textarea.select();
+        }, 100);
+
+        dialog.querySelector('#json-paste-confirm').addEventListener('click', () => {
+            const content = textarea.value.trim();
+            cleanup();
+            resolve(content || null);
+        });
+
+        dialog.querySelector('#json-paste-cancel').addEventListener('click', () => {
+            cleanup();
+            resolve(null);
+        });
+
+        dialog.querySelector('.modal-close').addEventListener('click', () => {
+            cleanup();
+            resolve(null);
+        });
+
+        dialog.querySelector('.modal-overlay').addEventListener('click', () => {
+            cleanup();
+            resolve(null);
+        });
+    });
+}
+
+/**
+ * 智能移除 JSON 注释（避免删除字符串中的注释符号）
+ * @param {string} jsonText - 带注释的 JSON 文本
+ * @returns {string} 清理后的 JSON
+ */
+function removeJsonComments(jsonText) {
+    const lines = jsonText.split('\n');
+    const result = [];
+    let inMultilineComment = false;
+
+    for (let line of lines) {
+        let cleanLine = '';
+        let inString = false;
+        let stringChar = null;
+        let i = 0;
+
+        while (i < line.length) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+
+            // 处理多行注释
+            if (inMultilineComment) {
+                if (char === '*' && nextChar === '/') {
+                    inMultilineComment = false;
+                    i += 2;
+                    continue;
+                }
+                i++;
+                continue;
+            }
+
+            // 处理字符串
+            if ((char === '"' || char === "'") && (i === 0 || line[i - 1] !== '\\')) {
+                if (!inString) {
+                    inString = true;
+                    stringChar = char;
+                } else if (char === stringChar) {
+                    inString = false;
+                    stringChar = null;
+                }
+                cleanLine += char;
+                i++;
+                continue;
+            }
+
+            // 在字符串内，直接添加
+            if (inString) {
+                cleanLine += char;
+                i++;
+                continue;
+            }
+
+            // 检测注释开始
+            if (char === '/' && nextChar === '/') {
+                // 单行注释，跳过本行剩余部分
+                break;
+            }
+
+            if (char === '/' && nextChar === '*') {
+                // 多行注释开始
+                inMultilineComment = true;
+                i += 2;
+                continue;
+            }
+
+            cleanLine += char;
+            i++;
+        }
+
+        // 只保留非空行
+        if (cleanLine.trim()) {
+            result.push(cleanLine);
+        }
+    }
+
+    return result.join('\n');
+}
+
+/**
+ * 处理导入的 JSON 内容
+ * @param {string} jsonText - JSON 文本
+ */
+async function processImportedJson(jsonText) {
+    try {
+        // 智能移除注释（避免删除字符串中的注释符号）
+        const cleanJson = removeJsonComments(jsonText);
+
+        // 解析 JSON
+        let configData;
+        try {
+            configData = JSON.parse(cleanJson);
+        } catch (parseError) {
+            throw new Error('JSON 格式错误，请检查内容是否正确');
+        }
+
+        // 验证配置
+        const validation = validateStandardConfig(configData);
+        if (!validation.valid) {
+            const errorList = validation.errors.join('\n• ');
+            throw new Error(`配置验证失败:\n• ${errorList}`);
+        }
+
+        // 转换为内部格式
+        const servers = standardToInternal(configData);
+
+        if (servers.length === 0) {
+            throw new Error('配置文件中没有有效的服务器');
+        }
+
+        // 询问用户是替换还是合并
+        const action = await showImportMergeDialog(servers.length);
+
+        if (action === 'cancel') {
+            return;
+        }
+
+        // 替换模式：清空现有配置
+        if (action === 'replace') {
+            // 断开所有连接（使用 connections Map 而不是 server.connected）
+            for (const server of state.mcpServers || []) {
+                if (mcpClient.connections.has(server.id)) {
+                    try {
+                        await mcpClient.disconnect(server.id);
+                    } catch (error) {
+                        console.error(`[MCP Settings] 断开服务器 ${server.id} 失败:`, error);
+                        // 继续处理其他服务器
+                    }
+                }
+            }
+
+            // 删除所有服务器
+            for (const server of state.mcpServers || []) {
+                try {
+                    await deleteMCPServer(server.id);
+                } catch (error) {
+                    console.error(`[MCP Settings] 删除服务器 ${server.id} 失败:`, error);
+                }
+            }
+
+            state.mcpServers = [];
+        }
+
+        // 保存导入的服务器
+        for (const server of servers) {
+            await saveMCPServer(server);
+            state.mcpServers.push(server);
+        }
+
+        // 刷新 UI
+        renderServerList();
+
+        showNotification(
+            `${getIcon('checkCircle', { size: 14 })} 成功导入 ${servers.length} 个 MCP 服务器`,
+            'success'
+        );
+    } catch (error) {
+        console.error('[MCP Settings] 导入配置失败:', error);
+        showNotification(`${getIcon('xCircle', { size: 14 })} 导入配置失败: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * 显示导入合并对话框
+ * @param {number} serverCount - 要导入的服务器数量
+ * @returns {Promise<'replace'|'merge'|'cancel'>}
+ */
+async function showImportMergeDialog(serverCount) {
+    return new Promise((resolve) => {
+        const dialog = document.createElement('div');
+        dialog.className = 'modal active';
+        dialog.style.zIndex = '10002'; // 高于 MCP 设置模态框
+
+        dialog.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>${getIcon('upload', { size: 18 })} 导入 MCP 配置</h3>
+                </div>
+                <div class="modal-body">
+                    <p>即将导入 <strong>${serverCount}</strong> 个 MCP 服务器。</p>
+                    <p>请选择导入方式：</p>
+                    <div class="import-options" style="margin-top: 16px;">
+                        <button class="btn btn-warning" id="import-replace">
+                            ${getIcon('refreshCw', { size: 14 })} 替换现有配置
+                            <small style="display: block; margin-top: 4px; opacity: 0.8;">删除所有现有服务器，替换为导入的配置</small>
+                        </button>
+                        <button class="btn btn-primary" id="import-merge" style="margin-top: 8px;">
+                            ${getIcon('plus', { size: 14 })} 合并到现有配置
+                            <small style="display: block; margin-top: 4px; opacity: 0.8;">保留现有服务器，添加导入的配置</small>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="import-cancel">取消</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // 绑定事件
+        dialog.querySelector('#import-replace').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            resolve('replace');
+        });
+
+        dialog.querySelector('#import-merge').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            resolve('merge');
+        });
+
+        dialog.querySelector('#import-cancel').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            resolve('cancel');
+        });
+
+        // 点击背景取消
+        dialog.querySelector('.modal-overlay').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            resolve('cancel');
+        });
+    });
+}
+
+/**
+ * 从模板创建配置
+ * @param {string} templateId - 模板 ID
+ */
+export async function createFromTemplate(templateId) {
+    try {
+        // 生成模板
+        const templateConfig = generateTemplate(templateId);
+
+        // 转换为内部格式
+        const servers = standardToInternal(templateConfig);
+
+        if (servers.length === 0) {
+            throw new Error('模板无效');
+        }
+
+        // 保存服务器
+        for (const server of servers) {
+            await saveMCPServer(server);
+            state.mcpServers.push(server);
+        }
+
+        // 刷新 UI
+        renderServerList();
+
+        showNotification(
+            `${getIcon('checkCircle', { size: 14 })} 已从模板创建 ${servers.length} 个服务器`,
+            'success'
+        );
+    } catch (error) {
+        console.error('[MCP Settings] 从模板创建失败:', error);
+        showNotification(`${getIcon('xCircle', { size: 14 })} 从模板创建失败: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * 显示模板选择对话框
+ */
+export async function showTemplateDialog() {
+    return new Promise((resolve) => {
+        const templates = getAvailableTemplates();
+
+        const dialog = document.createElement('div');
+        dialog.className = 'modal active';
+        dialog.style.zIndex = '10002';
+
+        const templateHTML = templates.map(t => `
+            <div class="template-item" data-template-id="${t.id}">
+                <div class="template-name">${t.name}</div>
+                <div class="template-description">${t.description}</div>
+            </div>
+        `).join('');
+
+        dialog.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3>${getIcon('package', { size: 18 })} 选择配置模板</h3>
+                    <button class="modal-close" aria-label="关闭">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="template-list">
+                        ${templateHTML}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="template-cancel">取消</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // 添加样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .template-list {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .template-item {
+                padding: 12px 16px;
+                border: var(--border);
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .template-item:hover {
+                background: var(--md-surface);
+                border-color: var(--md-blue);
+            }
+
+            .template-name {
+                font-weight: 600;
+                margin-bottom: 4px;
+                color: var(--md-text);
+            }
+
+            .template-description {
+                font-size: 13px;
+                color: var(--md-muted);
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 绑定事件
+        dialog.querySelectorAll('.template-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const templateId = item.dataset.templateId;
+                document.body.removeChild(dialog);
+                document.head.removeChild(style);
+                await createFromTemplate(templateId);
+                resolve(templateId);
+            });
+        });
+
+        dialog.querySelector('#template-cancel').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            document.head.removeChild(style);
+            resolve(null);
+        });
+
+        dialog.querySelector('.modal-close').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            document.head.removeChild(style);
+            resolve(null);
+        });
+
+        dialog.querySelector('.modal-overlay').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            document.head.removeChild(style);
+            resolve(null);
+        });
+    });
 }
 
 console.log('[MCP Settings] 📝 MCP 配置 UI 模块已加载');

@@ -16,7 +16,8 @@ import { state } from '../core/state.js';  // ✅ 访问 xmlToolCallingEnabled �
 import { ThinkTagParser } from './think-tag-parser.js';  // ✅ <think> 标签解析器
 
 // ✅ 响应长度限制（防止内存溢出）
-const MAX_RESPONSE_LENGTH = 200000; // 20万字符
+const MAX_TEXT_RESPONSE_LENGTH = 200000;     // 纯文本响应：200KB
+const MAX_IMAGE_RESPONSE_LENGTH = 60000000;  // 图片响应：60MB（支持 4K 图片）
 
 /**
  * 解析 Gemini 流式响应
@@ -225,13 +226,28 @@ export async function parseGeminiStream(reader, sessionId = null) {
                         }
                     }
 
-                    // ✅ 检查是否超过长度限制
-                    if (totalReceived > MAX_RESPONSE_LENGTH) {
-                        console.warn(`响应超长（${totalReceived} 字符），已强制截断`);
-                        eventBus.emit('ui:notification', {
-                            message: `响应过长（${totalReceived.toLocaleString()} 字符），已自动截断`,
-                            type: 'warning'
-                        });
+                    // ✅ 智能截断检查（区分文本和图片响应）
+                    const hasImages = contentParts.some(p => p.type === 'image_url');
+                    const imageDataSize = contentParts
+                        .filter(p => p.type === 'image_url')
+                        .reduce((sum, p) => sum + (p.url ? p.url.length : 0), 0);
+                    const textDataSize = totalReceived - imageDataSize;
+
+                    const limit = hasImages ? MAX_IMAGE_RESPONSE_LENGTH : MAX_TEXT_RESPONSE_LENGTH;
+                    const exceeded = totalReceived > limit;
+
+                    if (exceeded) {
+                        if (hasImages && textDataSize <= MAX_TEXT_RESPONSE_LENGTH) {
+                            // 图片生成完成，这是正常情况，不显示警告
+                            console.log(`✅ 图片生成完成（图片 ${(imageDataSize/1024/1024).toFixed(1)}MB + 文本 ${textDataSize.toLocaleString()} 字符）`);
+                        } else {
+                            // 真正的超长响应
+                            console.warn(`响应超长（${totalReceived.toLocaleString()} 字符），已强制截断`);
+                            eventBus.emit('ui:notification', {
+                                message: `响应过长（${totalReceived.toLocaleString()} 字符），已自动截断`,
+                                type: 'warning'
+                            });
+                        }
                         await reader.cancel();
                         finalizeGeminiStream(textContent, thinkingContent, thoughtSignature, groundingMetadata, contentParts, sessionId);
                         return;

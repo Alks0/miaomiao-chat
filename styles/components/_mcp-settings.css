@@ -294,9 +294,43 @@
 }
 
 /* ========== 添加按钮容器 ========== */
-.mcp-add-server-container {
-    margin-top: 1rem;
-    text-align: center;
+/* ========== 操作按钮区域 ========== */
+.mcp-actions-container {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.mcp-actions-left {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.mcp-actions-right {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* 导入/导出/模板按钮 */
+#mcp-import-config-btn,
+#mcp-export-config-btn,
+#mcp-template-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+#mcp-import-config-btn:hover,
+#mcp-export-config-btn:hover,
+#mcp-template-btn:hover {
+    transform: translateY(-1px);
 }
 
 /* ========== 服务器表单（抽屉式） ========== */
@@ -311,6 +345,7 @@
     padding: 1.5rem;
     overflow-y: auto;
     animation: slideInRight 0.3s ease-out;
+    z-index: 100; /* 确保表单面板在按钮区域之上 */
 }
 
 @keyframes slideInRight {
@@ -543,5 +578,25 @@
 
     .form-actions .btn {
         width: 100%;
+    }
+
+    /* 响应式操作按钮区域 */
+    .mcp-actions-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .mcp-actions-left,
+    .mcp-actions-right {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #mcp-import-config-btn,
+    #mcp-export-config-btn,
+    #mcp-template-btn,
+    #mcp-add-server-btn {
+        flex: 1;
+        justify-content: center;
     }
 }
