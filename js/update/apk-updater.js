@@ -20,7 +20,7 @@ const GITHUB_API_BASE = 'https://api.github.com';
 const UPDATE_CHECK_URL = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 
 // 当前应用版本（运行时从 Capacitor 获取）
-const CURRENT_VERSION = '1.1.7'; // 默认值
+const CURRENT_VERSION = '1.1.8'; // 默认值
 
 /**
  * 获取当前应用版本号
