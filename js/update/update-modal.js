@@ -103,7 +103,7 @@ export function initUpdateModal() {
     const updateSilentBtn = document.getElementById('update-silent-btn');
     const overlay = document.getElementById('update-modal-overlay');
 
-    // ✅ 检测平台
+    // 检测平台
     const isElectron = window.electronAPI && typeof window.electronAPI === 'object';
     const isAndroid = window.Capacitor && window.Capacitor.getPlatform() === 'android';
 
@@ -129,7 +129,7 @@ export function initUpdateModal() {
         });
     }
 
-    // ✅ Android 平台初始化
+    // Android 平台初始化
     if (isAndroid) {
         console.log('[UpdateModal] Android 环境，绑定 APK 更新逻辑');
 
@@ -177,11 +177,11 @@ export function initUpdateModal() {
             updateSilentBtn.style.display = 'none'; // 隐藏静默按钮
         }
 
-        console.log('✅ Android update modal initialized');
+        console.log('Android update modal initialized');
         return; // 跳过 Electron 逻辑
     }
 
-    // ✅ Electron 平台初始化（原有逻辑）
+    // Electron 平台初始化（原有逻辑）
     if (isElectron) {
         // 立刻更新按钮
         if (updateNowBtn) {
@@ -242,7 +242,7 @@ export function initUpdateModal() {
                 progressText.textContent = '下载完成！';
             }
 
-            // ✅ 显示"立即重启安装"按钮
+            // 显示"立即重启安装"按钮
             if (progressContainer) {
                 progressContainer.style.display = 'none';
             }
@@ -281,6 +281,6 @@ export function initUpdateModal() {
         });
     }
 
-    console.log('✅ Electron update modal initialized');
+    console.log('Electron update modal initialized');
     }
 }

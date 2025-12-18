@@ -39,14 +39,14 @@ export function populateModelSelect() {
             optgroup.label = provider.name;
 
             provider.models.forEach(model => {
-                // ✅ 支持对象和字符串格式
+                // 支持对象和字符串格式
                 const modelId = typeof model === 'string' ? model : model.id;
                 const modelName = typeof model === 'string' ? model : (model.name || model.id);
                 const capabilities = typeof model === 'object' ? model.capabilities : null;
 
                 const option = document.createElement('option');
                 option.value = modelId;
-                option.dataset.providerId = provider.id;  // ✅ 存储提供商 ID
+                option.dataset.providerId = provider.id;  // 存储提供商 ID
 
                 // 添加能力标签（纯文本格式）
                 const badgesText = renderCapabilityBadgesText(capabilities);
@@ -75,7 +75,7 @@ export function populateModelSelect() {
         return;
     }
 
-    console.log(`✅ 模型列表已更新 (${enabledProviders.length} 个提供商)`);
+    console.log(`模型列表已更新 (${enabledProviders.length} 个提供商)`);
 }
 
 /**
@@ -95,7 +95,7 @@ export function initModels() {
 
         state.selectedModel = selectedModel;
 
-        // ✅ 修复：根据 providerId 查找提供商（而不是模型名）
+        // 根据 providerId 查找提供商（而不是模型名）
         const provider = state.providers.find(p => p.id === providerId);
 
         if (provider && provider.apiFormat !== state.apiFormat) {
@@ -121,10 +121,10 @@ export function initModels() {
             });
         }
 
-        // ✅ 存储当前提供商 ID，供 getCurrentProvider() 使用
+        // 存储当前提供商 ID，供 getCurrentProvider() 使用
         state.currentProviderId = providerId;
 
-        // ✅ 修复: 同步 provider 的 geminiApiKeyInHeader 到 state（用于 API 请求）
+        // 同步 provider 的 geminiApiKeyInHeader 到 state（用于 API 请求）
         if (provider && provider.apiFormat === 'gemini') {
             state.geminiApiKeyInHeader = provider.geminiApiKeyInHeader || false;
             console.log(`🔄 同步 geminiApiKeyInHeader: ${state.geminiApiKeyInHeader}`);

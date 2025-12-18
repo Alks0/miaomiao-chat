@@ -30,7 +30,7 @@ export function injectToolsToOpenAI(messages, tools) {
         });
     }
 
-    console.log('[Tool Injection] ✅ XML 工具描述已注入 OpenAI system prompt');
+    console.log('[Tool Injection] XML 工具描述已注入 OpenAI system prompt');
 }
 
 /**
@@ -52,7 +52,7 @@ export function injectToolsToClaude(requestBody, tools) {
         requestBody.system = xmlToolsDescription;
     }
 
-    console.log('[Tool Injection] ✅ XML 工具描述已注入 Claude system 参数');
+    console.log('[Tool Injection] XML 工具描述已注入 Claude system 参数');
 }
 
 /**
@@ -78,11 +78,11 @@ export function injectToolsToGemini(requestBody, tools) {
         };
     }
 
-    console.log('[Tool Injection] ✅ XML 工具描述已注入 Gemini systemInstruction');
+    console.log('[Tool Injection] XML 工具描述已注入 Gemini systemInstruction');
 }
 
 /**
- * ✅ P1: 性能监控 - 统计 XML 注入的 token 消耗
+ * 性能监控 - 统计 XML 注入的 token 消耗
  * @param {Array} tools - 工具列表
  * @returns {Object} { toolCount, estimatedTokens }
  */
@@ -103,7 +103,7 @@ export function getXMLInjectionStats(tools) {
 }
 
 /**
- * ✅ P2: 监控指标追踪（用于灰度发布和性能分析）
+ * 监控指标追踪（用于灰度发布和性能分析）
  * 在部署阶段 3（灰度发布）时启用
  */
 const metrics = {

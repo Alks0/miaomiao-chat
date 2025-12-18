@@ -5,7 +5,7 @@
 
 import { elements } from '../core/elements.js';
 import { state } from '../core/state.js';
-// ✅ 新增：IndexedDB 偏好设置 API
+// 新增：IndexedDB 偏好设置 API
 import { savePreference, loadPreference } from '../state/storage.js';
 
 /**
@@ -20,7 +20,7 @@ export async function initInputResize() {
     let startY = 0;
     let startHeight = 0;
 
-    // ✅ 从 IndexedDB 恢复高度
+    // 从 IndexedDB 恢复高度
     try {
         let savedHeight = null;
         if (state.storageMode !== 'localStorage') {
@@ -63,7 +63,7 @@ export async function initInputResize() {
             isResizing = false;
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            // ✅ 保存高度到存储
+            // 保存高度到存储
             const height = textarea.offsetHeight;
             try {
                 if (state.storageMode !== 'localStorage') {
@@ -71,7 +71,7 @@ export async function initInputResize() {
                 } else {
                     localStorage.setItem('inputTextareaHeight', height);
                 }
-            } catch (error) {
+            } catch (_error) {
                 localStorage.setItem('inputTextareaHeight', height);
             }
         }
@@ -95,7 +95,7 @@ export async function initInputResize() {
     document.addEventListener('touchend', async () => {
         if (isResizing) {
             isResizing = false;
-            // ✅ 保存高度到存储
+            // 保存高度到存储
             const height = textarea.offsetHeight;
             try {
                 if (state.storageMode !== 'localStorage') {
@@ -103,7 +103,7 @@ export async function initInputResize() {
                 } else {
                     localStorage.setItem('inputTextareaHeight', height);
                 }
-            } catch (error) {
+            } catch (_error) {
                 localStorage.setItem('inputTextareaHeight', height);
             }
         }
@@ -134,7 +134,7 @@ export async function initPanelResize() {
         }
     ];
 
-    // ✅ 使用 for...of 以支持 async/await
+    // 使用 for...of 以支持 async/await
     for (const { panel, handleId, storageKey, minWidth, maxWidth, side } of panels) {
         const handle = document.getElementById(handleId);
         if (!panel || !handle) continue;
@@ -143,7 +143,7 @@ export async function initPanelResize() {
         let startX = 0;
         let startWidth = 0;
 
-        // ✅ 从 IndexedDB 恢复宽度
+        // 从 IndexedDB 恢复宽度
         try {
             let savedWidth = null;
             if (state.storageMode !== 'localStorage') {
@@ -196,7 +196,7 @@ export async function initPanelResize() {
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
                 handle.classList.remove('resizing');
-                // ✅ 保存宽度到存储
+                // 保存宽度到存储
                 const width = panel.offsetWidth;
                 try {
                     if (state.storageMode !== 'localStorage') {
@@ -204,7 +204,7 @@ export async function initPanelResize() {
                     } else {
                         localStorage.setItem(storageKey, width);
                     }
-                } catch (error) {
+                } catch (_error) {
                     localStorage.setItem(storageKey, width);
                 }
             }
@@ -232,7 +232,7 @@ export async function initPanelResize() {
             if (isResizing) {
                 isResizing = false;
                 handle.classList.remove('resizing');
-                // ✅ 保存宽度到存储
+                // 保存宽度到存储
                 const width = panel.offsetWidth;
                 try {
                     if (state.storageMode !== 'localStorage') {
@@ -240,7 +240,7 @@ export async function initPanelResize() {
                     } else {
                         localStorage.setItem(storageKey, width);
                     }
-                } catch (error) {
+                } catch (_error) {
                     localStorage.setItem(storageKey, width);
                 }
             }
@@ -249,7 +249,7 @@ export async function initPanelResize() {
         // 键盘支持（方向键调整宽度）
         handle.addEventListener('keydown', async (e) => {
             const step = e.shiftKey ? 20 : 10; // Shift键增加步长
-            let currentWidth = panel.offsetWidth;
+            const currentWidth = panel.offsetWidth;
             let newWidth = currentWidth;
 
             // 左方向键减小宽度，右方向键增大宽度
@@ -267,14 +267,14 @@ export async function initPanelResize() {
             newWidth = Math.min(maxWidth, Math.max(minWidth, newWidth));
             panel.style.width = newWidth + 'px';
 
-            // ✅ 保存到存储
+            // 保存到存储
             try {
                 if (state.storageMode !== 'localStorage') {
                     await savePreference(storageKey, newWidth);
                 } else {
                     localStorage.setItem(storageKey, newWidth);
                 }
-            } catch (error) {
+            } catch (_error) {
                 localStorage.setItem(storageKey, newWidth);
             }
 

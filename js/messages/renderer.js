@@ -11,33 +11,8 @@ import { safeMarkedParse } from '../utils/markdown.js';
 import { generateMessageId, escapeHtml } from '../utils/helpers.js';
 import { getCurrentModelCapabilities } from '../providers/manager.js';
 import { renderCapabilityBadgesText } from '../utils/capability-badges.js';
-
-/**
- * 判断附件类型
- * @param {string} mimeType - MIME 类型
- * @returns {'image'|'pdf'|'text'|'unknown'}
- */
-function getAttachmentCategory(mimeType) {
-    if (!mimeType) return 'unknown';
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType === 'application/pdf') return 'pdf';
-    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType.startsWith('text/')) return 'text';
-    return 'unknown';
-}
-
-/**
- * 截断文件名
- * @param {string} name - 文件名
- * @param {number} maxLen - 最大长度
- * @returns {string}
- */
-function truncateFileName(name, maxLen) {
-    if (!name || name.length <= maxLen) return name || '';
-    const ext = name.split('.').pop();
-    const baseName = name.slice(0, name.length - ext.length - 1);
-    const truncated = baseName.slice(0, maxLen - ext.length - 4) + '...';
-    return `${truncated}.${ext}`;
-}
+import { renderHumanizedError } from '../utils/errors.js';
+import { categorizeFile, truncateFileName } from '../utils/file-helpers.js';
 
 /**
  * 添加消息到 DOM
@@ -63,11 +38,11 @@ export function addMessage(role, content, images = null) {
  * @param {string} providerName - 可选的提供商名称
  * @returns {HTMLElement} 消息元素
  */
-export function createMessageElement(role, content, images = null, messageId = null, modelName = null, providerName = null) {
+export function createMessageElement(role, content, images = null, messageId = null, modelName = null, _providerName = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
 
-    // ✅ 设置唯一消息ID（如果提供）
+    // 设置唯一消息ID（如果提供）
     if (messageId) {
         messageDiv.dataset.messageId = messageId;
     }
@@ -83,7 +58,7 @@ export function createMessageElement(role, content, images = null, messageId = n
     contentWrapper.className = 'message-content-wrapper';
 
     // 🏷️ 添加模型和提供商标签（只针对助手消息）
-    if (role === 'assistant' && (modelName || providerName)) {
+    if (role === 'assistant' && (modelName || _providerName)) {
         const modelBadge = document.createElement('div');
         modelBadge.className = 'message-model-badge';
 
@@ -92,9 +67,9 @@ export function createMessageElement(role, content, images = null, messageId = n
         const badgesText = renderCapabilityBadgesText(capabilities);
 
         // 在模型名称后添加能力徽章
-        const badgeText = [modelName + badgesText, providerName].filter(Boolean).join(' | ');
+        const badgeText = [modelName + badgesText, _providerName].filter(Boolean).join(' | ');
         modelBadge.textContent = badgeText;
-        modelBadge.title = `模型: ${modelName || '未知'}\n提供商: ${providerName || '未知'}`;
+        modelBadge.title = `模型: ${modelName || '未知'}\n提供商: ${_providerName || '未知'}`;
 
         contentWrapper.appendChild(modelBadge);
     }
@@ -114,7 +89,7 @@ export function createMessageElement(role, content, images = null, messageId = n
         const attachmentsContainer = document.createElement('div');
         attachmentsContainer.className = 'message-images';
         images.forEach(file => {
-            const category = file.category || getAttachmentCategory(file.type);
+            const category = file.category || categorizeFile(file.type);
 
             if (category === 'image') {
                 // 图片：显示缩略图
@@ -298,7 +273,7 @@ export function renderReplyWithSelector(replies, selectedIndex, assistantMessage
             html += renderThinkingBlock(reply.thinkingContent);
         }
 
-        // ✅ 修复1: 优先渲染 contentParts (包含图片)
+        // 修复1: 优先渲染 contentParts (包含图片)
         if (reply.contentParts && reply.contentParts.length > 0) {
             html += renderContentParts(reply.contentParts);
         }
@@ -347,7 +322,7 @@ export function bindImageClickEvents(container) {
             btn.onclick = (e) => {
                 e.stopPropagation();
                 if (window.downloadImage) {
-                    // ✅ 修复：添加 filename 参数，避免触发 window.open 跳转
+                    // 添加 filename 参数，避免触发 window.open 跳转
                     const match = img.src.match(/^data:image\/(\w+);/);
                     const ext = match ? match[1] : 'png';
                     window.downloadImage(img.src, `image-${Date.now()}.${ext}`);
@@ -374,7 +349,7 @@ function renderGeminiParts(parts) {
             const imgData = inlineData.data;
             const ext = mimeType.split('/')[1] || 'png';
             const dataUrl = `data:${mimeType};base64,${imgData}`;
-            // ✅ 使用内联 onclick（与 helpers.js 保持一致，确保事件可靠）
+            // 使用内联 onclick（与 helpers.js 保持一致，确保事件可靠）
             html += `<div class="image-wrapper">
                 <img src="${dataUrl}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${dataUrl}')" style="cursor:pointer;">
                 <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${dataUrl}', 'image-${Date.now()}.${ext}')" title="下载原图">
@@ -401,7 +376,7 @@ function renderContent(content) {
                 const url = part.image_url.url;
                 const match = url.match(/^data:image\/(\w+);/);
                 const ext = match ? match[1] : 'png';
-                // ✅ 使用内联 onclick（与 helpers.js 保持一致，确保事件可靠）
+                // 使用内联 onclick（与 helpers.js 保持一致，确保事件可靠）
                 html += `<div class="image-wrapper">
                     <img src="${url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${url}')" style="cursor:pointer;">
                     <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${url}', 'image-${Date.now()}.${ext}')" title="下载原图">
@@ -419,7 +394,7 @@ function renderContent(content) {
 }
 
 /**
- * ✅ 新增: 渲染 contentParts 数组（包含文本、图片和思维链）
+ * 新增: 渲染 contentParts 数组（包含文本、图片和思维链）
  * @param {Array} contentParts - 内容部分数组
  * @returns {string} HTML字符串
  */
@@ -427,17 +402,17 @@ export function renderContentParts(contentParts) {
     let html = '';
     for (const part of contentParts) {
         if (part.type === 'thinking') {
-            // ✅ 支持 inline thinking
+            // 支持 inline thinking
             html += renderThinkingBlock(part.text, false);
         } else if (part.type === 'text') {
-            // ✅ 过滤工具调用占位符（重新加载时不显示）
+            // 过滤工具调用占位符（重新加载时不显示）
             if (part.text && part.text !== '(调用工具)') {
                 html += safeMarkedParse(part.text);
             }
         } else if (part.type === 'image_url' && part.complete && part.url) {
             const match = part.url.match(/^data:image\/(\w+);/);
             const ext = match ? match[1] : 'png';
-            // ✅ 使用内联 onclick（与 helpers.js 保持一致，确保事件可靠）
+            // 使用内联 onclick（与 helpers.js 保持一致，确保事件可靠）
             html += `<div class="image-wrapper">
                 <img src="${part.url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${part.url}')" style="cursor:pointer;">
                 <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${part.url}', 'image-${Date.now()}.${ext}')" title="下载原图">
@@ -451,13 +426,13 @@ export function renderContentParts(contentParts) {
     return html;
 }
 
-// ✅ 思维链块分隔符（常量化，便于维护）
+// 思维链块分隔符（常量化，便于维护）
 const THINKING_BLOCK_SEPARATOR = '\n\n---\n\n';
 
 /**
  * 渲染思维链块（支持多块分段显示）
  *
- * ✅ **多思考块支持**：
+ * **多思考块支持**：
  * - **Gemini 思维链**：多个 thought parts 通过分隔符连接
  * - **OpenAI o系列**：推理过程可能分为多个阶段
  * - **Claude Extended Thinking**：长思维链自动分段
@@ -480,7 +455,7 @@ export function renderThinkingBlock(thinkingContent, isStreaming = false) {
 
     const streamingClass = isStreaming ? 'streaming' : '';
 
-    // ✅ 使用常量分隔符，提高可维护性
+    // 使用常量分隔符，提高可维护性
     const blocks = thinkingContent.split(THINKING_BLOCK_SEPARATOR).filter(b => b.trim());
 
     if (blocks.length <= 1) {
@@ -488,7 +463,7 @@ export function renderThinkingBlock(thinkingContent, isStreaming = false) {
         return renderSingleThinkingBlock(thinkingContent, '思考过程', streamingClass);
     }
 
-    // ✅ 多个思考块，使用更清晰的标签命名
+    // 多个思考块，使用更清晰的标签命名
     return blocks.map((block, index) => {
         const label = `思考阶段 ${index + 1}`;
         const isLast = index === blocks.length - 1;
@@ -558,120 +533,53 @@ export function scrollToBottom() {
 
 /**
  * 增强代码块（添加语言标签和复制按钮）
- * ✅ 智能语言检测 + 手动切换功能
+ * 智能语言检测 + 手动切换功能
+ * 性能优化：缓存 DOM 查询
  * @param {HTMLElement} container - 容器元素（可选，默认处理整个消息区域）
  */
 export function enhanceCodeBlocks(container = null) {
     const target = container || elements.messagesArea;
-    target.querySelectorAll('pre code').forEach((codeBlock) => {
+    const codeBlocks = target.querySelectorAll('pre code');
+
+    codeBlocks.forEach((codeBlock) => {
         const pre = codeBlock.parentElement;
 
+        // 优化：使用缓存的选择器避免重复查询
         // 如果已经处理过，跳过
-        if (pre.querySelector('.code-block-header') || pre.querySelector('.code-collapse-header')) return;
+        if (pre.classList.contains('code-block-enhanced')) return;
 
         // 获取代码内容
         const codeText = codeBlock.textContent;
         const lineCount = codeText.split('\n').length;
 
-        // ✅ 智能语言检测
+        // 智能语言检测
         const languageClass = Array.from(codeBlock.classList).find(cls => cls.startsWith('language-'));
         const hintedLang = languageClass ? languageClass.replace('language-', '') : null;
         const detectedLang = detectCodeLanguage(codeText, hintedLang);
 
-        // ✅ 检测流式状态
-        const messageEl = pre.closest('.message.assistant');
-        const isStreaming = messageEl?.classList.contains('generating') || state.isLoading;
+        // 所有代码块都使用统一的折叠样式
+        // 根据行数决定默认是否折叠：超过 20 行默认折叠，否则默认展开
+        const defaultCollapsed = lineCount > 20;
+        createCollapsibleCodeBlock(pre, codeBlock, detectedLang, codeText, lineCount, defaultCollapsed);
 
-        // ✅ 折叠条件：流式渲染 OR 代码超过 20 行
-        const shouldCollapse = isStreaming || lineCount > 20;
-
-        if (shouldCollapse) {
-            createCollapsibleCodeBlock(pre, codeBlock, detectedLang, codeText, lineCount);
-            return;
-        }
-
-        // 普通代码块处理（原有逻辑）
-
-        // 创建头部
-        const header = document.createElement('div');
-        header.className = 'code-block-header';
-        header.innerHTML = `
-            <select class="code-language-selector" aria-label="选择代码语言">
-                <option value="auto" ${!hintedLang || hintedLang === 'text' ? 'selected' : ''}>${detectedLang} (自动)</option>
-                <option value="javascript" ${detectedLang === 'javascript' ? 'selected' : ''}>JavaScript</option>
-                <option value="typescript" ${detectedLang === 'typescript' ? 'selected' : ''}>TypeScript</option>
-                <option value="python" ${detectedLang === 'python' ? 'selected' : ''}>Python</option>
-                <option value="java" ${detectedLang === 'java' ? 'selected' : ''}>Java</option>
-                <option value="cpp" ${detectedLang === 'cpp' ? 'selected' : ''}>C++</option>
-                <option value="c" ${detectedLang === 'c' ? 'selected' : ''}>C</option>
-                <option value="csharp" ${detectedLang === 'csharp' ? 'selected' : ''}>C#</option>
-                <option value="go" ${detectedLang === 'go' ? 'selected' : ''}>Go</option>
-                <option value="rust" ${detectedLang === 'rust' ? 'selected' : ''}>Rust</option>
-                <option value="php" ${detectedLang === 'php' ? 'selected' : ''}>PHP</option>
-                <option value="ruby" ${detectedLang === 'ruby' ? 'selected' : ''}>Ruby</option>
-                <option value="bash" ${detectedLang === 'bash' ? 'selected' : ''}>Bash</option>
-                <option value="sql" ${detectedLang === 'sql' ? 'selected' : ''}>SQL</option>
-                <option value="html" ${detectedLang === 'html' ? 'selected' : ''}>HTML</option>
-                <option value="css" ${detectedLang === 'css' ? 'selected' : ''}>CSS</option>
-                <option value="json" ${detectedLang === 'json' ? 'selected' : ''}>JSON</option>
-                <option value="yaml" ${detectedLang === 'yaml' ? 'selected' : ''}>YAML</option>
-                <option value="markdown" ${detectedLang === 'markdown' ? 'selected' : ''}>Markdown</option>
-                <option value="text" ${detectedLang === 'text' ? 'selected' : ''}>Plain Text</option>
-            </select>
-            <button class="copy-code-btn" aria-label="复制代码">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
-                </svg>
-                <span>复制</span>
-            </button>
-        `;
-
-        // 创建内容包装
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'code-block-content';
-        const clonedCode = codeBlock.cloneNode(true);
-        // 设置初始语言类
-        clonedCode.className = `language-${detectedLang}`;
-        contentWrapper.appendChild(clonedCode);
-
-        // 重构 pre 元素
-        pre.innerHTML = '';
-        pre.appendChild(header);
-        pre.appendChild(contentWrapper);
-
-        // 绑定复制事件
-        const copyBtn = header.querySelector('.copy-code-btn');
-        copyBtn.addEventListener('click', () => copyCode(copyBtn, codeText));
-
-        // ✅ 绑定语言切换事件
-        const langSelector = header.querySelector('.code-language-selector');
-        langSelector.addEventListener('change', (e) => {
-            const newLang = e.target.value === 'auto' ? detectedLang : e.target.value;
-            const codeEl = contentWrapper.querySelector('code');
-            if (codeEl) {
-                codeEl.className = `language-${newLang}`;
-                // 如果 highlight.js 已加载，重新高亮
-                if (typeof hljs !== 'undefined') {
-                    hljs.highlightElement(codeEl);
-                }
-            }
-        });
+        // 标记为已增强
+        pre.classList.add('code-block-enhanced');
+        return;
     });
 
-    // ✅ 增强思维链块（折叠/展开功能）
+    // 增强思维链块（折叠/展开功能）
     enhanceThinkingBlocks(target);
 
-    // ✅ 增强表格（导出 CSV、排序）
+    // 增强表格（导出 CSV、排序）
     enhanceTables(target);
 
-    // ✅ 绑定图片点击事件（查看大图、下载）
+    // 绑定图片点击事件（查看大图、下载）
     bindImageClickEvents(target);
 }
 
 /**
  * 智能检测代码语言
- * ✅ 基于代码特征的启发式检测
+ * 基于代码特征的启发式检测
  * @param {string} code - 代码内容
  * @param {string} hintedLang - marked.js 提示的语言
  * @returns {string} 检测到的语言
@@ -691,7 +599,7 @@ function detectCodeLanguage(code, hintedLang) {
         try {
             JSON.parse(trimmed);
             return 'json';
-        } catch (e) {
+        } catch (_e) {
             // 不是有效的 JSON
         }
     }
@@ -771,7 +679,7 @@ function detectCodeLanguage(code, hintedLang) {
     }
 
     // YAML 检测
-    if (/^[\w-]+:\s*$|^  [\w-]+:\s/m.test(code) && !/[{}[\]]/.test(code)) {
+    if (/^[\w-]+:\s*$|^ {2}[\w-]+:\s/m.test(code) && !/[{}[\]]/.test(code)) {
         return 'yaml';
     }
 
@@ -786,12 +694,16 @@ function detectCodeLanguage(code, hintedLang) {
 
 /**
  * 增强思维链块（添加折叠/展开功能）
- * ✅ 实现缺失的交互功能
+ * 实现缺失的交互功能
+ * 使用 dataset 标记避免重复绑定,事件监听器会在元素移除时自动清理
+ * 性能优化：缓存 DOM 查询
  * @param {HTMLElement} container - 容器元素
  */
 export function enhanceThinkingBlocks(container = null) {
     const target = container || elements.messagesArea;
-    target.querySelectorAll('.thinking-header').forEach((header) => {
+    const headers = target.querySelectorAll('.thinking-header');
+
+    headers.forEach((header) => {
         // 避免重复绑定
         if (header.dataset.enhanced === 'true') return;
         header.dataset.enhanced = 'true';
@@ -811,10 +723,10 @@ export function enhanceThinkingBlocks(container = null) {
             }
         };
 
-        // 点击事件
+        // 点击事件（元素移除时会自动清理）
         header.addEventListener('click', toggleThinking);
 
-        // 键盘事件（可访问性）
+        // 键盘事件（可访问性,元素移除时会自动清理）
         header.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -847,12 +759,16 @@ function copyCode(button, codeText) {
 
 /**
  * 增强表格（添加导出和排序功能）
- * ✅ 提升数据表格的可用性
+ * 提升数据表格的可用性
+ * 使用 dataset 标记避免重复增强,事件监听器会在元素移除时自动清理
+ * 性能优化：缓存 DOM 查询
  * @param {HTMLElement} container - 容器元素
  */
 function enhanceTables(container = null) {
     const target = container || elements.messagesArea;
-    target.querySelectorAll('table').forEach((table) => {
+    const tables = target.querySelectorAll('table');
+
+    tables.forEach((table) => {
         // 避免重复增强
         if (table.dataset.enhanced === 'true') return;
         table.dataset.enhanced = 'true';
@@ -884,7 +800,7 @@ function enhanceTables(container = null) {
 
         wrapper.insertBefore(toolbar, table);
 
-        // 绑定导出事件
+        // 绑定导出事件（元素移除时会自动清理）
         toolbar.querySelector('.table-export-btn').addEventListener('click', () => {
             exportTableAsCSV(table);
         });
@@ -947,10 +863,10 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
     const contentDiv = messageEl.querySelector('.message-content');
     if (!contentDiv) return;
 
-    // ✅ 优先使用 OpenAI 格式的 contentParts（包含思维链）
+    // 优先使用 OpenAI 格式的 contentParts（包含思维链）
     const openaiMsg = state.messages[index];
 
-    // ✅ 修复：优先使用 contentParts 渲染（包含编辑后的思维链）
+    // 优先使用 contentParts 渲染（包含编辑后的思维链）
     if (openaiMsg?.contentParts && openaiMsg.contentParts.length > 0) {
         // 过滤掉占位符
         const validParts = openaiMsg.contentParts.filter(
@@ -964,7 +880,7 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
         }
     }
 
-    // ✅ 回退：使用 thinkingContent + content 渲染
+    // 回退：使用 thinkingContent + content 渲染
     if (role === 'assistant' && openaiMsg?.thinkingContent) {
         let html = renderThinkingBlock(openaiMsg.thinkingContent);
         if (typeof openaiMsg.content === 'string') {
@@ -978,7 +894,7 @@ eventBus.on('message:content-updated', ({ messageEl, index, newContent, role }) 
         return;
     }
 
-    // ✅ 最后回退：根据 API 格式渲染
+    // 最后回退：根据 API 格式渲染
     let htmlContent = '';
 
     if (state.apiFormat === 'gemini') {
@@ -1084,15 +1000,15 @@ const languageDisplayNames = {
 function generateCodeTitle(code, language) {
     const firstLine = code.trim().split('\n')[0].trim();
 
-    // ✅ 策略1: 从注释中提取标题
+    // 策略1: 从注释中提取标题
     if (firstLine.startsWith('//') || firstLine.startsWith('#')) {
-        const title = firstLine.replace(/^[\/\/#]+\s*/, '').trim();
+        const title = firstLine.replace(/^[//#]+\s*/, '').trim();
         if (title.length > 0 && title.length < 60) {
             return title;
         }
     }
 
-    // ✅ 策略2: 从函数/类定义中提取
+    // 策略2: 从函数/类定义中提取
     const patterns = {
         javascript: /(?:function|class|const|let)\s+([a-zA-Z_$][\w$]*)/,
         typescript: /(?:function|class|const|let|interface|type)\s+([a-zA-Z_$][\w$]*)/,
@@ -1111,13 +1027,13 @@ function generateCodeTitle(code, language) {
         }
     }
 
-    // ✅ 策略3: 从文件路径中提取
-    const fileMatch = code.match(/\/([a-zA-Z0-9_\-]+\.[a-z]+)/);
+    // 策略3: 从文件路径中提取
+    const fileMatch = code.match(/\/([a-zA-Z0-9_-]+\.[a-z]+)/);
     if (fileMatch) {
         return fileMatch[1];
     }
 
-    // ✅ 策略4: 默认标题
+    // 策略4: 默认标题
     return `${languageDisplayNames[language] || language} 代码`;
 }
 
@@ -1128,20 +1044,22 @@ function generateCodeTitle(code, language) {
  * @param {string} language - 语言
  * @param {string} codeText - 代码文本
  * @param {number} lineCount - 行数
+ * @param {boolean} defaultCollapsed - 默认是否折叠（默认 true）
  */
-function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCount) {
+function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCount, defaultCollapsed = true) {
     // 生成智能标题
     const title = generateCodeTitle(codeText, language);
 
-    pre.className = 'code-block-collapsible collapsed';
+    // 根据参数决定默认折叠状态
+    pre.className = defaultCollapsed ? 'code-block-collapsible collapsed' : 'code-block-collapsible';
     pre.innerHTML = '';
 
-    // ✅ 折叠头部
+    // 折叠头部
     const header = document.createElement('div');
     header.className = 'code-collapse-header';
     header.setAttribute('role', 'button');
     header.setAttribute('tabindex', '0');
-    header.setAttribute('aria-expanded', 'false');
+    header.setAttribute('aria-expanded', defaultCollapsed ? 'false' : 'true');
     header.innerHTML = `
         <span class="code-icon" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1154,10 +1072,10 @@ function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCoun
             <span class="code-language-badge">${language.toUpperCase()}</span>
             <span class="code-line-count">${lineCount} 行</span>
         </span>
-        <span class="code-toggle-icon" aria-hidden="true">▶</span>
+        <span class="code-toggle-icon" aria-hidden="true">${defaultCollapsed ? '▶' : '▼'}</span>
     `;
 
-    // ✅ 操作按钮组
+    // 操作按钮组
     const actions = document.createElement('div');
     actions.className = 'code-collapse-actions';
     actions.innerHTML = `
@@ -1186,7 +1104,7 @@ function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCoun
         </button>
     `;
 
-    // ✅ 代码内容容器（默认折叠）
+    // 代码内容容器（默认折叠）
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'code-collapse-content';
 
@@ -1202,13 +1120,13 @@ function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCoun
     pre.appendChild(actions);
     pre.appendChild(contentWrapper);
 
-    // ✅ 绑定折叠/展开事件
+    // 绑定折叠/展开事件
     bindCollapseEvents(pre, header);
 
-    // ✅ 绑定操作按钮事件
+    // 绑定操作按钮事件
     bindCodeBlockActions(pre, actions, codeText, language);
 
-    // ✅ 应用语法高亮
+    // 应用语法高亮
     if (typeof hljs !== 'undefined') {
         hljs.highlightElement(clonedCode);
     }
@@ -1216,6 +1134,7 @@ function createCollapsibleCodeBlock(pre, codeBlock, language, codeText, lineCoun
 
 /**
  * 绑定折叠/展开事件
+ * 事件监听器会在元素移除时自动清理
  * @param {HTMLElement} pre - pre元素
  * @param {HTMLElement} header - 头部元素
  */
@@ -1230,10 +1149,10 @@ function bindCollapseEvents(pre, header) {
         }
     };
 
-    // 点击事件
+    // 点击事件（元素移除时会自动清理）
     header.addEventListener('click', toggle);
 
-    // 键盘事件（可访问性）
+    // 键盘事件（可访问性,元素移除时会自动清理）
     header.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -1250,13 +1169,13 @@ function bindCollapseEvents(pre, header) {
  * @param {string} language - 语言
  */
 function bindCodeBlockActions(pre, actions, codeText, language) {
-    // ✅ 防止重复绑定事件
+    // 防止重复绑定事件
     if (actions.dataset.eventsBound === 'true') {
         return;
     }
     actions.dataset.eventsBound = 'true';
 
-    // ✅ 阻止操作按钮的事件冒泡（避免触发折叠）
+    // 阻止操作按钮的事件冒泡（避免触发折叠）
     actions.addEventListener('click', (e) => {
         e.stopPropagation();
     });
@@ -1285,7 +1204,7 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
         return { code: codeText, language: language };
     };
 
-    // ✅ 复制按钮
+    // 复制按钮
     const copyBtn = actions.querySelector('.copy-code');
     if (copyBtn) {
         copyBtn.addEventListener('click', () => {
@@ -1312,7 +1231,7 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
         });
     }
 
-    // ✅ 下载按钮
+    // 下载按钮
     const downloadBtn = actions.querySelector('.download-code');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', () => {
@@ -1321,7 +1240,7 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
         });
     }
 
-    // ✅ 预览按钮（打开编辑器模态框，只读模式）
+    // 预览按钮（打开编辑器模态框，只读模式）
     const previewBtn = actions.querySelector('.preview-code');
     if (previewBtn) {
         previewBtn.addEventListener('click', async () => {
@@ -1350,7 +1269,7 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
         });
     }
 
-    // ✅ 编辑按钮
+    // 编辑按钮
     const editBtn = actions.querySelector('.edit-code');
     if (editBtn) {
         editBtn.addEventListener('click', async () => {
@@ -1370,10 +1289,10 @@ function bindCodeBlockActions(pre, actions, codeText, language) {
                 openCodeEditorModal(code, lang, (newCode, newLanguage) => {
                     updateCodeBlockInMessage(messageEl, pre, newCode, newLanguage);
                 });
-            } catch (error) {
-                console.error('[编辑代码] 错误:', error);
+            } catch (_error) {
+                console.error('[编辑代码] 错误:', _error);
                 eventBus.emit('ui:notification', {
-                    message: '打开编辑器失败: ' + error.message,
+                    message: '打开编辑器失败: ' + _error.message,
                     type: 'error'
                 });
             }
@@ -1462,10 +1381,10 @@ export function updateCodeBlockInMessage(messageEl, pre, newCode, newLanguage) {
         // 更新状态（同步三种格式）
         updateMessageMarkdown(index, originalMarkdown);
 
-        // ✅ 精确更新：只更新被编辑的代码块，而不是重新渲染整个消息
+        // 精确更新：只更新被编辑的代码块，而不是重新渲染整个消息
         updateSingleCodeBlock(pre, newCode, newLanguage);
 
-        // ✅ 发出保存事件，触发会话自动保存
+        // 发出保存事件，触发会话自动保存
         eventBus.emit('messages:changed', {
             action: 'code_block_updated',
             index

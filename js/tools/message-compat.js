@@ -289,7 +289,7 @@ export function initMessageCompat() {
 
     initialized = true;
 
-    // ✅ 注意：这些监听器用于提供警告和通知，不拦截原有流程
+    // 注意：这些监听器用于提供警告和通知，不拦截原有流程
     // 实际的拦截逻辑在 editor.js 中实现
 
     // 监听删除消息事件（提供警告）

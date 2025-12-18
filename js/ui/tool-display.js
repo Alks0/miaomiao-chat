@@ -30,7 +30,14 @@ const durationTimers = new Map();
  * @param {Object} toolCall - 工具调用对象
  * @returns {HTMLElement} 工具调用 DOM 元素
  */
-export function createToolCallUI(toolCall) {
+export async function createToolCallUI(toolCall) {
+    // 检查是否已存在相同 tool-id 的 UI（防止重复创建）
+    const existing = document.querySelector(`[data-tool-id="${CSS.escape(toolCall.id)}"]`);
+    if (existing) {
+        console.warn(`[ToolDisplay] 工具 UI 已存在，跳过创建: ${toolCall.id}`);
+        return existing;
+    }
+
     const container = document.createElement('div');
     container.className = 'tool-call-container';
     container.setAttribute('data-tool-id', toolCall.id);
@@ -106,12 +113,21 @@ export function createToolCallUI(toolCall) {
 
     container.append(header, params, executionStatus, resultEl, errorEl);
 
-    // 插入到聊天区域
-    const chatArea = document.getElementById('chat');
-    if (chatArea) {
-        chatArea.appendChild(container);
+    // 插入到当前的 assistant 消息内部（而不是chat容器）
+    const { state } = await import('../core/state.js');
+    const targetElement = state.currentAssistantMessage || document.querySelector('.message.assistant:last-child .message-content');
+
+    if (targetElement) {
+        targetElement.appendChild(container);
+        console.log('[ToolDisplay] 工具UI已插入到消息内部');
+
         // 滚动到底部
-        chatArea.scrollTop = chatArea.scrollHeight;
+        const chatArea = document.getElementById('chat');
+        if (chatArea) {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+    } else {
+        console.warn('[ToolDisplay] 未找到assistant消息元素，工具UI无法显示');
     }
 
     // 启动计时器
@@ -130,9 +146,14 @@ export function createToolCallUI(toolCall) {
  * @param {Object} data - 额外数据（结果或错误）
  */
 export function updateToolCallStatus(toolId, status, data = {}) {
+    console.log(`[ToolDisplay] updateToolCallStatus 调用: toolId=${toolId}, status=${status}`);
     const container = document.querySelector(`[data-tool-id="${toolId}"]`);
-    if (!container) return;
+    if (!container) {
+        console.warn(`[ToolDisplay] 未找到工具UI容器: ${toolId}`);
+        return;
+    }
 
+    console.log(`[ToolDisplay] 找到工具容器，更新状态为: ${status}`);
     container.setAttribute('data-status', status);
 
     const statusEl = container.querySelector('.tool-status');
@@ -151,8 +172,10 @@ export function updateToolCallStatus(toolId, status, data = {}) {
     }
 
     if (status === 'completed') {
+        console.log('[ToolDisplay] 设置工具为completed状态');
         statusEl.innerHTML = `${getIcon('checkCircle', { size: 14 })} 执行成功`;
         executionStatus.style.display = 'none';
+        console.log('[ToolDisplay] 已隐藏executionStatus（spinner）');
         resultEl.style.display = 'block';
 
         // 渲染结果
@@ -298,10 +321,71 @@ function renderArrayResult(container, items) {
  * 渲染对象结果
  */
 function renderObjectResult(container, obj) {
-    const pre = document.createElement('pre');
-    pre.className = 'result-json';
-    pre.textContent = JSON.stringify(obj, null, 2);
-    container.appendChild(pre);
+    // 多模态支持：检测并渲染图片
+    const hasImage = obj && typeof obj === 'object' && obj.image;
+    const hasText = obj && typeof obj === 'object' && obj.text;
+
+    // 渲染图片
+    if (hasImage) {
+        const imageData = obj.image;
+        let imageUrl;
+
+        // 处理 base64 格式: "data:image/png;base64,..."
+        if (typeof imageData === 'string') {
+            imageUrl = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+        }
+        // 处理对象格式
+        else if (typeof imageData === 'object') {
+            // Gemini 格式: { inlineData: { mimeType, data } }
+            if (imageData.inlineData) {
+                imageUrl = `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`;
+            }
+            // Claude 格式: { source: { media_type, data } }
+            else if (imageData.source) {
+                imageUrl = `data:${imageData.source.media_type || imageData.source.mimeType};base64,${imageData.source.data}`;
+            }
+            // 简化格式: { mimeType, data } 或 { media_type, data }
+            else if (imageData.data) {
+                const mimeType = imageData.mimeType || imageData.media_type || 'image/png';
+                imageUrl = `data:${mimeType};base64,${imageData.data}`;
+            }
+        }
+
+        if (imageUrl) {
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'result-image-container';
+
+            const img = document.createElement('img');
+            img.className = hasText ? 'result-image' : 'result-image no-text';
+            img.src = imageUrl;
+            img.alt = '工具返回的图片';
+
+            imgContainer.appendChild(img);
+            container.appendChild(imgContainer);
+        }
+    }
+
+    // 渲染文本
+    if (hasText) {
+        const textEl = document.createElement('div');
+        textEl.className = 'result-text';
+        textEl.textContent = obj.text;
+        container.appendChild(textEl);
+    }
+
+    // 渲染其他字段（如果有）
+    const otherFields = { ...obj };
+    delete otherFields.image;
+    delete otherFields.text;
+
+    if (Object.keys(otherFields).length > 0 || (!hasImage && !hasText)) {
+        const pre = document.createElement('pre');
+        pre.className = 'result-json';
+        // 如果有 image/text，只显示其他字段；否则显示完整对象
+        const displayObj = (hasImage || hasText) ? otherFields : obj;
+        pre.textContent = JSON.stringify(displayObj, null, 2);
+        container.appendChild(pre);
+    }
 }
 
 // ========== 计时器管理 ==========

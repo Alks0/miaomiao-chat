@@ -96,7 +96,7 @@ export async function textFormatterHandler(args) {
                 };
                 break;
 
-            case 'replace':
+            case 'replace': {
                 if (!find) {
                     throw new Error('replace 操作需要 find 参数');
                 }
@@ -108,8 +108,9 @@ export async function textFormatterHandler(args) {
                     replace_with: replaceWith
                 };
                 break;
+            }
 
-            case 'substring':
+            case 'substring': {
                 const startPos = start || 0;
                 const endPos = end !== undefined ? end : text.length;
                 result = text.substring(startPos, endPos);
@@ -119,6 +120,7 @@ export async function textFormatterHandler(args) {
                     extracted_length: result.length
                 };
                 break;
+            }
 
             case 'reverse':
                 result = text.split('').reverse().join('');
@@ -145,7 +147,7 @@ export async function textFormatterHandler(args) {
                 metadata = getTextStatistics(text);
                 break;
 
-            case 'split':
+            case 'split': {
                 const sep = separator || ' ';
                 const splitResult = text.split(sep);
                 result = text;
@@ -155,8 +157,9 @@ export async function textFormatterHandler(args) {
                     count: splitResult.length
                 };
                 break;
+            }
 
-            case 'join':
+            case 'join': {
                 if (!parts || !Array.isArray(parts)) {
                     throw new Error('join 操作需要 parts 数组参数');
                 }
@@ -167,6 +170,7 @@ export async function textFormatterHandler(args) {
                     parts_count: parts.length
                 };
                 break;
+            }
 
             default:
                 throw new Error(`不支持的操作: ${operation}`);

@@ -11,8 +11,8 @@
 }
 
 .dark-theme .image-loading-placeholder {
-    background: #2a2a2a;
-    border-color: #444444;
+    background: var(--color-bg-accent);
+    border-color: var(--color-border-primary);
 }
 
 .image-loading-icon {
@@ -60,7 +60,7 @@
 }
 
 .dark-theme .image-loading-progress {
-    background: #1a1a1a;
+    background: var(--color-bg-code);
 }
 
 .image-loading-progress .progress-bar {

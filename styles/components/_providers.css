@@ -14,7 +14,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 9999;
+    z-index: var(--z-modal-settings);
     display: none;
     align-items: center;
     justify-content: center;
@@ -41,7 +41,7 @@
     box-shadow: 0 8px 48px rgba(0, 0, 0, 0.4);
     overflow: hidden;
     animation: modalFadeIn 0.2s ease-out;
-    z-index: 1;
+    z-index: var(--z-base);
     will-change: opacity;
 }
 
@@ -132,12 +132,12 @@
 
 /* 当前使用中的提供商 - 绿色边框 */
 .provider-item.current {
-    border: 2px solid #4ade80;
+    border: 2px solid var(--md-green);
 }
 
 .provider-item.current.selected {
-    border-color: #4ade80;
-    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+    border-color: var(--md-green);
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
 }
 
 .provider-item-avatar {
@@ -207,8 +207,8 @@
 }
 
 .toggle-switch.on {
-    background: rgba(74, 222, 128, 0.15);
-    color: #4ade80;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--md-green);
 }
 
 .toggle-switch.off {
@@ -395,7 +395,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: var(--color-border-secondary);
     border-radius: 28px;
     transition: background-color 0.3s ease;
 }
@@ -446,13 +446,13 @@
 }
 
 .password-input-wrapper {
-    /* ✅ 使用 CSS Grid 叠加：输入框和切换按钮占据同一网格单元 */
+    /* 使用 CSS Grid 叠加：输入框和切换按钮占据同一网格单元 */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
 }
 
 .password-toggle-btn {
-    /* ✅ 使用 CSS Grid 叠加定位到右侧居中 */
+    /* 使用 CSS Grid 叠加定位到右侧居中 */
     grid-row-start: 1;
     grid-column-start: 1;
     justify-self: end;     /* 水平靠右 */
@@ -465,7 +465,7 @@
     padding: 4px;
     display: flex;
     align-items: center;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .password-toggle-btn:hover {
@@ -591,8 +591,8 @@
     font-size: 11px;
     padding: 2px 8px;
     border-radius: 10px;
-    background: rgba(74, 222, 128, 0.15);
-    color: #4ade80;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--md-green);
     font-weight: 500;
 }
 
@@ -708,8 +708,8 @@
 .key-edit-btn,
 .key-toggle-btn,
 .key-delete-btn {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     border: none;
     border-radius: 6px;
     background: transparent;
@@ -950,7 +950,7 @@
     height: 20px;
     background: linear-gradient(to bottom, var(--md-surface), transparent);
     pointer-events: none;
-    z-index: 1;
+    z-index: var(--z-base);
     opacity: 0;
     transition: opacity 0.3s;
 }
@@ -970,7 +970,7 @@
     height: 20px;
     background: linear-gradient(to top, var(--md-surface), transparent);
     pointer-events: none;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 /* 模型管理弹窗（第三层） */
@@ -1118,8 +1118,8 @@
     color: var(--md-muted);
     cursor: pointer;
     padding: 0;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1155,27 +1155,27 @@
         max-width: 100%;
         max-height: 100%;
         border-radius: 0;
-        flex-direction: column;  /* ✅ 改为上下布局 */
+        flex-direction: column;  /* 改为上下布局 */
     }
 
     .providers-sidebar {
-        width: 100%;  /* ✅ 全宽 */
-        max-height: 40vh;  /* ✅ 限制上半部分高度 */
-        overflow-y: auto;  /* ✅ 允许垂直滚动 */
+        width: 100%;  /* 全宽 */
+        max-height: 40vh;  /* 限制上半部分高度 */
+        overflow-y: auto;  /* 允许垂直滚动 */
         border-right: none;
         border-bottom: var(--border);
     }
 
     .providers-detail {
         flex: 1;
-        min-height: 0;  /* ✅ 允许收缩 */
+        min-height: 0;  /* 允许收缩 */
     }
 
     .detail-content {
         padding: 16px;
     }
 
-    /* ✅ 左侧列表项在移动端更紧凑 */
+    /* 左侧列表项在移动端更紧凑 */
     .provider-item {
         padding: 10px;
         gap: 10px;
@@ -1189,7 +1189,7 @@
         font-size: 12px;
     }
 
-    /* ✅ 模型管理弹窗移动端适配 */
+    /* 模型管理弹窗移动端适配 */
     .models-manage-content {
         width: 100vw;
         height: 100vh;
@@ -1204,7 +1204,7 @@
 
     .models-checklist {
         padding: 12px;
-        max-height: none;  /* ✅ 移除固定高度限制 */
+        max-height: none;  /* 移除固定高度限制 */
     }
 
     .model-checkbox-item {
@@ -1212,43 +1212,43 @@
         font-size: 14px;
     }
 
-    /* ✅ 全选/反选按钮移动端优化 */
+    /* 全选/反选按钮移动端优化 */
     .models-bulk-actions {
         padding: 10px 12px;
     }
 
     .btn-bulk-action {
-        min-height: 44px;  /* ✅ 符合 WCAG 触摸目标标准 */
+        min-height: 44px;  /* 符合 WCAG 触摸目标标准 */
         font-size: 14px;
     }
 
-    /* ✅ 增大按钮触摸目标（符合 WCAG 标准）*/
+    /* 增大按钮触摸目标（符合 WCAG 标准）*/
     .btn-primary,
     .btn-secondary,
     .btn-danger,
     .add-provider-btn {
         min-height: 44px;
         padding: 12px 24px;
-        font-size: 16px;  /* ✅ 增加可读性 */
+        font-size: 16px;  /* 增加可读性 */
     }
 
-    /* ✅ 开关按钮也需要增大 */
+    /* 开关按钮也需要增大 */
     .provider-toggle {
         min-width: 52px;
         min-height: 28px;
     }
 
-    /* ✅ 防止 iOS 自动缩放 */
+    /* 防止 iOS 自动缩放 */
     .form-group input[type="text"],
     .form-group input[type="password"],
     .form-group input[type="url"],
     .form-group select,
     .form-group textarea {
-        font-size: 16px;  /* ✅ 最小 16px */
+        font-size: 16px;  /* 最小 16px */
         padding: 12px 14px;
     }
 
-    /* ✅ 搜索框也需要调整 */
+    /* 搜索框也需要调整 */
     .providers-search input,
     .models-search input {
         font-size: 16px;

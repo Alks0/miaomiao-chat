@@ -2,7 +2,7 @@
 .app-header {
     background: var(--color-bg-accent);
     color: var(--color-text-inverse);
-    z-index: 10;
+    z-index: var(--z-sticky);
     flex-shrink: 0;
 }
 
@@ -32,8 +32,8 @@
 }
 
 .header-content .icon-button {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     background: transparent;
     border: 2px solid rgba(255,255,255,0.3);
     color: var(--color-text-inverse);

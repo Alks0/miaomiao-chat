@@ -10,7 +10,7 @@
     height: 100dvh;
     background: var(--color-bg-surface);
     border-right: 3px solid var(--color-border-primary);
-    z-index: 100; /* 高于遮罩层(99)，低于设置面板(101) */
+    z-index: var(--z-sidebar);
     transform: translateX(-100%);
     transition: transform 0.25s ease-out;
     display: flex;
@@ -27,7 +27,7 @@
     width: 16px; /* 增大触控区域 */
     height: 100%;
     cursor: ew-resize;
-    z-index: 10;
+    z-index: var(--z-sticky);
     background: transparent;
     transition: background 0.15s ease;
 }
@@ -67,6 +67,8 @@
     padding: 16px;
     background: var(--md-lime);
     border-bottom: var(--border);
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .sidebar-header h2 {
@@ -74,6 +76,8 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--color-text-primary);
+    flex: 1 1 auto;
+    min-width: 100px;
 }
 
 .new-session-btn {
@@ -101,6 +105,12 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Safari flexbox gap fallback (Medium #12) */
+.sidebar-header-actions > * + * {
+    margin-left: 8px;
 }
 
 .close-sidebar-btn {
@@ -255,7 +265,7 @@
     position: fixed;
     inset: 0;
     background: rgba(56, 56, 56, 0.6);
-    z-index: 99; /* 在侧边栏(100)之下，确保不遮挡面板 */
+    z-index: var(--z-panel-backdrop);
     opacity: 0;
     visibility: hidden;
     pointer-events: none; /* 默认不可点击 */

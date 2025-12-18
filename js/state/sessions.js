@@ -11,9 +11,13 @@ import { saveSessionToDB, loadAllSessionsFromDB, deleteSessionFromDB, migrateFro
 import { generateSessionId, generateSessionName } from '../utils/helpers.js';
 import { renderSessionMessages } from '../messages/restore.js';
 import { replaceAllMessages } from '../core/state-mutations.js';
+import { requestStateMachine } from '../core/request-state-machine.js';
 
 // 防抖保存定时器
 let saveSessionTimer = null;
+
+// 会话切换 AbortController
+let sessionSwitchController = null;
 
 /**
  * 加载所有会话
@@ -33,7 +37,7 @@ export async function loadSessions() {
     // 加载当前会话ID
     let currentId = null;
     try {
-        // ✅ 优先从 IndexedDB 加载
+        // 优先从 IndexedDB 加载
         if (state.storageMode !== 'localStorage') {
             currentId = await loadPreference('currentSessionId');
         }
@@ -68,7 +72,7 @@ export async function loadSessions() {
  */
 export async function saveCurrentSessionId() {
     try {
-        // ✅ 优先保存到 IndexedDB
+        // 优先保存到 IndexedDB
         if (state.storageMode !== 'localStorage') {
             await savePreference('currentSessionId', state.currentSessionId || '');
         } else {
@@ -206,14 +210,18 @@ export async function createNewSession(shouldSwitch = true) {
  * @param {Object} elements - DOM 元素引用（用于检查输入框）
  */
 export async function switchToSession(sessionId, saveOld = true, elements = null) {
-    // ✅ 防止重复切换（同一会话）
+    // 防止重复切换（同一会话）
     if (state.currentSessionId === sessionId) return;
 
-    // ✅ 防止竞态条件：如果正在切换，忽略新的切换请求
-    if (state.isSwitchingSession) {
-        console.warn(`会话切换正在进行中，忽略切换到 ${sessionId} 的请求`);
-        return;
+    // 如果正在切换，取消当前切换，开始新的切换
+    if (state.isSwitchingSession && sessionSwitchController) {
+        console.warn(`[Session] 取消正在进行的会话切换，切换到新目标: ${sessionId}`);
+        sessionSwitchController.abort();
     }
+
+    // 创建新的 AbortController
+    sessionSwitchController = new AbortController();
+    const { signal } = sessionSwitchController;
 
     // 检查是否有未保存的内容（如果提供了 elements）
     if (elements) {
@@ -227,13 +235,31 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
         }
     }
 
-    // ✅ 设置切换标志，防止并发切换
+    // 设置切换标志
     state.isSwitchingSession = true;
 
     try {
+        // 检查是否被中断
+        if (signal.aborted) {
+            console.log('[Session] 会话切换被取消');
+            return;
+        }
+
+        // 取消当前进行的 API 请求
+        if (requestStateMachine.isBusy()) {
+            console.log('[Session] 取消正在进行的 API 请求');
+            requestStateMachine.cancel();
+        }
+
         // 保存当前会话
         if (saveOld && state.currentSessionId) {
             await saveCurrentSessionMessages();
+        }
+
+        // 再次检查是否被中断
+        if (signal.aborted) {
+            console.log('[Session] 会话切换在保存后被取消');
+            return;
         }
 
         const session = state.sessions.find(s => s.id === sessionId);
@@ -247,7 +273,7 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
         // 切换会话 - 恢复所有三种格式
         state.currentSessionId = sessionId;
 
-        // ✅ 使用安全的状态更新函数替换消息数组
+        // 使用安全的状态更新函数替换消息数组
         replaceAllMessages(
             session.messages || [],
             session.geminiContents || [],
@@ -257,41 +283,53 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
         state.lastUserMessage = null;
         state.messageHistory = [];
 
-        // ✅ 退出编辑模式（清理 DOM 状态）
+        // 退出编辑模式（清理 DOM 状态）
         if (state.editingElement) {
             state.editingElement.classList.remove('editing');
         }
         state.editingIndex = null;
         state.editingElement = null;
 
-        // ✅ 清空输入框
+        // 清空输入框
         if (elements && elements.userInput) {
             elements.userInput.value = '';
             elements.userInput.style.height = 'auto';
         }
 
-        // ✅ 通知 UI 更新编辑按钮状态
+        // 通知 UI 更新编辑按钮状态
         eventBus.emit('editor:mode-changed', { isEditing: false });
 
         state.currentReplies = [];
         state.selectedReplyIndex = 0;
         state.uploadedImages = [];
 
-        // ✅ 更新图片预览（清空）
+        // 更新图片预览（清空）
         eventBus.emit('ui:update-image-preview');
 
-        // ✅ 将当前会话的生成任务移到后台（如果正在生成）
+        // 将当前会话的生成任务移到后台（如果正在生成）
         if (oldSessionId && state.isLoading && state.currentAbortController) {
             console.log(`[sessions.js] 将会话 ${oldSessionId} 的任务移到后台, state.isLoading =`, state.isLoading);
             state.backgroundTasks.set(oldSessionId, {
                 abortController: state.currentAbortController,
                 messageElement: state.currentAssistantMessage,
+                createdAt: Date.now()  // 添加创建时间戳
             });
             eventBus.emit('ui:notification', {
                 message: '上一个会话的生成将在后台继续',
                 type: 'info',
                 duration: 3000
             });
+
+            // 3分钟后自动清理超时的后台任务
+            setTimeout(() => {
+                const task = state.backgroundTasks.get(oldSessionId);
+                if (task && Date.now() - task.createdAt > 180000) {
+                    console.warn('[sessions.js] 清理超时后台任务:', oldSessionId);
+                    task.abortController?.abort();
+                    state.backgroundTasks.delete(oldSessionId);
+                    eventBus.emit('sessions:updated');
+                }
+            }, 180000);
         }
 
         // 恢复会话的 API 格式
@@ -300,7 +338,7 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             eventBus.emit('config:format-change-requested', { format: session.apiFormat, shouldFetchModels: false });
         }
 
-        // ✅ 检查目标会话是否有后台任务
+        // 检查目标会话是否有后台任务
         const backgroundTask = state.backgroundTasks.get(sessionId);
         if (backgroundTask) {
             // 恢复后台任务的状态
@@ -314,7 +352,7 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
         } else {
             // 🔧 没有后台任务，完全重置状态和UI（修复切换会话后按钮卡住的问题）
             state.isLoading = false;
-            state.isSending = false;  // ✅ 重置发送锁，防止跨会话锁定
+            state.isSending = false;  // 重置发送锁，防止跨会话锁定
             state.currentAssistantMessage = null;
             state.currentAbortController = null;
 
@@ -330,12 +368,24 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             eventBus.emit('ui:reset-input-buttons');
         }
 
+        // 检查是否被中断
+        if (signal.aborted) {
+            console.log('[Session] 会话切换在 UI 更新前被取消');
+            return;
+        }
+
         saveCurrentSessionId();
 
         // 渲染会话消息
         renderSessionMessages();
 
-        // ✅ 如果有后台任务，恢复 currentAssistantMessage 引用
+        // 最后检查是否被中断
+        if (signal.aborted) {
+            console.log('[Session] 会话切换在渲染后被取消');
+            return;
+        }
+
+        // 如果有后台任务，恢复 currentAssistantMessage 引用
         if (backgroundTask && backgroundTask.messageElement && isElementsInitialized()) {
             // 延迟到下一帧执行，确保 renderSessionMessages() 的 DOM 操作完全完成
             requestAnimationFrame(() => {
@@ -356,9 +406,9 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
                     const lastAssistantMsg = messagesArea.querySelector('.message.assistant:last-child .message-content');
                     if (lastAssistantMsg) {
                         state.currentAssistantMessage = lastAssistantMsg;
-                        console.log('[sessions.js] ✅ 后台任务 DOM 引用已恢复（已保存的消息）');
+                        console.log('[sessions.js] 后台任务 DOM 引用已恢复（已保存的消息）');
                     } else {
-                        // ✅ 修复：未找到消息框，创建新的占位符（消息还没保存到数组）
+                        // 未找到消息框，创建新的占位符（消息还没保存到数组）
                         console.log('[sessions.js] 未找到助手消息，创建新占位符（正在流式输出）');
 
                         // 创建消息框（与 handler.js 中的逻辑一致）
@@ -385,7 +435,7 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
 
                         // 恢复引用
                         state.currentAssistantMessage = contentDiv;
-                        console.log('[sessions.js] ✅ 后台任务占位符已创建');
+                        console.log('[sessions.js] 后台任务占位符已创建');
                     }
                 } catch (error) {
                     console.error('[sessions.js] ❌ 恢复后台任务失败:', error);
@@ -400,11 +450,20 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             session
         });
     } catch (error) {
+        // 忽略 AbortError（正常的取消操作）
+        if (error.name === 'AbortError') {
+            console.log('[Session] 会话切换被取消（AbortError）');
+            return;
+        }
         console.error('会话切换失败:', error);
         eventBus.emit('ui:notification', { message: '会话切换失败', type: 'error' });
     } finally {
-        // ✅ 无论成功或失败，都清除切换标志
-        state.isSwitchingSession = false;
+        // 清除切换标志（只有在没有新的切换时）
+        // 如果已经有新的 AbortController，说明新的切换已经开始，不要清除标志
+        if (sessionSwitchController && sessionSwitchController.signal === signal) {
+            state.isSwitchingSession = false;
+            sessionSwitchController = null;
+        }
     }
 }
 

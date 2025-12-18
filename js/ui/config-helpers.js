@@ -42,7 +42,7 @@ export function initEndpointInputListeners() {
                 const customModel = e.target.value.trim();
                 state.customModels[format] = customModel;
 
-                // ✅ 新逻辑：直接刷新模型列表（从提供商聚合）
+                // 新逻辑：直接刷新模型列表（从提供商聚合）
                 if (format === state.apiFormat) {
                     import('../ui/models.js').then(({ populateModelSelect }) => {
                         populateModelSelect();
@@ -105,7 +105,7 @@ function initModelParamsListeners() {
         'claude-top-k': 'top_k'
     };
 
-    // ✅ 初始化时同步通用参数值（确保所有格式一致）
+    // 初始化时同步通用参数值（确保所有格式一致）
     const wasSynced = syncUniversalParams();
 
     // 如果发生了同步（说明之前数据不一致），保存一次
@@ -170,7 +170,7 @@ function setupParamListeners(format, paramsMap) {
                     return; // 非法数值，忽略
                 }
 
-                // ✅ 检查是否为通用参数（需要同步到所有格式）
+                // 检查是否为通用参数（需要同步到所有格式）
                 const universalParam = Object.keys(UNIVERSAL_PARAMS).find(
                     key => UNIVERSAL_PARAMS[key][format] === paramKey
                 );
@@ -487,7 +487,7 @@ export function initOtherConfigInputs() {
 
             // 提示用户
             if (e.target.checked) {
-                console.log('[Config] ✅ XML 工具调用兜底已启用，将在 system prompt 中注入工具描述');
+                console.log('[Config] XML 工具调用兜底已启用，将在 system prompt 中注入工具描述');
             }
         });
     }

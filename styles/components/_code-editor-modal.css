@@ -514,7 +514,7 @@
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.95);
-    z-index: 99999;
+    z-index: var(--z-top);
     display: flex;
     flex-direction: column;
     opacity: 0;

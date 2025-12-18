@@ -5,7 +5,7 @@
 
 import { elements } from '../core/elements.js';
 import { state } from '../core/state.js';
-// ✅ 新增：IndexedDB 偏好设置 API
+// 新增：IndexedDB 偏好设置 API
 import { savePreference } from '../state/storage.js';
 
 function applyTheme(theme) {
@@ -36,7 +36,7 @@ export async function toggleTheme() {
     applyTheme(newTheme);
     localStorage.setItem('theme', newTheme);
 
-    // ✅ 保存主题到存储
+    // 保存主题到存储
     try {
         if (state.storageMode !== 'localStorage') {
             await savePreference('theme', newTheme);

@@ -8,7 +8,7 @@ import { eventBus } from '../core/events.js';
 import { recordFirstToken, recordTokens, finalizeStreamStats, getCurrentStreamStatsData, appendStreamStats } from './stats.js';
 import { updateStreamingMessage } from './helpers.js';
 import { saveAssistantMessage } from '../messages/sync.js';
-import { setCurrentMessageIndex } from '../messages/dom-sync.js';  // ✅ Bug 2 修复：导入索引设置函数
+import { setCurrentMessageIndex } from '../messages/dom-sync.js';  // Bug 2 导入索引设置函数
 import { renderReplyWithSelector } from '../messages/renderer.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { saveErrorMessage } from '../messages/sync.js';
@@ -33,7 +33,7 @@ export async function handleMultiStreamResponses(endpoint, apiKey, model, abortC
     // 并行发送所有请求
     const promises = [];
 
-    // ✅ 使用提供商的原始 apiFormat
+    // 使用提供商的原始 apiFormat
     const provider = getCurrentProvider();
     const requestFormat = provider?.apiFormat || 'openai';
     const sendFn = getSendFunction(requestFormat);
@@ -156,7 +156,7 @@ export async function handleMultiStreamResponses(endpoint, apiKey, model, abortC
             sessionId: sessionId, // 🔒 传递会话ID防止串消息
         });
 
-        // ✅ Bug 2 修复：立即设置 dataset.messageIndex
+        // Bug 2 立即设置 dataset.messageIndex
         setCurrentMessageIndex(messageIndex);
 
         // 渲染回复选择器
@@ -221,7 +221,7 @@ async function parseStreamToReply(response, showRealtime = false) {
     let thinkingContent = '';
     let thoughtSignature = null;
     let groundingMetadata = null;
-    let contentParts = [];
+    const contentParts = [];
 
     switch (state.apiFormat) {
         case 'gemini':

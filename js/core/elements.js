@@ -132,7 +132,7 @@ function initializeElements() {
     // 验证关键元素
     validateCriticalElements();
 
-    console.log('✅ DOM 元素初始化完成');
+    console.log('DOM 元素初始化完成');
     return _elements;
 }
 

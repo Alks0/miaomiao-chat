@@ -12,9 +12,32 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            webSecurity: true // 启用网络安全
         },
         icon: path.join(__dirname, '../assets/icon.png')
+    });
+
+    // 设置 CSP 响应头（在 Electron 中生效，包含 frame-ancestors）
+    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+            responseHeaders: {
+                ...details.responseHeaders,
+                'Content-Security-Policy': [
+                    "default-src 'self'; " +
+                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+                    "img-src 'self' data: blob: https:; " +
+                    "font-src 'self' data: https://fonts.gstatic.com; " +
+                    "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://aiplatform.googleapis.com https: wss: ws:; " +
+                    "media-src 'self' data: blob:; " +
+                    "object-src 'none'; " +
+                    "base-uri 'self'; " +
+                    "form-action 'self'; " +
+                    "frame-ancestors 'none';"
+                ]
+            }
+        });
     });
 
     mainWindow.loadFile('index.html');
@@ -213,6 +236,291 @@ mcpManager.on('server-error', (data) => {
 mcpManager.on('notification', (data) => {
     if (mainWindow) {
         mainWindow.webContents.send('mcp:notification', data);
+    }
+});
+
+// ========== Computer Use IPC 处理器 ==========
+
+// 延迟加载 Computer Use 模块（避免启动时的 asar 路径解析问题）
+let computerUse = null;
+function getComputerUse() {
+    if (!computerUse) {
+        computerUse = require('./computer-use/manager');
+    }
+    return computerUse;
+}
+
+/**
+ * IPC: 更新 Computer Use 权限
+ */
+ipcMain.handle('computer-use:update-permissions', async (event, permissions) => {
+    try {
+        getComputerUse().updatePermissions(permissions);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 更新权限失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 更新 Bash 配置
+ */
+ipcMain.handle('computer-use:update-bash-config', async (event, config) => {
+    try {
+        getComputerUse().updateBashConfig(config);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 更新 Bash 配置失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 截图
+ */
+ipcMain.handle('computer-use:screenshot', async () => {
+    try {
+        const result = await getComputerUse().captureScreen();
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('[Computer Use] 截图失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 区域放大截图（zoom）
+ */
+ipcMain.handle('computer-use:zoom', async (event, { x1, y1, x2, y2 }) => {
+    try {
+        const result = await getComputerUse().zoomRegion(x1, y1, x2, y2);
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('[Computer Use] Zoom 失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 鼠标移动
+ */
+ipcMain.handle('computer-use:mouse-move', async (event, { x, y }) => {
+    try {
+        const result = await getComputerUse().moveMouse(x, y);
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('[Computer Use] 鼠标移动失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 鼠标点击
+ */
+ipcMain.handle('computer-use:mouse-click', async (event, { button }) => {
+    try {
+        await getComputerUse().clickMouse(button);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 鼠标点击失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 鼠标双击
+ */
+ipcMain.handle('computer-use:mouse-double-click', async (event, { button }) => {
+    try {
+        await getComputerUse().doubleClickMouse(button);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 鼠标双击失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 鼠标三击
+ */
+ipcMain.handle('computer-use:mouse-triple-click', async (event, { button }) => {
+    try {
+        await getComputerUse().tripleClickMouse(button);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 鼠标三击失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 鼠标拖拽
+ */
+ipcMain.handle('computer-use:mouse-drag', async (event, { fromX, fromY, toX, toY }) => {
+    try {
+        await getComputerUse().dragMouse(fromX, fromY, toX, toY);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 鼠标拖拽失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 鼠标滚轮
+ */
+ipcMain.handle('computer-use:mouse-scroll', async (event, { amount }) => {
+    try {
+        await getComputerUse().scrollMouse(amount);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 鼠标滚轮失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 按下鼠标按钮
+ */
+ipcMain.handle('computer-use:mouse-press-button', async (event, { button }) => {
+    try {
+        await getComputerUse().pressMouseButton(button);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 按下鼠标按钮失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 释放鼠标按钮
+ */
+ipcMain.handle('computer-use:mouse-release-button', async (event, { button }) => {
+    try {
+        await getComputerUse().releaseMouseButton(button);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 释放鼠标按钮失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 键盘输入
+ */
+ipcMain.handle('computer-use:keyboard-type', async (event, { text }) => {
+    try {
+        await getComputerUse().typeText(text);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 键盘输入失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 按键
+ */
+ipcMain.handle('computer-use:keyboard-press', async (event, { key, modifiers }) => {
+    try {
+        await getComputerUse().pressKey(key, modifiers);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 按键失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 按住按键
+ */
+ipcMain.handle('computer-use:keyboard-hold', async (event, { key }) => {
+    try {
+        await getComputerUse().holdKey(key);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 按住按键失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 释放按键
+ */
+ipcMain.handle('computer-use:keyboard-release', async (event, { key }) => {
+    try {
+        await getComputerUse().releaseKey(key);
+        return { success: true };
+    } catch (error) {
+        console.error('[Computer Use] 释放按键失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 获取显示器信息
+ */
+ipcMain.handle('computer-use:get-display-info', async () => {
+    try {
+        const result = await getComputerUse().getDisplayInfo();
+        return { success: true, displays: result };
+    } catch (error) {
+        console.error('[Computer Use] 获取显示器信息失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 获取光标位置
+ */
+ipcMain.handle('computer-use:get-cursor-position', async () => {
+    try {
+        const result = await getComputerUse().getCursorPosition();
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('[Computer Use] 获取光标位置失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 执行 Bash 命令
+ */
+ipcMain.handle('computer-use:bash-execute', async (event, { command }) => {
+    try {
+        const result = await getComputerUse().executeBash(command);
+        // bash.execute() 已经返回了包含 success 字段的对象，直接返回
+        return result;
+    } catch (error) {
+        console.error('[Computer Use] Bash 执行失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 读取文件
+ */
+ipcMain.handle('computer-use:file-read', async (event, { path }) => {
+    try {
+        const result = await getComputerUse().readFile(path);
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('[Computer Use] 读取文件失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 写入文件
+ */
+ipcMain.handle('computer-use:file-write', async (event, { path, content }) => {
+    try {
+        const result = await getComputerUse().writeFile(path, content);
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('[Computer Use] 写入文件失败:', error);
+        return { success: false, error: error.message };
     }
 });
 

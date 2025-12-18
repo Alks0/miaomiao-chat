@@ -102,10 +102,10 @@ export function initToolsQuickSelector() {
     eventBus.on('tool:registered', renderToolsList);
     eventBus.on('tool:removed', renderToolsList);
 
-    // ✅ 初始化按钮状态（启动时恢复工具状态后需要更新按钮颜色）
+    // 初始化按钮状态（启动时恢复工具状态后需要更新按钮颜色）
     updateButtonState();
 
-    console.log('[ToolsQuickSelector] ✅ 快捷工具选择器已初始化');
+    console.log('[ToolsQuickSelector] 快捷工具选择器已初始化');
 }
 
 /**
@@ -200,7 +200,8 @@ function closeSelector() {
  * 渲染工具列表
  */
 function renderToolsList() {
-    const tools = getAllTools();
+    // 过滤掉 hidden 工具（如 Computer Use）
+    const tools = getAllTools().filter(t => !t.hidden);
     const container = selectorPanel.querySelector('.tools-list-container');
 
     // 按类型分组
@@ -370,7 +371,8 @@ function toggleAllTools(enabled) {
  * 更新工具计数
  */
 function updateToolsCount() {
-    const tools = getAllTools();
+    // 过滤掉 hidden 工具（如 Computer Use）
+    const tools = getAllTools().filter(t => !t.hidden);
     const enabledCount = tools.filter(t => isToolEnabled(t.id)).length;
     const totalCount = tools.length;
 
@@ -385,7 +387,8 @@ function updateToolsCount() {
  * 更新按钮激活状态
  */
 function updateButtonState() {
-    const tools = getAllTools();
+    // 过滤掉 hidden 工具（如 Computer Use）
+    const tools = getAllTools().filter(t => !t.hidden);
     const hasEnabled = tools.some(t => isToolEnabled(t.id));
     const toggleBtn = document.getElementById('toggle-tools');
 

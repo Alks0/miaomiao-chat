@@ -80,26 +80,28 @@ export async function randomGeneratorHandler(args) {
         let metadata = {};
 
         switch (type) {
-            case 'number':
+            case 'number': {
                 const minVal = min !== undefined ? min : 0;
                 const maxVal = max !== undefined ? max : 100;
                 result = generateRandomNumber(minVal, maxVal);
                 metadata = { min: minVal, max: maxVal, is_integer: Number.isInteger(result) };
                 break;
+            }
 
-            case 'string':
+            case 'string': {
                 const strLength = length || 10;
                 const strCharset = charset || 'alphanumeric';
                 result = generateRandomString(strLength, strCharset);
                 metadata = { length: strLength, charset: strCharset };
                 break;
+            }
 
             case 'uuid':
                 result = generateUUID();
                 metadata = { version: 4, variant: 'RFC 4122' };
                 break;
 
-            case 'password':
+            case 'password': {
                 const pwdLength = length || 16;
                 const pwdOptions = {
                     symbols: include_symbols !== false,
@@ -109,12 +111,14 @@ export async function randomGeneratorHandler(args) {
                 result = generatePassword(pwdLength, pwdOptions);
                 metadata = { length: pwdLength, ...pwdOptions };
                 break;
+            }
 
-            case 'color':
+            case 'color': {
                 const colorFormat = format || 'hex';
                 result = generateRandomColor(colorFormat);
                 metadata = { format: colorFormat };
                 break;
+            }
 
             case 'boolean':
                 result = Math.random() < 0.5;
@@ -129,12 +133,13 @@ export async function randomGeneratorHandler(args) {
                 metadata = { choices, total_choices: choices.length };
                 break;
 
-            case 'array':
+            case 'array': {
                 const arrayCount = count || 5;
                 const arrayType = args.array_type || 'number';
                 result = generateRandomArray(arrayCount, arrayType, args);
                 metadata = { count: arrayCount, array_type: arrayType };
                 break;
+            }
 
             default:
                 throw new Error(`不支持的生成类型: ${type}`);
@@ -237,7 +242,7 @@ function generatePassword(length, options) {
     if (options.numbers && !/[0-9]/.test(password)) {
         password = password.substring(0, length - 1) + '1';
     }
-    if (options.symbols && !/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)) {
+    if (options.symbols && !/[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/.test(password)) {
         password = password.substring(0, length - 1) + '!';
     }
 
@@ -259,9 +264,10 @@ function generateRandomColor(format) {
             return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
         case 'rgb':
             return `rgb(${r}, ${g}, ${b})`;
-        case 'hsl':
+        case 'hsl': {
             const { h, s, l } = rgbToHsl(r, g, b);
             return `hsl(${h}, ${s}%, ${l}%)`;
+        }
         default:
             return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
     }
@@ -277,7 +283,8 @@ function generateRandomColor(format) {
 function rgbToHsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
+    let h, s;
+    const l = (max + min) / 2;
 
     if (max === min) {
         h = s = 0;

@@ -5,16 +5,15 @@
 
 import { state, elements } from '../core/state.js';
 import { eventBus } from '../core/events.js';
+import { requestStateMachine } from '../core/request-state-machine.js';
 import { toOpenAIMessage, toGeminiMessage, toClaudeMessage } from '../messages/converters.js';
 import { createMessageElement } from '../messages/renderer.js';
 import { removeMessagesAfterAll, updateMessageContentWithImages } from '../messages/editor.js';
 import { showNotification } from './notifications.js';
 import { generateMessageId } from '../utils/helpers.js';
 import { pushMessage } from '../core/state-mutations.js';
-
-// 附件限制
-const MAX_ATTACHMENTS = 10;
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+import { truncateFileName } from '../utils/file-helpers.js';
+import { MAX_ATTACHMENTS, MAX_FILE_SIZE, MAX_MESSAGE_LENGTH, IMAGE_COMPRESSION_TIMEOUT } from '../utils/constants.js';
 
 // 支持的文件类型
 const SUPPORTED_TYPES = {
@@ -51,15 +50,12 @@ function getFileCategory(mimeType) {
     return 'unknown';
 }
 
-// ✅ 消息长度限制（防止内存溢出和 API 拒绝）
-const MAX_MESSAGE_LENGTH = 100000; // 10万字符（约 25k tokens）
-
-// ✅ 引用消息状态
+// 引用消息状态
 let quotedMessage = null; // { role: 'user'|'assistant', content: '...', preview: '...' }
 
 /**
  * 验证消息长度
- * ✅ 防止超长消息导致内存溢出或 API 拒绝
+ * 防止超长消息导致内存溢出或 API 拒绝
  * @param {string} text - 消息文本
  * @returns {boolean} 是否通过验证
  */
@@ -87,7 +83,7 @@ function handleKeyDown(e) {
 
 /**
  * 自动调整文本框高度
- * ✅ 最大高度为视口高度的 50%，最小 168px，最大 500px
+ * 最大高度为视口高度的 50%，最小 168px，最大 500px
  */
 export function autoResizeTextarea() {
     const textarea = elements.userInput;
@@ -172,20 +168,15 @@ export function handleAttachFile() {
                 const base64 = await fileToBase64(file);
 
                 if (fileCategory === 'image') {
-                    // 图片：生成压缩版本
-                    const { compressImage } = await import('../utils/images.js');
-                    const base64Data = base64.split(',')[1];
-                    const compressed = await compressImage(base64Data, fileType, 512);
-                    const compressedDataUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
-
+                    // 图片：保存原图（按需压缩策略：API 报错时自动压缩重试）
                     state.uploadedImages.push({
                         name: file.name,
                         type: fileType,
                         category: 'image',
                         data: base64,
-                        compressed: compressedDataUrl,
+                        size: file.size,
                     });
-                    console.log(`已添加图片: ${file.name}`);
+                    console.log(`已添加图片: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
                 } else if (fileCategory === 'pdf') {
                     // PDF：直接保存
                     state.uploadedImages.push({
@@ -325,20 +316,6 @@ export function updateImagePreview() {
 }
 
 /**
- * 截断文件名
- * @param {string} name - 文件名
- * @param {number} maxLen - 最大长度
- * @returns {string}
- */
-function truncateFileName(name, maxLen) {
-    if (name.length <= maxLen) return name;
-    const ext = name.split('.').pop();
-    const baseName = name.slice(0, name.length - ext.length - 1);
-    const truncated = baseName.slice(0, maxLen - ext.length - 4) + '...';
-    return `${truncated}.${ext}`;
-}
-
-/**
  * 更新用户消息 DOM
  * @param {HTMLElement} messageEl - 消息元素
  * @param {string} text - 文本内容
@@ -381,7 +358,7 @@ function updateCancelEditButton() {
     const saveBtn = document.getElementById('save-edit');
     const sendBtn = document.getElementById('send-button');
 
-    // ✅ 防御性检查：确保所有按钮都存在
+    // 防御性检查：确保所有按钮都存在
     if (!cancelBtn || !saveBtn || !sendBtn) {
         console.error('[ERROR] 编辑按钮未找到:', {
             cancelBtn: !!cancelBtn,
@@ -457,8 +434,8 @@ function saveEdit() {
     }
 
     // 转换附件格式（从上传的格式转换为消息存储格式）
-    // ✅ 图片使用压缩版发送 API，PDF/TXT 直接发送
-    const attachmentDataUrls = hasAttachments ? state.uploadedImages.map(file => file.compressed || file.data) : [];
+    // 按需压缩策略：先发送原图，API 报错时自动压缩重试
+    const attachmentDataUrls = hasAttachments ? state.uploadedImages.map(file => file.data) : [];
     const originalDataUrls = hasAttachments ? state.uploadedImages.map(file => file.data) : null;
     let messageAttachments = [];
 
@@ -499,7 +476,7 @@ function saveEdit() {
 }
 
 /**
- * ✅ 设置引用消息
+ * 设置引用消息
  * @param {string} role - 消息角色（user/assistant）
  * @param {string} content - 消息内容（纯文本）
  */
@@ -517,7 +494,7 @@ function setQuotedMessage(role, content) {
 }
 
 /**
- * ✅ 清除引用消息
+ * 清除引用消息
  */
 function clearQuotedMessage() {
     quotedMessage = null;
@@ -525,7 +502,7 @@ function clearQuotedMessage() {
 }
 
 /**
- * ✅ 渲染引用预览 UI
+ * 渲染引用预览 UI
  */
 function renderQuotePreview() {
     if (!quotedMessage) return;
@@ -580,7 +557,7 @@ function renderQuotePreview() {
 }
 
 /**
- * ✅ 更新引用预览样式（根据是否有图片）
+ * 更新引用预览样式（根据是否有图片）
  */
 function updateQuotePreviewStyle() {
     const quotePreview = document.getElementById('quote-preview');
@@ -598,7 +575,7 @@ function updateQuotePreviewStyle() {
 }
 
 /**
- * ✅ 移除引用预览 UI
+ * 移除引用预览 UI
  */
 function removeQuotePreview() {
     const quotePreview = document.getElementById('quote-preview');
@@ -611,7 +588,7 @@ function removeQuotePreview() {
  * 处理消息发送
  */
 export async function handleSend() {
-    console.log('[input.js] handleSend 被调用, state.isLoading =', state.isLoading, ', state.isSending =', state.isSending, ', state.currentSessionId =', state.currentSessionId);
+    console.log('[input.js] handleSend 被调用, 状态机:', requestStateMachine.getState());
 
     let textContent = elements.userInput.value.trim();
     const hasAttachments = state.uploadedImages.length > 0;
@@ -621,16 +598,14 @@ export async function handleSend() {
         console.log('[input.js] handleSend 被阻止: 没有文本或附件');
         return;
     }
-    if (state.isLoading) {
-        console.log('[input.js] handleSend 被阻止: state.isLoading =', state.isLoading);
-        return;
-    }
-    if (state.isSending) {
-        console.log('[input.js] handleSend 被阻止: state.isSending =', state.isSending, '(锁将在', state.sendLockTimeout ? '30秒后' : '未知时间', '自动释放)');
+
+    // 使用状态机检查是否正忙
+    if (requestStateMachine.isBusy()) {
+        console.log('[input.js] handleSend 被阻止: 请求正在进行中, 当前状态:', requestStateMachine.getState());
         return;
     }
 
-    // ✅ 如果有引用消息，添加引用上下文
+    // 如果有引用消息，添加引用上下文
     if (quotedMessage && !isEditing) {
         const roleLabel = quotedMessage.role === 'user' ? '用户' : 'AI';
         const quotedText = quotedMessage.content;
@@ -640,24 +615,14 @@ export async function handleSend() {
         textContent = quotePrefix + textContent;
     }
 
-    // ✅ 验证消息长度
+    // 验证消息长度
     if (!validateMessageLength(textContent)) {
         return;
     }
 
-    // 双击保护：防止快速重复点击
-    if (state.isSending) return;
-    state.isSending = true;
-
-    // 设置安全超时，确保锁在 30 秒后自动释放（防止卡死，作为兜底保护）
-    if (state.sendLockTimeout) clearTimeout(state.sendLockTimeout);
-    state.sendLockTimeout = setTimeout(() => {
-        state.isSending = false;
-    }, 30000);
-
     // 构建三种格式的用户消息
-    // ✅ 图片使用压缩版发送 API（节省带宽），PDF/TXT 直接发送，保留原数据引用
-    const attachmentDataUrls = hasAttachments ? state.uploadedImages.map(file => file.compressed || file.data) : null;
+    // 按需压缩策略：先发送原图，API 报错时自动压缩重试
+    const attachmentDataUrls = hasAttachments ? state.uploadedImages.map(file => file.data) : null;
     const originalDataUrls = hasAttachments ? state.uploadedImages.map(file => file.data) : null;
 
     // 🔑 生成唯一消息ID
@@ -666,7 +631,7 @@ export async function handleSend() {
     // OpenAI 格式
     const openaiMessage = toOpenAIMessage('user', textContent, attachmentDataUrls);
     openaiMessage.id = messageId;
-    // ✅ 保存原始数据 URL 引用（用于下载）
+    // 保存原始数据 URL 引用（用于下载）
     if (originalDataUrls) {
         openaiMessage.originalImageUrls = originalDataUrls;
     }
@@ -674,7 +639,7 @@ export async function handleSend() {
     // Gemini 格式
     const geminiMessage = toGeminiMessage('user', textContent, attachmentDataUrls);
     geminiMessage.id = messageId;
-    // ✅ 保存原始数据 URL 引用（用于下载）
+    // 保存原始数据 URL 引用（用于下载）
     if (originalDataUrls) {
         geminiMessage.originalImageUrls = originalDataUrls;
     }
@@ -682,7 +647,7 @@ export async function handleSend() {
     // Claude 格式
     const claudeMessage = toClaudeMessage('user', textContent, attachmentDataUrls);
     claudeMessage.id = messageId;
-    // ✅ 保存原始数据 URL 引用（用于下载）
+    // 保存原始数据 URL 引用（用于下载）
     if (originalDataUrls) {
         claudeMessage.originalImageUrls = originalDataUrls;
     }
@@ -722,11 +687,11 @@ export async function handleSend() {
         // 移除编辑位置之后的所有消息（所有格式）
         removeMessagesAfterAll(targetIndex);
     } else {
-        // ✅ 使用安全的状态更新函数推送消息
+        // 使用安全的状态更新函数推送消息
         pushMessage(openaiMessage, geminiMessage, claudeMessage);
 
         const messageIndex = state.messages.length - 1;
-        // ✅ 传递 messageId 到 DOM 元素
+        // 传递 messageId 到 DOM 元素
         const messageEl = createMessageElement('user', textContent, hasAttachments ? state.uploadedImages : null, messageId);
         elements.messagesArea.appendChild(messageEl);
         if (messageEl) {
@@ -740,7 +705,7 @@ export async function handleSend() {
     state.uploadedImages = [];
     updateImagePreview();
 
-    // ✅ 清除引用消息
+    // 清除引用消息
     clearQuotedMessage();
 
     // 重置编辑状态
@@ -801,25 +766,20 @@ async function handlePaste(e) {
         try {
             const base64 = await fileToBase64(file);
 
-            // 生成压缩版本（512px，用于 API 请求和显示）
-            const { compressImage } = await import('../utils/images.js');
-            const base64Data = base64.split(',')[1];
-            const compressed = await compressImage(base64Data, file.type, 512);
-            const compressedDataUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
-
             // 生成文件名（粘贴的图片通常没有文件名）
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const fileName = `pasted-image-${timestamp}.${file.type.split('/')[1] || 'png'}`;
 
+            // 保存原图（按需压缩策略：API 报错时自动压缩重试）
             state.uploadedImages.push({
                 name: fileName,
                 type: file.type,
                 category: 'image',
                 data: base64,
-                compressed: compressedDataUrl,
+                size: file.size,
             });
 
-            console.log(`[Input] 已粘贴图片: ${fileName}`);
+            console.log(`[Input] 已粘贴图片: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
         } catch (error) {
             console.error('[Input] 处理粘贴图片失败:', error);
             showNotification('粘贴图片失败', 'error');
@@ -840,10 +800,10 @@ export function initInputHandlers() {
     elements.userInput?.addEventListener('input', autoResizeTextarea);
     elements.attachFile?.addEventListener('click', handleAttachFile);
 
-    // ✅ 支持粘贴图片
+    // 支持粘贴图片
     elements.userInput?.addEventListener('paste', handlePaste);
 
-    // ✅ 绑定取消请求按钮
+    // 绑定取消请求按钮
     elements.cancelRequestButton?.addEventListener('click', () => {
         eventBus.emit('api:cancel-requested');
     });
@@ -854,7 +814,7 @@ export function initInputHandlers() {
         cancelBtn.addEventListener('click', cancelEdit);
     }
 
-    // ✅ 图片删除事件改为直接绑定（在 updateImagePreview() 中处理）
+    // 图片删除事件改为直接绑定（在 updateImagePreview() 中处理）
 
     // 字数统计和typing效果
     elements.userInput?.addEventListener('input', (e) => {
@@ -878,7 +838,7 @@ export function initInputHandlers() {
         updateCancelEditButton();
     });
 
-    // ✅ 监听引用消息请求
+    // 监听引用消息请求
     eventBus.on('message:quote-requested', ({ messageEl, role, content }) => {
         // 提取消息的纯文本内容
         const contentDiv = messageEl.querySelector('.message-content');
@@ -906,15 +866,22 @@ export function initInputHandlers() {
         showNotification('已添加引用', 'success');
     });
 
-    // 监听会话切换时的按钮重置事件（修复切换会话后按钮卡住的问题）
+    // 监听会话切换时的按钮重置事件
     eventBus.on('ui:reset-input-buttons', () => {
-        console.log('[input.js] 收到 ui:reset-input-buttons 事件, state.isLoading =', state.isLoading);
-        if (elements.sendButton) {
-            elements.sendButton.disabled = false;
-            elements.sendButton.style.display = 'inline-flex';
-        }
-        if (elements.cancelRequestButton) {
-            elements.cancelRequestButton.style.display = 'none';
+        console.log('[input.js] 收到 ui:reset-input-buttons 事件');
+        // 如果状态机显示正忙，强制重置
+        if (requestStateMachine.isBusy()) {
+            console.warn('[input.js] 状态机显示正忙，强制重置');
+            requestStateMachine.forceReset();
+        } else {
+            // 正常重置 UI
+            if (elements.sendButton) {
+                elements.sendButton.disabled = false;
+                elements.sendButton.style.display = 'inline-flex';
+            }
+            if (elements.cancelRequestButton) {
+                elements.cancelRequestButton.style.display = 'none';
+            }
         }
     });
 
@@ -928,7 +895,7 @@ export function initInputHandlers() {
         }
     });
 
-    // ✅ 监听更新图片预览事件（切换会话时清空）
+    // 监听更新图片预览事件（切换会话时清空）
     eventBus.on('ui:update-image-preview', () => {
         updateImagePreview();
         // 同时清除引用消息
@@ -938,6 +905,22 @@ export function initInputHandlers() {
     // 暴露到全局作用域（用于 HTML onclick）
     window.cancelEdit = cancelEdit;
     window.saveEdit = saveEdit;
+
+    // 全局按钮状态检测器（每10秒检测一次状态一致性）
+    setInterval(() => {
+        const isBusy = requestStateMachine.isBusy();
+        const sendButtonDisabled = elements.sendButton?.disabled;
+        const cancelButtonVisible = elements.cancelRequestButton?.style.display === 'inline-flex';
+
+        // 检测状态不一致
+        if (!isBusy && (sendButtonDisabled || cancelButtonVisible)) {
+            console.warn('[按钮状态修复] 检测到状态不一致，强制修复');
+            console.warn('[按钮状态修复] 状态机:', requestStateMachine.getState());
+            console.warn('[按钮状态修复] UI:', { sendButtonDisabled, cancelButtonVisible });
+
+            requestStateMachine.forceReset();
+        }
+    }, IMAGE_COMPRESSION_TIMEOUT);
 
     console.log('Input handlers initialized');
 }

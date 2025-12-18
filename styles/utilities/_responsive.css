@@ -16,10 +16,10 @@
     }
 
     .message-avatar {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        font-size: 10px;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        font-size: 11px;
     }
 
     .input-bar {
@@ -61,8 +61,14 @@
     .sidebar-header {
         position: sticky;
         top: 0;
-        z-index: 10;
+        z-index: var(--z-sticky);
         box-shadow: var(--shadow-md);
+        background: var(--md-lime);
+    }
+
+    /* 防止内容被 sticky header 遮挡 */
+    .session-list {
+        scroll-padding-top: 80px;
     }
 
     /* 增强overlay的可点击性 */
@@ -100,6 +106,17 @@
         padding: 2px 6px;
         border-radius: 3px;
         opacity: 0.8;
+    }
+
+    /* 引用预览响应式调整 */
+    .quote-preview {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .quote-preview-message {
+        font-size: 13px;
+        -webkit-line-clamp: 3;
     }
 }
 
@@ -148,10 +165,10 @@
     }
 
     .message-avatar {
-        width: 28px;
-        height: 28px;
-        min-width: 28px;
-        font-size: 9px;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        font-size: 10px;
     }
 
     /* 回复选择器紧凑 */
@@ -161,9 +178,10 @@
     }
 
     .reply-tab {
-        min-width: 32px;
-        height: 32px;
-        font-size: 12px;
+        min-width: 44px;
+        height: 44px;
+        font-size: 11px;
+        padding: 2px;
     }
 
     /* 欢迎消息紧凑 */
@@ -194,5 +212,194 @@
     .remove-image {
         opacity: 1;
     }
+
+    /* 引用预览更紧凑 */
+    .quote-preview {
+        padding: 8px;
+        gap: 6px;
+    }
+
+    .quote-preview-content {
+        gap: 6px;
+    }
+
+    .quote-preview-label {
+        font-size: 11px;
+    }
+
+    .quote-preview-message {
+        font-size: 12px;
+    }
 }
 
+/* ========== 平板横屏 (768px - 1024px) ========== */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .chat-container {
+        padding: 16px;
+    }
+
+    .message {
+        padding: 14px;
+    }
+
+    /* 侧边栏适中宽度 */
+    .sidebar {
+        width: 280px;
+        min-width: 240px;
+        max-width: 320px;
+    }
+
+    /* 设置面板适中宽度 */
+    .settings-panel {
+        width: 400px;
+        min-width: 360px;
+        max-width: 480px;
+    }
+
+    /* 输入栏适配 */
+    .input-bar {
+        padding: 12px 16px;
+    }
+
+    /* 工具调用卡片两列布局 */
+    .tool-calls-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ========== 小桌面 (1024px - 1440px) ========== */
+@media (min-width: 1025px) and (max-width: 1440px) {
+    .chat-container {
+        padding: 20px;
+    }
+
+    /* 侧边栏默认宽度 */
+    .sidebar {
+        width: 300px;
+        min-width: 260px;
+        max-width: 400px;
+    }
+
+    /* 设置面板默认宽度 */
+    .settings-panel {
+        width: 480px;
+        min-width: 420px;
+        max-width: 560px;
+    }
+
+    /* 工具调用卡片三列布局 */
+    .tool-calls-container {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* ========== 大桌面 (> 1440px) ========== */
+@media (min-width: 1441px) {
+    .chat-container {
+        padding: 24px;
+    }
+
+    /* 侧边栏更宽 */
+    .sidebar {
+        width: 320px;
+        min-width: 280px;
+        max-width: 480px;
+    }
+
+    /* 设置面板更宽 */
+    .settings-panel {
+        width: 560px;
+        min-width: 480px;
+        max-width: 640px;
+    }
+
+    /* 消息更舒适的间距 */
+    .message {
+        padding: 18px;
+        gap: 14px;
+    }
+
+    /* 工具调用卡片四列布局 */
+    .tool-calls-container {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    /* 代码块更大的最大高度 */
+    .message-content pre {
+        max-height: 600px;
+    }
+}
+
+/* ========== 超宽屏 (> 1920px) ========== */
+@media (min-width: 1921px) {
+    /* 工具调用卡片最多五列 */
+    .tool-calls-container {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+
+
+/* ========== 触摸设备优化 ========== */
+@media (hover: none) and (pointer: coarse) {
+    /* 移除所有 hover 效果，避免触摸设备的 sticky hover 问题 */
+    .session-actions,
+    .message-actions,
+    .remove-image,
+    .password-toggle,
+    .file-preview-delete {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    /* 增强触摸反馈 */
+    * {
+        -webkit-tap-highlight-color: rgba(14, 165, 233, 0.2);
+        tap-highlight-color: rgba(14, 165, 233, 0.2);
+    }
+
+    /* 禁用 hover 变换效果，使用 active 代替 */
+    .session-item:hover,
+    .message:hover,
+    .quick-toggle-btn:hover,
+    .send-btn:hover {
+        transform: none !important;
+    }
+
+    .session-item:active,
+    .message:active,
+    .quick-toggle-btn:active,
+    .send-btn:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
+
+    /* 增大触摸区域的内边距 */
+    button,
+    .icon-button,
+    .session-action-btn {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 8px;
+    }
+
+    /* 滚动优化 */
+    .session-list,
+    .chat-container,
+    .settings-content {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+}
+
+/* ========== 动画性能优化 ========== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

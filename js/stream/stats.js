@@ -109,7 +109,7 @@ export function getCurrentStreamStatsData() {
 }
 
 /**
- * ✅ 获取部分流统计数据（用于工具调用时保存，不结束统计）
+ * 获取部分流统计数据（用于工具调用时保存，不结束统计）
  * 与 getCurrentStreamStatsData 的区别：不需要 endTime，返回当前进行中的统计
  * @returns {Object|null} 部分统计数据
  */
@@ -126,7 +126,7 @@ export function getPartialStreamStatsData() {
         totalTime: '-',  // 工具调用进行中，总时间待定
         tokens,
         tps: '-',        // 工具调用进行中，TPS 待定
-        isPartial: true  // ✅ 标记为部分统计，供 continuation 聚合时识别
+        isPartial: true  // 标记为部分统计，供 continuation 聚合时识别
     };
 }
 
@@ -213,13 +213,13 @@ export function getStreamStatsHTML() {
 
 /**
  * 将统计信息追加到消息末尾
- * ✅ 修复：支持多种获取消息容器的方式，防止 state.currentAssistantMessage 被清空时失败
+ * 支持多种获取消息容器的方式，防止 state.currentAssistantMessage 被清空时失败
  */
 export function appendStreamStats() {
     const statsHTML = getStreamStatsHTML();
     if (!statsHTML) return;
 
-    // ✅ 尝试多种方式获取消息容器
+    // 尝试多种方式获取消息容器
     let wrapper = null;
 
     // 方式1：使用 state.currentAssistantMessage

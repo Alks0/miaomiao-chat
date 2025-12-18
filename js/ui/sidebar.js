@@ -8,9 +8,9 @@ import { eventBus } from '../core/events.js';
 import { switchToSession, deleteSession, renameSession, createNewSession } from '../state/sessions.js';
 import { escapeHtml } from '../utils/helpers.js';
 import { getCurrentQuery, highlightMatch } from './session-search.js';
-// ✅ 新增：IndexedDB 偏好设置 API
+// 新增：IndexedDB 偏好设置 API
 import { savePreference, loadPreference } from '../state/storage.js';
-// ✅ 新增：自定义对话框（替代 Electron 中不支持的 prompt/confirm）
+// 新增：自定义对话框（替代 Electron 中不支持的 prompt/confirm）
 import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
 
 // 模块状态
@@ -494,7 +494,7 @@ export function initSidebar() {
         elements.closeSidebar.addEventListener('click', () => toggleSidebar());
     }
 
-    // ✅ 侧边栏状态恢复已移至 main.js（使用 IndexedDB 优先）
+    // 侧边栏状态恢复已移至 main.js（使用 IndexedDB 优先）
     // 删除此处的 localStorage 读取，避免重复恢复
 
     // 监听会话相关事件（保存 unsubscribe 函数）
@@ -525,9 +525,9 @@ export function initSidebar() {
     );
 
     _initialized = true;
-    console.log('✅ Sidebar initialized');
+    console.log('Sidebar initialized');
 
-    // ✅ 修复竞态条件：手动触发一次会话列表更新
+    // 修复竞态条件：手动触发一次会话列表更新
     // 因为 loadSessions() 可能在 initSidebar() 之前就触发了 sessions:loaded 事件
     updateSessionList();
 

@@ -1,6 +1,6 @@
 {
   "name": "miaomiao-chat",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Web Chat Application with Electron",
   "main": "electron/main.js",
   "scripts": {
@@ -12,7 +12,11 @@
     "cap:prepare": "node scripts/prepare-capacitor.js",
     "cap:sync": "npm run cap:prepare && npx cap sync android",
     "cap:build": "npm run cap:sync && cd android && gradlew assembleRelease",
-    "cap:open": "npx cap open android"
+    "cap:open": "npx cap open android",
+    "lint": "eslint js/**/*.js electron/**/*.js --max-warnings=50",
+    "lint:fix": "eslint js/**/*.js electron/**/*.js --fix",
+    "format": "prettier --write \"js/**/*.{js,css}\" \"styles/**/*.css\" \"*.html\"",
+    "format:check": "prettier --check \"js/**/*.{js,css}\" \"styles/**/*.css\" \"*.html\""
   },
   "keywords": [
     "electron",
@@ -31,7 +35,11 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.7.4"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -39,8 +47,10 @@
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/filesystem": "^8.0.0",
+    "@nut-tree-fork/nut-js": "^4.2.6",
     "electron-log": "^5.0.1",
-    "electron-updater": "^6.1.7"
+    "electron-updater": "^6.1.7",
+    "mathjs": "^15.1.0"
   },
   "build": {
     "appId": "com.miaomiao.chat",
@@ -73,7 +83,11 @@
       "!nul",
       "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-      "!node_modules/**/{build,dist,obj,gradle,intermediates}",
+      "!node_modules/**/{build,obj,gradle,intermediates}",
+      "!node_modules/**/dist/**",
+      "node_modules/@nut-tree-fork/**/dist/**",
+      "node_modules/electron-log/**/dist/**",
+      "node_modules/mathjs/**/dist/**",
       "!node_modules/@capacitor/android/**",
       "!node_modules/@capacitor/cli/**",
       "!node_modules/*.d.ts",
@@ -105,6 +119,12 @@
       "differentialPackage": false
     },
     "compression": "normal",
+    "asar": true,
+    "asarUnpack": [
+      "electron/**/*",
+      "node_modules/@nut-tree-fork/**/*",
+      "node_modules/electron-log/**/*"
+    ],
     "mac": {
       "target": [
         "dmg",

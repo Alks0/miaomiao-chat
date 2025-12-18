@@ -826,7 +826,7 @@ function bindApiKeysEvents(providerId) {
         }
     });
 
-    // ✅ 使用事件委托（event delegation）避免重复绑定
+    // 使用事件委托（event delegation）避免重复绑定
     const listContainer = document.getElementById('api-keys-list');
     if (listContainer) {
         // 存储当前提供商 ID 到 dataset 中
@@ -883,7 +883,7 @@ function bindApiKeysEvents(providerId) {
 
                         updateApiKey(currentProviderId, keyId, { enabled: !key.enabled });
 
-                        // ✅ 修复: 如果禁用的是当前密钥，自动切换到下一个可用密钥
+                        // 如果禁用的是当前密钥，自动切换到下一个可用密钥
                         if (willDisable && currentProvider.currentKeyId === keyId) {
                             const nextEnabledKey = currentProvider.apiKeys.find(k => k.enabled && k.id !== keyId);
                             if (nextEnabledKey) {
@@ -1031,7 +1031,7 @@ async function showModelsManageModal(providerId) {
     } catch (error) {
         loading.style.display = 'none';
 
-        // ✅ 添加详细的错误提示
+        // 添加详细的错误提示
         let errorHint = '';
         if (error.status === 401) {
             errorHint = '<p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 8px;">提示: 请检查 API 密钥是否正确</p>';
@@ -1047,10 +1047,11 @@ async function showModelsManageModal(providerId) {
             </div>
         `;
 
-        // ✅ 修复: 统一的关闭处理器
+        // 统一的关闭处理器
         const closeHandler = () => {
             modal.classList.remove('active');
             // 清理搜索框绑定标记
+            const searchInput = document.getElementById('models-search-input');
             if (searchInput) {
                 searchInput.value = '';
                 delete searchInput._searchBound;
@@ -1058,7 +1059,7 @@ async function showModelsManageModal(providerId) {
             // 隐藏全选/反选按钮
             const bulkActions = document.getElementById('models-bulk-actions');
             if (bulkActions) bulkActions.style.display = 'none';
-            // ✅ 清理 ESC 监听器
+            // 清理 ESC 监听器
             if (modal._escHandler) {
                 document.removeEventListener('keydown', modal._escHandler);
                 modal._escHandler = null;
@@ -1081,7 +1082,7 @@ async function showModelsManageModal(providerId) {
         const closeBtn = document.getElementById('close-models-manage');
         const cancelBtn = document.getElementById('cancel-models-manage');
 
-        // ✅ 先移除旧事件再绑定（使用 replaceWith 技巧）
+        // 先移除旧事件再绑定（使用 replaceWith 技巧）
         closeBtn?.replaceWith(closeBtn.cloneNode(true));
         document.getElementById('close-models-manage')?.addEventListener('click', closeHandler);
 
@@ -1112,7 +1113,7 @@ function renderModelsChecklist(providerId, allModels) {
 
     const searchQuery = searchInput?.value.toLowerCase() || '';
 
-    // ✅ 过滤模型（支持对象格式）
+    // 过滤模型（支持对象格式）
     const filteredModels = searchQuery
         ? allModels.filter(m => {
             const modelId = typeof m === 'string' ? m : m.id;
@@ -1136,7 +1137,7 @@ function renderModelsChecklist(providerId, allModels) {
     // 显示全选/反选按钮
     if (bulkActions) bulkActions.style.display = 'flex';
 
-    // ✅ 渲染复选框列表（支持对象格式）
+    // 渲染复选框列表（支持对象格式）
     checklist.innerHTML = filteredModels.map(model => {
         const modelId = typeof model === 'string' ? model : model.id;
         const modelName = typeof model === 'string' ? model : (model.name || model.id);
@@ -1159,7 +1160,7 @@ function renderModelsChecklist(providerId, allModels) {
     // 更新选中数量
     updateSelectedCount();
 
-    // ✅ 滚动指示器：监听滚动事件切换 scrolled 类
+    // 滚动指示器：监听滚动事件切换 scrolled 类
     if (checklist) {
         checklist.addEventListener('scroll', function handleScroll() {
             if (checklist.scrollTop > 10) {
@@ -1190,7 +1191,7 @@ function bindModelsManageEvents(providerId) {
         modal.classList.remove('active');
         if (searchInput) {
             searchInput.value = '';
-            // ✅ 清理搜索框绑定标记，确保下次打开时能重新绑定
+            // 清理搜索框绑定标记，确保下次打开时能重新绑定
             delete searchInput._searchBound;
         }
         // 隐藏全选/反选按钮
@@ -1222,7 +1223,7 @@ function bindModelsManageEvents(providerId) {
     document.getElementById('cancel-models-manage')?.addEventListener('click', closeHandler);
 
     // 搜索框 - 添加防抖，避免频繁触发
-    // ✅ 不使用 replaceWith，保持焦点
+    // 不使用 replaceWith，保持焦点
     if (searchInput && !searchInput._searchBound) {
         let searchTimeout = null;
         searchInput.addEventListener('input', async (e) => {

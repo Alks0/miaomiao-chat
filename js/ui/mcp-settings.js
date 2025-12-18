@@ -112,14 +112,17 @@ export function initMCPSettings() {
     }
 
     isInitialized = true; // 标记为已初始化
-    console.log('[MCP Settings] ✅ 初始化完成');
+    console.log('[MCP Settings] 初始化完成');
 }
 
 /**
  * 设置模态框事件
+ * 性能优化：缓存 DOM 查询
  */
 function setupModalEvents() {
+    // 优化：一次性查询所有需要的元素
     const closeBtn = modal.querySelector('.close-mcp-settings');
+
     if (closeBtn) {
         closeBtn.addEventListener('click', closeModal);
     }
@@ -186,8 +189,10 @@ export function closeModal() {
 
 /**
  * 渲染平台信息
+ * 性能优化：缓存 DOM 查询
  */
 function renderPlatformInfo() {
+    // 优化：一次性查询所有元素
     const badge = modal.querySelector('#mcp-platform-badge');
     const warning = modal.querySelector('#mcp-platform-warning');
 
@@ -466,7 +471,7 @@ async function handleSaveServer() {
     const nameInput = modal.querySelector('#mcp-server-name');
     const name = nameInput.value.trim();
 
-    // ✅ 使用验证函数
+    // 使用验证函数
     if (!validateServerName(nameInput)) {
         showNotification('请输入服务器名称', 'error');
         nameInput.focus();
@@ -485,7 +490,7 @@ async function handleSaveServer() {
         const url = urlInput.value.trim();
         const apiKey = modal.querySelector('#mcp-server-apikey').value.trim();
 
-        // ✅ 使用验证函数
+        // 使用验证函数
         if (!validateServerURL(urlInput)) {
             showNotification('请输入有效的服务器 URL', 'error');
             urlInput.focus();
@@ -502,7 +507,7 @@ async function handleSaveServer() {
         const argsStr = modal.querySelector('#mcp-server-args').value.trim();
         const cwd = modal.querySelector('#mcp-server-cwd').value.trim();
 
-        // ✅ 使用验证函数
+        // 使用验证函数
         if (!validateServerCommand(commandInput)) {
             showNotification('请输入启动命令', 'error');
             commandInput.focus();
@@ -516,11 +521,11 @@ async function handleSaveServer() {
         }
     }
 
-    // ✅ 先保存到 IndexedDB，成功后再添加到状态
+    // 先保存到 IndexedDB，成功后再添加到状态
     try {
         await saveMCPServer(config);
 
-        // ✅ 保存成功后才添加到状态
+        // 保存成功后才添加到状态
         state.mcpServers.push(config);
 
         // 隐藏表单
@@ -536,7 +541,7 @@ async function handleSaveServer() {
     } catch (error) {
         console.error('[MCP Settings] 保存服务器失败:', error);
         showNotification('保存失败，请重试', 'error');
-        // ✅ 不需要回滚，因为状态还没添加
+        // 不需要回滚，因为状态还没添加
     }
 }
 
@@ -666,7 +671,7 @@ async function connectToServer(serverId) {
         server.retryCount = 0;
     }
 
-    // ✅ 显示加载状态（使用 loading class）
+    // 显示加载状态（使用 loading class）
     const btn = modal.querySelector(`.mcp-connect-btn[data-server-id="${serverId}"]`);
     if (btn) {
         btn.disabled = true;
@@ -676,7 +681,7 @@ async function connectToServer(serverId) {
         btn.textContent = '连接中...';
     }
 
-    // ✅ 监听重试事件，更新按钮文本
+    // 监听重试事件，更新按钮文本
     const retryHandler = (data) => {
         if (data.serverId === serverId && btn) {
             btn.textContent = `重试中 (${data.attempt}/${data.maxRetries})`;
@@ -690,12 +695,12 @@ async function connectToServer(serverId) {
     eventBus.off('mcp:retry-attempt', retryHandler);
 
     if (result.success) {
-        console.log(`[MCP Settings] ✅ 已连接: ${server.name}`);
+        console.log(`[MCP Settings] 已连接: ${server.name}`);
         showNotification(`已连接到 ${server.name}`, 'success');
-        // ✅ 重置重试计数
+        // 重置重试计数
         server.retryCount = 0;
 
-        // ✅ 保存到 IndexedDB
+        // 保存到 IndexedDB
         try {
             await saveMCPServer(server);
         } catch (error) {
@@ -705,19 +710,19 @@ async function connectToServer(serverId) {
         renderServerList(); // 刷新列表
     } else {
         console.error(`[MCP Settings] ❌ 连接失败: ${result.error}`);
-        // ✅ 增加重试计数（仅在非重试耗尽的情况下）
+        // 增加重试计数（仅在非重试耗尽的情况下）
         if (!result.retriesExhausted) {
             server.retryCount = (server.retryCount || 0) + 1;
         }
 
-        // ✅ 保存到 IndexedDB
+        // 保存到 IndexedDB
         try {
             await saveMCPServer(server);
         } catch (error) {
             console.error('[MCP Settings] 保存服务器状态失败:', error);
         }
 
-        // ✅ 显示友好的错误消息
+        // 显示友好的错误消息
         const friendlyError = getErrorMessage(result.errorType, result.error);
         const errorMsg = result.retriesExhausted
             ? `${friendlyError}（已重试 ${server.retryCount} 次）`
@@ -725,7 +730,7 @@ async function connectToServer(serverId) {
 
         showNotification(errorMsg, 'error');
 
-        // ✅ 移除加载状态，更新按钮
+        // 移除加载状态，更新按钮
         if (btn) {
             btn.disabled = false;
             btn.classList.remove('loading');
@@ -753,7 +758,7 @@ async function deleteServer(serverId) {
     const server = state.mcpServers.find(s => s.id === serverId);
     if (!server) return;
 
-    // ✅ 使用自定义确认对话框
+    // 使用自定义确认对话框
     const confirmed = await showConfirmDialog(
         `确定要删除服务器 "${server.name}" 吗？`,
         '删除服务器'
@@ -776,7 +781,7 @@ async function deleteServer(serverId) {
     // 从状态中移除
     state.mcpServers = state.mcpServers.filter(s => s.id !== serverId);
 
-    // ✅ 从 IndexedDB 中删除
+    // 从 IndexedDB 中删除
     try {
         await deleteMCPServer(serverId);
     } catch (error) {
@@ -808,21 +813,21 @@ function setupEventListeners() {
         renderServerList();
     });
 
-    // ✅ 监听连接丢失事件
+    // 监听连接丢失事件
     eventBus.on('mcp:connection-lost', (data) => {
         console.warn(`[MCP Settings] ⚠️ 连接丢失: ${data.serverName}`);
         showNotification(`${getIcon('alertCircle', { size: 14 })} ${data.serverName} 连接断开，将在 5 秒后自动重连...`, 'warning');
         renderServerList();
     });
 
-    // ✅ 监听重连失败事件
+    // 监听重连失败事件
     eventBus.on('mcp:reconnect-failed', (data) => {
         console.error(`[MCP Settings] ❌ 自动重连失败: ${data.serverName}`);
         showNotification(`${getIcon('xCircle', { size: 14 })} ${data.serverName} 自动重连失败，请手动重试`, 'error');
         renderServerList();
     });
 
-    // ✅ 监听 Electron 子进程重启事件
+    // 监听 Electron 子进程重启事件
     if (window.electron) {
         // 服务器正在重启
         eventBus.on('mcp:server-restarting', (data) => {
@@ -832,7 +837,7 @@ function setupEventListeners() {
 
         // 服务器重启成功
         eventBus.on('mcp:server-restarted', (data) => {
-            console.log(`[MCP Settings] ✅ 服务器重启成功: ${data.serverId}`);
+            console.log(`[MCP Settings] 服务器重启成功: ${data.serverId}`);
             showNotification(`${getIcon('checkCircle', { size: 14 })} MCP 服务器已自动恢复`, 'success');
             renderServerList();
         });
@@ -886,7 +891,7 @@ function getPlatformWarning(platform) {
 }
 
 /**
- * ✅ 获取友好的错误消息
+ * 获取友好的错误消息
  * @param {string} errorType - 错误类型
  * @param {string} rawError - 原始错误消息
  * @returns {string} 友好的错误消息
@@ -1183,7 +1188,7 @@ function removeJsonComments(jsonText) {
     const result = [];
     let inMultilineComment = false;
 
-    for (let line of lines) {
+    for (const line of lines) {
         let cleanLine = '';
         let inString = false;
         let stringChar = null;

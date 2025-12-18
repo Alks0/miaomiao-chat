@@ -30,16 +30,67 @@ const virtualScrollState = {
 };
 
 /**
+ * 计算智能阈值（考虑图片因素）
+ * 含有图片的消息会降低阈值
+ */
+function calculateSmartThreshold(messages) {
+    let imageCount = 0;
+    let hasImage = false;
+
+    // 统计图片数量
+    for (const msg of messages) {
+        if (msg.content) {
+            // OpenAI/Claude 格式（数组内容）
+            if (Array.isArray(msg.content)) {
+                // 检测 OpenAI 格式的图片
+                imageCount += msg.content.filter(part => part.type === 'image_url').length;
+                // 检测 Claude 格式的图片
+                imageCount += msg.content.filter(part => part.type === 'image').length;
+                if (!hasImage && imageCount > 0) hasImage = true;
+            }
+        }
+        // Gemini parts 格式
+        if (msg.parts && Array.isArray(msg.parts)) {
+            imageCount += msg.parts.filter(part => part.inlineData).length;
+            if (!hasImage && imageCount > 0) hasImage = true;
+        }
+    }
+
+    // 根据图片密度调整阈值
+    if (!hasImage) {
+        // 纯文本消息：使用默认阈值
+        return VIRTUAL_SCROLL_CONFIG.threshold;
+    }
+
+    const imageRatio = imageCount / messages.length;
+    if (imageRatio > 0.3) {
+        // 高图片密度（> 30%）：大幅降低阈值
+        return Math.max(30, Math.floor(VIRTUAL_SCROLL_CONFIG.threshold * 0.3));
+    } else if (imageRatio > 0.1) {
+        // 中等图片密度（10-30%）：适度降低阈值
+        return Math.max(50, Math.floor(VIRTUAL_SCROLL_CONFIG.threshold * 0.5));
+    } else {
+        // 低图片密度（< 10%）：轻微降低阈值
+        return Math.max(75, Math.floor(VIRTUAL_SCROLL_CONFIG.threshold * 0.75));
+    }
+}
+
+/**
  * 初始化虚拟滚动
  * @param {boolean} force - 强制启用/禁用
  */
 export function initVirtualScroll(force = null) {
     const messages = state.apiFormat === 'gemini' ? state.geminiContents : state.messages;
+
+    // 计算智能阈值
+    const smartThreshold = calculateSmartThreshold(messages);
+
     const shouldEnable = force !== null
         ? force
-        : (messages.length >= VIRTUAL_SCROLL_CONFIG.threshold);
+        : (messages.length >= smartThreshold);
 
     if (shouldEnable && !virtualScrollState.isActive) {
+        console.log(`[VirtualScroll] 启用虚拟滚动 (${messages.length} 条消息, 阈值: ${smartThreshold})`);
         enableVirtualScroll();
     } else if (!shouldEnable && virtualScrollState.isActive) {
         disableVirtualScroll();

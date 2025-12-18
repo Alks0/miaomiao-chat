@@ -6,7 +6,7 @@
     inset: 0;
     background: rgba(56, 56, 56, 0.8);
     backdrop-filter: blur(4px);
-    z-index: 9999;
+    z-index: var(--z-modal-settings);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -30,8 +30,8 @@
     position: absolute;
     top: 12px;
     right: 12px;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     background: var(--md-coral);
     border: 2px solid var(--color-border-primary);
     box-shadow: var(--shadow-sm);
@@ -280,8 +280,8 @@
     }
 
     .update-modal-close {
-        width: 28px;
-        height: 28px;
+        width: 44px;
+        height: 44px;
         top: 8px;
         right: 8px;
     }

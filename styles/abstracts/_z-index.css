@@ -1,0 +1,43 @@
+/**
+ * Z-Index 层级系统
+ * 统一管理所有层级，避免混乱
+ * 使用 CSS 变量确保一致性
+ */
+
+:root {
+    /* ========== 基础层级 (0-99) ========== */
+    --z-background: 0;               /* 背景层 */
+    --z-base: 1;                     /* 默认层级 */
+    --z-above-base: 2;               /* 略高于基础层 */
+    --z-sticky: 10;                  /* 粘性元素、调整手柄 */
+    --z-focus: 20;                   /* 焦点高亮 */
+    --z-floating: 50;                /* 浮动按钮（如滚动到底部） */
+
+    /* ========== 面板层级 (100-999) ========== */
+    --z-panel-backdrop: 99;          /* 面板背景遮罩 */
+    --z-sidebar: 100;                /* 侧边栏 */
+    --z-settings-panel: 101;         /* 设置面板 */
+    --z-dropdown: 105;               /* 下拉菜单（高于侧边栏）*/
+    --z-tooltip: 150;                /* 工具提示 */
+    --z-popover: 200;                /* 弹出层、表单面板 */
+
+    /* ========== 模态框层级 (1000-9999) ========== */
+    --z-modal-backdrop: 1000;        /* 模态框背景遮罩 */
+    --z-modal: 1001;                 /* 一般模态框内容 */
+    --z-modal-settings: 10000;       /* 设置类模态框（MCP、工具管理） */
+    --z-modal-dialog: 20000;         /* 对话框（确认、输入）*/
+
+    /* ========== 通知层级 (50000+) ========== */
+    --z-notification: 99999;         /* 通知栏 */
+
+    /* ========== 最高层级 ========== */
+    --z-top: 100000;                 /* 最高层级（代码编辑器等，确保绝对最高）*/
+}
+
+/* ========== 使用示例 ========== */
+/*
+.dropdown { z-index: var(--z-dropdown); }
+.modal-backdrop { z-index: var(--z-modal-backdrop); }
+.modal { z-index: var(--z-modal); }
+.notification { z-index: var(--z-notification); }
+*/

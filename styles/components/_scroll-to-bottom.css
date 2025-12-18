@@ -13,7 +13,7 @@
     align-items: center;
     justify-content: center;
     box-shadow: var(--shadow-md);
-    z-index: 50;
+    z-index: var(--z-floating);
     opacity: 0;
     visibility: hidden;
     transform: translateY(20px) scale(0.8);

@@ -19,7 +19,7 @@ import { getCurrentModelCapabilities, getCurrentProvider } from '../providers/ma
  * @returns {Promise<Response>} Fetch Response
  */
 export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) {
-    // ✅ 使用提供商的原始格式（OpenAI 或 OpenAI-Responses）
+    // 使用提供商的原始格式（OpenAI 或 OpenAI-Responses）
     const provider = getCurrentProvider();
     const format = provider?.apiFormat || 'openai';
     const isResponsesFormat = format === 'openai-responses';
@@ -30,7 +30,7 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     // 构建消息数组（过滤掉错误消息，它们不应发送给 API）
     let messages = state.messages.filter(m => !m.isError);
 
-    // ✅ 根据模型能力过滤消息（在格式转换前，OpenAI格式）
+    // 根据模型能力过滤消息（在格式转换前，OpenAI格式）
     const capabilities = getCurrentModelCapabilities();
     if (capabilities) {
         messages = filterMessagesByCapabilities(messages, capabilities);
@@ -41,7 +41,7 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
         });
     }
 
-    // ✅ System Prompt 独立于预填充开关（总是生效）
+    // System Prompt 独立于预填充开关（总是生效）
     if (state.systemPrompt) {
         messages.unshift({
             role: 'system',
@@ -49,7 +49,7 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
         });
     }
 
-    // ✅ 开场对话插入到 System Prompt 之后、对话历史之前
+    // 开场对话插入到 System Prompt 之后、对话历史之前
     if (state.prefillEnabled) {
         const opening = getOpeningMessages();
         if (opening.length > 0) {
@@ -60,7 +60,7 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
         }
     }
 
-    // ✅ 预填充消息追加到末尾（用户最新消息之后）
+    // 预填充消息追加到末尾（用户最新消息之后）
     if (state.prefillEnabled) {
         const prefill = getPrefillMessages();
         messages.push(...prefill);
@@ -91,10 +91,18 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     const verbosityConfig = buildVerbosityConfig();
     if (verbosityConfig) Object.assign(requestBody, verbosityConfig);
 
-    // ⭐ 添加工具调用支持 (Function Calling)
+    // 添加工具调用支持 (Function Calling)
     const tools = [];
 
-    // 保留原有的 web_search（用户要求保持不变）
+    // Code Interpreter 工具
+    if (state.codeExecutionEnabled) {
+        tools.push({
+            type: "code_interpreter"
+        });
+        console.log('[OpenAI] 📊 Code Interpreter 工具已启用');
+    }
+
+    // Web Search 工具
     if (state.webSearchEnabled) {
         tools.push({
             type: "function",
@@ -123,18 +131,18 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
 
     if (tools.length > 0) {
         if (state.xmlToolCallingEnabled) {
-            // ✅ XML 模式：只注入 XML 到 system prompt，不使用原生 tools 字段
+            // XML 模式：只注入 XML 到 system prompt，不使用原生 tools 字段
             const { injectToolsToOpenAI, getXMLInjectionStats } = await import('../tools/tool-injection.js');
             injectToolsToOpenAI(messages, tools);
 
-            // ✅ P1: 性能监控 - 记录 token 消耗
+            // 性能监控 - 记录 token 消耗
             const stats = getXMLInjectionStats(tools);
             console.log('[OpenAI] 📊 XML 模式启用，注入统计:', stats);
             if (stats.estimatedTokens > 2000) {
                 console.warn('[OpenAI] ⚠️ XML 描述过长，预计消耗', stats.estimatedTokens, 'tokens');
             }
         } else {
-            // ✅ 原生模式：使用标准 tools 字段
+            // 原生模式：使用标准 tools 字段
             requestBody.tools = tools;
             requestBody.tool_choice = "auto";
             requestBody.parallel_tool_calls = true;
@@ -164,7 +172,7 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
  * @returns {Array} 包含工具结果的消息数组
  */
 export function buildToolResultMessages(toolCalls, toolResults) {
-    // ✅ XML 模式：使用 XML 格式而不是原生 tool_calls
+    // XML 模式：使用 XML 格式而不是原生 tool_calls
     if (state.xmlToolCallingEnabled) {
         // 构建 XML 格式的工具调用文本
         let toolCallXML = '';
@@ -195,13 +203,113 @@ export function buildToolResultMessages(toolCalls, toolResults) {
         ];
     }
 
-    // 原生模式：使用 tool_calls 格式
+    // 检查是否使用 Responses API 格式
+    const provider = getCurrentProvider();
+    const isResponsesFormat = provider?.apiFormat === 'openai-responses';
+
+    // Responses API 多模态支持
+    if (isResponsesFormat) {
+        // 转换工具结果为 Responses API 格式
+        const convertedResults = toolResults.map(result => {
+            let resultContent;
+            try {
+                resultContent = JSON.parse(result.content);
+            } catch {
+                resultContent = result.content;
+            }
+
+            // 检测多模态内容
+            const outputParts = [];
+
+            if (resultContent && typeof resultContent === 'object') {
+                // 处理文本字段
+                if (resultContent.text) {
+                    outputParts.push({
+                        type: 'input_text',
+                        text: resultContent.text
+                    });
+                }
+
+                // 处理图片字段
+                if (resultContent.image) {
+                    const imageData = resultContent.image;
+                    let imageUrl;
+
+                    // 处理 base64 格式: "data:image/png;base64,..."
+                    if (typeof imageData === 'string') {
+                        imageUrl = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+                    }
+                    // 处理对象格式: { mimeType, data } 或 { inlineData: {...} }
+                    else if (typeof imageData === 'object') {
+                        const mimeType = imageData.mimeType || imageData.inlineData?.mimeType || 'image/png';
+                        const data = imageData.data || imageData.inlineData?.data;
+                        if (data) {
+                            imageUrl = `data:${mimeType};base64,${data}`;
+                        }
+                    }
+
+                    if (imageUrl) {
+                        outputParts.push({
+                            type: 'input_image',
+                            image_url: imageUrl
+                        });
+                    }
+                }
+
+                // 处理其他字段（非 image/text）
+                const otherFields = { ...resultContent };
+                delete otherFields.image;
+                delete otherFields.text;
+                if (Object.keys(otherFields).length > 0) {
+                    outputParts.push({
+                        type: 'input_text',
+                        text: JSON.stringify(otherFields)
+                    });
+                }
+            }
+
+            // 如果没有检测到多模态内容，使用纯文本
+            if (outputParts.length === 0) {
+                outputParts.push({
+                    type: 'input_text',
+                    text: typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent)
+                });
+            }
+
+            // 返回 Responses API 格式
+            return {
+                type: 'function_call_output',
+                function_call_id: result.tool_call_id,
+                output: outputParts
+            };
+        });
+
+        // Responses API: assistant message 格式不同
+        const messages = [
+            // 1. assistant 消息：包含 function_calls
+            {
+                role: 'assistant',
+                content: '',
+                function_calls: toolCalls.map(tc => ({
+                    id: tc.id,
+                    type: 'function',
+                    name: tc.name,
+                    arguments: JSON.stringify(tc.arguments)
+                }))
+            },
+            // 2. 添加转换后的工具结果
+            ...convertedResults
+        ];
+
+        return messages;
+    }
+
+    // 原生 Chat Completions API 模式：使用 tool_calls 格式（仅文本）
     const messages = [
-        // 1. 添加助手消息（包含工具调用）
-        // ✅ content 字段必须存在（OpenAI API 要求）
+        // 添加助手消息（包含工具调用）
         {
             role: 'assistant',
-            content: '',  // ✅ 修复：添加 content 字段（空字符串）
+            content: '',
             tool_calls: toolCalls.map(tc => ({
                 id: tc.id,
                 type: 'function',
@@ -211,7 +319,7 @@ export function buildToolResultMessages(toolCalls, toolResults) {
                 }
             }))
         },
-        // 2. 添加工具结果消息
+        // 2. 添加工具结果消息（Chat Completions API 仅支持纯文本）
         ...toolResults
     ];
 

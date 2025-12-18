@@ -140,10 +140,102 @@ export function initSettings() {
     elements.apiKey?.addEventListener('input', saveCurrentConfig);
     elements.modelSelect?.addEventListener('change', saveCurrentConfig);
 
+    // 高速图片压缩开关
+    const fastImageCompressionSwitch = document.getElementById('fast-image-compression');
+    if (fastImageCompressionSwitch) {
+        fastImageCompressionSwitch.checked = state.fastImageCompression || false;
+        fastImageCompressionSwitch.addEventListener('change', (e) => {
+            state.fastImageCompression = e.target.checked;
+            saveCurrentConfig();
+            console.log('[Settings] ⚡ 高速图片压缩模式已', e.target.checked ? '启用' : '禁用');
+        });
+    }
+
     // 初始化更新设置（仅 Electron/APK）
     initUpdateSettings();
 
-    console.log('✅ Settings panel initialized');
+    // ========== Code Execution 设置同步 ==========
+    const codeExecSwitch = document.getElementById('code-execution-enabled');
+    if (codeExecSwitch) {
+        codeExecSwitch.checked = state.codeExecutionEnabled || false;
+        codeExecSwitch.addEventListener('change', (e) => {
+            state.codeExecutionEnabled = e.target.checked;
+            // 同步快捷按钮
+            const quickBtn = document.getElementById('toggle-code-exec');
+            if (quickBtn) quickBtn.classList.toggle('active', e.target.checked);
+            saveCurrentConfig();
+            console.log('[Settings] 📊 Code Execution 已', e.target.checked ? '启用' : '禁用');
+        });
+    }
+
+    // ========== Computer Use 设置同步（仅 Electron 环境）==========
+    const computerUseGroup = document.getElementById('computer-use-settings-group');
+    if (isElectron() && computerUseGroup) {
+        computerUseGroup.style.display = ''; // 显示设置组
+
+        // 主开关
+        const computerUseSwitch = document.getElementById('computer-use-enabled');
+        if (computerUseSwitch) {
+            computerUseSwitch.checked = state.computerUseEnabled || false;
+            computerUseSwitch.addEventListener('change', (e) => {
+                state.computerUseEnabled = e.target.checked;
+                // 同步快捷按钮
+                const quickBtn = document.getElementById('toggle-computer-use');
+                if (quickBtn) quickBtn.classList.toggle('active', e.target.checked);
+                saveCurrentConfig();
+                console.log('[Settings] 💻 Computer Use 已', e.target.checked ? '启用' : '禁用');
+            });
+        }
+
+        // 权限开关（只保留 bash 和文本编辑器）
+        const permissionIds = ['bash', 'text-editor'];
+        const permissionKeys = ['bash', 'textEditor'];
+
+        permissionIds.forEach((id, index) => {
+            const checkbox = document.getElementById(`allow-${id}`);
+            const key = permissionKeys[index];
+            if (checkbox) {
+                checkbox.checked = state.computerUsePermissions[key] !== false;
+                checkbox.addEventListener('change', (e) => {
+                    state.computerUsePermissions[key] = e.target.checked;
+                    saveCurrentConfig();
+                    console.log(`[Settings] 💻 ${key} 权限已`, e.target.checked ? '启用' : '禁用');
+                });
+            }
+        });
+
+        // Bash 工作目录
+        const bashWorkingDir = document.getElementById('bash-working-dir');
+        if (bashWorkingDir) {
+            bashWorkingDir.value = state.bashConfig.workingDirectory || '';
+            bashWorkingDir.addEventListener('input', (e) => {
+                state.bashConfig.workingDirectory = e.target.value;
+                saveCurrentConfig();
+            });
+        }
+
+        // Bash 超时时间
+        const bashTimeout = document.getElementById('bash-timeout');
+        if (bashTimeout) {
+            bashTimeout.value = state.bashConfig.timeout || 30;
+            bashTimeout.addEventListener('input', (e) => {
+                state.bashConfig.timeout = parseInt(e.target.value) || 30;
+                saveCurrentConfig();
+            });
+        }
+
+        // Bash 需要确认
+        const bashConfirm = document.getElementById('bash-require-confirmation');
+        if (bashConfirm) {
+            bashConfirm.checked = state.bashConfig.requireConfirmation || false;
+            bashConfirm.addEventListener('change', (e) => {
+                state.bashConfig.requireConfirmation = e.target.checked;
+                saveCurrentConfig();
+            });
+        }
+    }
+
+    console.log('Settings panel initialized');
 }
 
 /**
@@ -318,5 +410,5 @@ async function initUpdateSettings() {
         });
     }
 
-    console.log('✅ Update settings initialized');
+    console.log('Update settings initialized');
 }

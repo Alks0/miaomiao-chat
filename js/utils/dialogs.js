@@ -47,7 +47,7 @@ export function showInputDialog(message, defaultValue = '', title = '输入') {
             resolve(null);
         };
 
-        // 清理函数
+        // 清理函数 - 正确移除所有事件监听器
         const cleanup = () => {
             modal.style.display = 'none';
             confirmBtn.removeEventListener('click', handleConfirm);

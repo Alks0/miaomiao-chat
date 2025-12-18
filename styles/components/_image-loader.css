@@ -1,6 +1,6 @@
 /* ========== 图片加载进度 ========== */
 .image-loading-container {
-    /* ✅ 使用 CSS Grid 叠加：进度条和加载内容占据同一网格单元 */
+    /* 使用 CSS Grid 叠加：进度条和加载内容占据同一网格单元 */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
     background: var(--color-bg-accent);
@@ -9,7 +9,7 @@
     min-height: 120px;
 }
 
-/* ✅ 加载内容容器（包含 spinner 和文字） */
+/* 加载内容容器（包含 spinner 和文字） */
 .image-loading-spinner,
 .image-progress-text {
     grid-row-start: 1;
@@ -19,7 +19,7 @@
 }
 
 .image-progress {
-    /* ✅ 使用 CSS Grid 叠加定位到底部 */
+    /* 使用 CSS Grid 叠加定位到底部 */
     grid-row-start: 1;
     grid-column-start: 1;
     justify-self: start;   /* 水平靠左 */
@@ -28,14 +28,14 @@
     background: var(--md-blue);
     transition: width 0.2s;
     width: 0;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .image-progress-text {
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
     font-size: 12px;
-    z-index: 2;
+    z-index: var(--z-above-base);
 }
 
 .image-loading-spinner {
@@ -45,7 +45,7 @@
     border-top-color: var(--md-blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    z-index: 2;
+    z-index: var(--z-above-base);
 }
 
 .image-error {
@@ -118,7 +118,7 @@
     position: fixed;
     inset: 0;
     background: rgba(56, 56, 56, 0.6);
-    z-index: 100; /* 在设置面板(101)之下，确保不遮挡面板 */
+    z-index: var(--z-panel-backdrop);
     opacity: 0;
     visibility: hidden;
     pointer-events: none; /* 默认不可点击 */

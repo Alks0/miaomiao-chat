@@ -27,7 +27,7 @@ export function selectReply(replyIndex, messageIndex = null) {
         replies = msg.allReplies;
         messageEl = elements.messagesArea.querySelector(`.message[data-message-index="${messageIndex}"]`);
 
-        // ✅ Bug 2 修复：防御性日志（而非复杂的 DOM 恢复）
+        // Bug 2 防御性日志（而非复杂的 DOM 恢复）
         if (!messageEl) {
             console.error(`[Bug 2] 消息索引 ${messageIndex} 的 DOM 元素未找到`);
             console.error('[Bug 2] 这表明 dataset.messageIndex 未正确设置');
@@ -48,7 +48,7 @@ export function selectReply(replyIndex, messageIndex = null) {
         }
     }
 
-    if (!messageEl) return; // ✅ Bug 2 修复：添加最终检查
+    if (!messageEl) return; // Bug 2 添加最终检查
     if (!replies || replyIndex < 0 || replyIndex >= replies.length) return;
 
     const reply = replies[replyIndex];
@@ -124,7 +124,7 @@ export function selectReply(replyIndex, messageIndex = null) {
                     html += renderThinkingBlock(reply.thinkingContent);
                 }
 
-                // ✅ 优先渲染 contentParts (包含图片)
+                // 优先渲染 contentParts (包含图片)
                 if (reply.contentParts && reply.contentParts.length > 0) {
                     html += renderContentParts(reply.contentParts);
                 }
@@ -183,7 +183,7 @@ export function selectReply(replyIndex, messageIndex = null) {
             }
             contentDiv.innerHTML = html;
 
-            // ✅ 不再需要手动绑定图片事件（已使用内联 onclick）
+            // 不再需要手动绑定图片事件（已使用内联 onclick）
 
             // 增强代码块（绑定复制按钮、表格导出、思维链折叠等）
             enhanceCodeBlocks(messageEl);
@@ -191,7 +191,7 @@ export function selectReply(replyIndex, messageIndex = null) {
     }
 }
 
-// ✅ 已删除 bindImageClickEvents 函数（改用内联 onclick，与其他渲染函数保持一致）
+// 已删除 bindImageClickEvents 函数（改用内联 onclick，与其他渲染函数保持一致）
 
 /**
  * 更新消息历史中选中的回复
@@ -286,5 +286,5 @@ export function initReplySelector() {
         selectReply(index, messageIndex);
     });
 
-    console.log('✅ Reply selector initialized');
+    console.log('Reply selector initialized');
 }

@@ -10,7 +10,7 @@
     height: 100dvh;
     background: var(--color-bg-surface);
     border-left: 3px solid var(--color-border-primary);
-    z-index: 101; /* 最高层级，在侧边栏(100)之上 */
+    z-index: var(--z-settings-panel);
     transform: translateX(100%);
     transition: transform 0.25s ease-out;
     display: flex;
@@ -28,7 +28,7 @@
     width: 16px; /* 增大触控区域 */
     height: 100%;
     cursor: ew-resize;
-    z-index: 10;
+    z-index: var(--z-sticky);
     background: transparent;
     transition: background 0.15s ease;
 }
@@ -275,20 +275,20 @@
 
 /* 密钥输入框包装器 */
 .password-input-wrapper {
-    /* ✅ 使用 CSS Grid 叠加：输入框和切换按钮占据同一网格单元 */
+    /* 使用 CSS Grid 叠加：输入框和切换按钮占据同一网格单元 */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
 }
 
 .password-input-wrapper .settings-input {
-    /* ✅ 输入框占据网格第1行第1列 */
+    /* 输入框占据网格第1行第1列 */
     grid-row-start: 1;
     grid-column-start: 1;
     padding-right: 40px; /* 为按钮留出空间 */
 }
 
 .password-toggle {
-    /* ✅ 使用 CSS Grid 叠加定位到右侧 */
+    /* 使用 CSS Grid 叠加定位到右侧 */
     grid-row-start: 1;
     grid-column-start: 1;
     justify-self: end;     /* 水平靠右 */
@@ -303,7 +303,7 @@
     justify-content: center;
     color: var(--md-muted);
     transition: all 0.15s var(--ease);
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .password-toggle:hover {

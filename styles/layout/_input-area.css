@@ -4,7 +4,7 @@
     padding: 12px 20px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
-    z-index: 10;
+    z-index: var(--z-sticky);
 }
 
 /* 拖拽调整高度的手柄 */
@@ -107,7 +107,7 @@
     font-family: var(--font-mono);
     color: var(--md-muted);
     transition: color 0.2s ease;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .char-counter.warning {
@@ -170,7 +170,7 @@
     transform: none;
 }
 
-/* ✅ 取消请求按钮样式 */
+/* 取消请求按钮样式 */
 .cancel-btn {
     width: 44px;
     height: 44px;
@@ -324,7 +324,7 @@
 }
 
 .image-preview-item {
-    /* ✅ 使用 CSS Grid 叠加：图片和删除按钮占据同一网格单元 */
+    /* 使用 CSS Grid 叠加：图片和删除按钮占据同一网格单元 */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
     width: 100px;
@@ -342,7 +342,7 @@
 }
 
 .image-preview-item img {
-    /* ✅ 图片占据网格的第1行第1列 */
+    /* 图片占据网格的第1行第1列 */
     grid-row-start: 1;
     grid-column-start: 1;
     width: 100%;
@@ -352,14 +352,14 @@
 }
 
 .remove-image {
-    /* ✅ 使用 CSS Grid 叠加定位到右上角 */
+    /* 使用 CSS Grid 叠加定位到右上角 */
     grid-row-start: 1;
     grid-column-start: 1;
     justify-self: end;     /* 水平靠右 */
     align-self: start;     /* 垂直靠上 */
     margin: 4px;           /* 距离边缘的间距 */
-    width: 22px;
-    height: 22px;
+    width: 32px;
+    height: 32px;
     border: var(--border);
     border-radius: 50%;
     background: var(--md-coral);
@@ -369,19 +369,19 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1;
     opacity: 0;
     transform: scale(0.8);
     transition: all 0.15s var(--ease);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .image-preview-item:hover .remove-image,
 .image-preview-item:focus-within .remove-image {
     opacity: 1;
-    /* ✅ 移除 pointer-events: auto - 不需要切换，始终可点击 */
+    /* 移除 pointer-events: auto - 不需要切换，始终可点击 */
     transform: scale(1);
 }
 
@@ -389,17 +389,17 @@
 @media (hover: none) {
     .remove-image {
         opacity: 1;
-        /* ✅ 移除 pointer-events: auto - 不需要，按钮始终可点击 */
+        /* 移除 pointer-events: auto - 不需要，按钮始终可点击 */
         transform: scale(1);
     }
 }
 
 .remove-image:hover {
-    transform: scale(1.1) !important;
+    transform: scale(1.1);
     background: var(--color-bg-surface);
 }
 
-/* ========== ✅ 引用预览栏（输入框上方，与图片预览并列） ========== */
+/* ========== 引用预览栏（输入框上方，与图片预览并列） ========== */
 .quote-preview {
     max-width: var(--content-max-width);
     margin: 0 auto 0;
@@ -478,8 +478,8 @@
 }
 
 .quote-preview-close {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border: var(--border);
     background: var(--color-bg-surface);
     color: var(--md-muted);
@@ -515,8 +515,8 @@
 }
 
 .file-preview-item .file-preview-icon {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -569,5 +569,8 @@
     top: 4px;
     right: 4px;
     margin: 0;
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
 }
 

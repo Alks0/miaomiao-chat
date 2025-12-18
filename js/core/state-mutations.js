@@ -12,7 +12,7 @@ import { state } from './state.js';
 import { eventBus } from './events.js';
 
 /**
- * ✅ 从指定索引开始重建 messageIdMap
+ * 从指定索引开始重建 messageIdMap
  * 用于删除消息后更新后续消息的索引
  * @param {number} fromIndex - 起始索引
  */
@@ -32,7 +32,7 @@ function rebuildMessageIdMapFromIndex(fromIndex) {
 }
 
 /**
- * ✅ 完全重建 messageIdMap
+ * 完全重建 messageIdMap
  * 用于会话恢复或格式转换时同步映射
  */
 export function rebuildMessageIdMap() {
@@ -51,12 +51,12 @@ export function rebuildMessageIdMap() {
         }
     });
 
-    console.log(`✅ messageIdMap 重建完成，共 ${state.messageIdMap.size} 条消息`);
+    console.log(`messageIdMap 重建完成，共 ${state.messageIdMap.size} 条消息`);
 }
 
 /**
  * 安全地向消息数组添加消息
- * ✅ 自动更新 messageIdMap
+ * 自动更新 messageIdMap
  * @param {Object} openaiMsg - OpenAI 格式消息
  * @param {Object} geminiMsg - Gemini 格式消息
  * @param {Object} claudeMsg - Claude 格式消息
@@ -71,7 +71,7 @@ export function pushMessage(openaiMsg, geminiMsg, claudeMsg) {
 
     const index = state.messages.length - 1;
 
-    // ✅ 更新 messageIdMap（如果消息有 ID）
+    // 更新 messageIdMap（如果消息有 ID）
     const messageId = openaiMsg.id || geminiMsg.id || claudeMsg.id;
     if (messageId && state.messageIdMap) {
         state.messageIdMap.set(messageId, index);
@@ -90,7 +90,7 @@ export function pushMessage(openaiMsg, geminiMsg, claudeMsg) {
 
 /**
  * 安全地删除消息（通过索引）
- * ✅ 自动更新 messageIdMap，重新索引后续消息
+ * 自动更新 messageIdMap，重新索引后续消息
  * @param {number} index - 消息索引
  */
 export function removeMessageAt(index) {
@@ -104,7 +104,7 @@ export function removeMessageAt(index) {
     const removedGemini = state.geminiContents[index];
     const removedClaude = state.claudeContents[index];
 
-    // ✅ 从 messageIdMap 中删除此消息
+    // 从 messageIdMap 中删除此消息
     const removedId = removedOpenai.id || removedGemini.id || removedClaude.id;
     if (removedId && state.messageIdMap) {
         state.messageIdMap.delete(removedId);
@@ -115,7 +115,7 @@ export function removeMessageAt(index) {
     state.geminiContents.splice(index, 1);
     state.claudeContents.splice(index, 1);
 
-    // ✅ 重新索引后续消息（索引都减 1）
+    // 重新索引后续消息（索引都减 1）
     if (state.messageIdMap) {
         rebuildMessageIdMapFromIndex(index);
     }
@@ -131,7 +131,7 @@ export function removeMessageAt(index) {
 
 /**
  * 安全地删除指定索引后的所有消息
- * ✅ 自动更新 messageIdMap
+ * 自动更新 messageIdMap
  * @param {number} fromIndex - 起始索引（保留该索引，删除之后的）
  */
 export function removeMessagesAfter(fromIndex) {
@@ -145,7 +145,7 @@ export function removeMessagesAfter(fromIndex) {
 
     if (removeCount === 0) return;
 
-    // ✅ 从 messageIdMap 中删除被移除的消息
+    // 从 messageIdMap 中删除被移除的消息
     if (state.messageIdMap) {
         const messages = state.apiFormat === 'gemini' ? state.geminiContents : state.messages;
         for (let i = fromIndex + 1; i < messages.length; i++) {
@@ -210,7 +210,7 @@ export function updateMessageAt(index, updates) {
 
 /**
  * 安全地替换整个消息数组
- * ✅ 自动重建 messageIdMap
+ * 自动重建 messageIdMap
  * @param {Array} messages - OpenAI 格式消息数组
  * @param {Array} geminiContents - Gemini 格式消息数组
  * @param {Array} claudeContents - Claude 格式消息数组
@@ -218,12 +218,12 @@ export function updateMessageAt(index, updates) {
 export function replaceAllMessages(messages, geminiContents, claudeContents) {
     const oldLength = state.messages.length;
 
-    // ✅ 使用数组副本（不可变更新）
+    // 使用数组副本（不可变更新）
     state.messages = [...messages];
     state.geminiContents = [...geminiContents];
     state.claudeContents = [...claudeContents];
 
-    // ✅ 重建 messageIdMap
+    // 重建 messageIdMap
     rebuildMessageIdMap();
 
     // 发出事件通知

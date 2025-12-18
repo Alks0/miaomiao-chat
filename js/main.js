@@ -3,6 +3,45 @@
  * 初始化所有模块并启动应用
  */
 
+// ========== 全局错误处理器（H1 修复）==========
+
+/**
+ * 全局未捕获的 Promise rejection 处理器
+ */
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('🚨 未捕获的 Promise rejection:', event.reason);
+
+    // 阻止默认的错误抛出行为
+    event.preventDefault();
+
+    // 尝试显示用户友好的错误消息
+    const errorMessage = event.reason?.message || String(event.reason) || '未知错误';
+
+    // 如果有 UI 通知系统，显示错误
+    if (window.eventBus) {
+        window.eventBus.emit('ui:notification', {
+            message: `操作失败: ${errorMessage}`,
+            type: 'error'
+        });
+    }
+});
+
+/**
+ * 全局错误处理器（捕获同步错误）
+ */
+window.addEventListener('error', (event) => {
+    console.error('🚨 全局错误:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error
+    });
+
+    // 阻止浏览器默认的错误提示
+    event.preventDefault();
+});
+
 /**
  * 动态加载 Eruda 调试工具（仅 Android 平台）
  */
@@ -62,7 +101,7 @@ import { loadConfig, saveCurrentConfigImmediate } from './state/config.js';
 import { loadSessions, switchToSession } from './state/sessions.js';
 import { initExportImport } from './state/export-import.js';
 import { initQuickMessages } from './state/quick-messages.js';
-// ✅ 新增：数据迁移
+// 新增：数据迁移
 import {
     executeMigration,
     getMigrationStatus,
@@ -179,7 +218,7 @@ async function init() {
                     return code;
                 }
             });
-            console.log('✅ Marked.js configured with syntax highlighting');
+            console.log('Marked.js configured with syntax highlighting');
         }
 
         // 2. 核心层（同步）
@@ -188,11 +227,11 @@ async function init() {
 
         // 3. 存储层（异步，按顺序）
         console.log('💾 Step 2/9: Initializing IndexedDB...');
-        // ✅ 增强错误处理：IndexedDB 失败时启用降级模式
+        // 增强错误处理：IndexedDB 失败时启用降级模式
         try {
             const dbInstance = await initDB();
 
-            // ✅ 请求持久化存储（防止 Android/iOS 自动清理）
+            // 请求持久化存储（防止 Android/iOS 自动清理）
             if (dbInstance) {
                 const { requestPersistentStorage } = await import('./state/storage.js');
                 await requestPersistentStorage();
@@ -210,7 +249,7 @@ async function init() {
             });
         }
 
-        // ✅ 3.5. 执行一次性迁移（仅第一次运行或失败时重试）
+        // 3.5. 执行一次性迁移（仅第一次运行或失败时重试）
         if (state.storageMode !== 'localStorage') {
             console.log('🔄 Step 2.5/9: Checking migration status...');
             const migrationStatus = await getMigrationStatus();
@@ -218,7 +257,7 @@ async function init() {
             if (migrationStatus !== MIGRATION_STATES.COMPLETED) {
                 console.log(`迁移状态: ${migrationStatus}，准备执行迁移...`);
 
-                // ✅ 并发保护：检查其他标签页是否正在迁移
+                // 并发保护：检查其他标签页是否正在迁移
                 try {
                     acquireMigrationLock();
                 } catch (lockError) {
@@ -232,7 +271,7 @@ async function init() {
                     try {
                         console.log('🔄 开始执行数据迁移...');
                         await executeMigration();
-                        console.log('✅ 迁移完成');
+                        console.log('迁移完成');
                     } catch (migrationError) {
                         console.error('迁移失败:', migrationError);
                         // 迁移失败不阻塞初始化
@@ -241,7 +280,7 @@ async function init() {
                     }
                 }
             } else {
-                console.log('✅ 迁移已完成，跳过');
+                console.log('迁移已完成，跳过');
             }
         }
 
@@ -255,23 +294,23 @@ async function init() {
         console.log('📚 Step 5/9: Loading sessions...');
         await loadSessions();
 
-        // ✅ 加载快捷消息（在配置和会话加载后）
+        // 加载快捷消息（在配置和会话加载后）
         console.log('💬 Step 5.5/9: Loading quick messages...');
         await initQuickMessages();
 
-        // ✅ 加载 MCP 配置（在 IndexedDB 初始化后）
+        // 加载 MCP 配置（在 IndexedDB 初始化后）
         console.log('🔌 Step 5.6/9: Loading MCP configuration...');
         if (state.storageMode !== 'localStorage') {
             try {
                 // 执行迁移（仅首次运行或需要时）
                 const migratedCount = await migrateMCPServersFromLocalStorage();
                 if (migratedCount > 0) {
-                    console.log(`[Main] ✅ 迁移 ${migratedCount} 个 MCP 服务器`);
+                    console.log(`[Main] 迁移 ${migratedCount} 个 MCP 服务器`);
                 }
 
                 // 加载 MCP 服务器配置
                 state.mcpServers = await loadAllMCPServers();
-                console.log(`[Main] ✅ 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                console.log(`[Main] 加载 ${state.mcpServers.length} 个 MCP 服务器`);
             } catch (error) {
                 console.error('[Main] ❌ 加载 MCP 配置失败:', error);
                 // 降级：从 localStorage 读取
@@ -291,7 +330,7 @@ async function init() {
                 const saved = localStorage.getItem('mcpServers');
                 if (saved) {
                     state.mcpServers = JSON.parse(saved);
-                    console.log(`[Main] ✅ 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                    console.log(`[Main] 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
                 }
             } catch (error) {
                 console.error('[Main] ❌ 从 localStorage 加载 MCP 配置失败:', error);
@@ -318,7 +357,7 @@ async function init() {
 
         // 输入和消息
         initInputHandlers();
-        await initInputResize(); // ✅ 改为 await（需要从 IndexedDB 加载高度）
+        await initInputResize(); // 改为 await（需要从 IndexedDB 加载高度）
         initClearChat();
 
         // API和配置
@@ -336,7 +375,7 @@ async function init() {
         // 面板和侧边栏
         initSidebar();
         initSettings();
-        await initPanelResize(); // ✅ 改为 await（需要从 IndexedDB 加载宽度）
+        await initPanelResize(); // 改为 await（需要从 IndexedDB 加载宽度）
 
         // 更新系统
         initUpdateModal();  // Electron 更新
@@ -370,7 +409,7 @@ async function init() {
         // 导入导出
         initExportImport();
 
-        // ✅ 会话恢复已由 loadSessions() 处理（Line 183）
+        // 会话恢复已由 loadSessions() 处理（Line 183）
         // loadSessions() 中已包含：
         //   - 加载 currentSessionId（IndexedDB 优先）
         //   - switchToSession(currentId) 或 switchToSession(sessions[0].id)
@@ -378,7 +417,7 @@ async function init() {
 
         // 6. 恢复侧边栏状态
         console.log('📂 Step 9/9: Restoring sidebar state...');
-        // ✅ 从 IndexedDB 恢复侧边栏状态
+        // 从 IndexedDB 恢复侧边栏状态
         try {
             let savedSidebarState = null;
             if (state.storageMode !== 'localStorage') {
@@ -409,7 +448,7 @@ async function init() {
             }
         }
 
-        console.log('✅ Web Chat initialized successfully!');
+        console.log('Web Chat initialized successfully!');
         console.log(`📊 Modules loaded: ${Object.keys(import.meta).length}`);
         console.log(`💬 Sessions: ${state.sessions.length}`);
         console.log(`🎨 Theme: ${document.documentElement.classList.contains('dark-theme') ? 'dark' : 'light'}`);

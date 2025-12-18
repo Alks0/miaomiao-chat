@@ -6,8 +6,102 @@
 import { eventBus } from '../core/events.js';
 import { executeTool } from '../tools/executor.js';
 import { createToolCallUI, updateToolCallStatus } from '../ui/tool-display.js';
-import { getOrCreateMappedId } from '../api/format-converter.js';  // ✅ P0: ID 转换
-import { state } from '../core/state.js';  // ✅ 访问应用状态
+import { getOrCreateMappedId } from '../api/format-converter.js';  // ID 转换
+import { state } from '../core/state.js';  // 访问应用状态
+
+/**
+ * 检测并下载 Claude Code Execution 返回的文件
+ * @param {Object} result - 工具执行结果
+ * @param {string} toolName - 工具名称
+ * @returns {Promise<Object>} 增强后的结果
+ */
+async function enrichToolResultWithFiles(result, toolName) {
+    // 只处理 Code Execution 相关工具
+    if (!toolName || !toolName.includes('code_execution')) {
+        return result;
+    }
+
+    // 检测 Claude Code Execution 的 bash_code_execution_tool_result 格式
+    if (result && result.content && typeof result.content === 'object') {
+        const content = result.content;
+
+        // 检测 bash_code_execution_result 格式
+        if (content.type === 'bash_code_execution_result' && Array.isArray(content.content)) {
+            const images = [];
+
+            for (const item of content.content) {
+                // 检测文件输出
+                if (item.type === 'file' && item.file_id) {
+                    console.log(`[ToolCallHandler] 🖼️ 检测到 Code Execution 文件输出:`, item);
+
+                    try {
+                        // 下载文件
+                        const fileData = await downloadClaudeFile(item.file_id);
+                        if (fileData) {
+                            images.push({
+                                type: 'image_url',
+                                url: `data:${item.file_type || 'image/png'};base64,${fileData}`,
+                                file_id: item.file_id
+                            });
+                            console.log(`[ToolCallHandler] 文件下载成功: ${item.file_id}`);
+                        }
+                    } catch (error) {
+                        console.error(`[ToolCallHandler] ❌ 下载文件失败: ${item.file_id}`, error);
+                    }
+                }
+            }
+
+            // 如果有图片，添加到结果中
+            if (images.length > 0) {
+                return {
+                    ...result,
+                    images: images  // 添加图片数组
+                };
+            }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * 下载 Claude 文件
+ * @param {string} fileId - 文件 ID
+ * @returns {Promise<string>} Base64 编码的文件内容
+ */
+async function downloadClaudeFile(fileId) {
+    const apiKey = state.apiKeys.claude;
+    if (!apiKey) {
+        throw new Error('Claude API key not found');
+    }
+
+    try {
+        const response = await fetch(`https://api.anthropic.com/v1/files/${fileId}`, {
+            headers: {
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-beta': 'files-api-2025-04-14'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+        }
+
+        // 读取文件内容为 ArrayBuffer
+        const arrayBuffer = await response.arrayBuffer();
+
+        // 转换为 base64
+        const base64 = btoa(
+            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
+
+        return base64;
+    } catch (error) {
+        console.error(`[downloadClaudeFile] 下载失败:`, error);
+        throw error;
+    }
+}
 
 /**
  * 工具调用累积器
@@ -129,7 +223,7 @@ export async function executeToolCalls(toolCalls) {
         });
 
         // 创建工具调用 UI
-        createToolCallUI({
+        await createToolCallUI({
             id,
             name,
             args
@@ -145,23 +239,38 @@ export async function executeToolCalls(toolCalls) {
             const result = await executeTool(name, args);
 
             // 更新 UI 为成功状态
-            updateToolCallStatus(id, 'completed', { result });
+            try {
+                console.log(`[ToolCallHandler] 准备更新工具UI状态为completed: ${id}`);
+                updateToolCallStatus(id, 'completed', { result });
+                console.log(`[ToolCallHandler] 工具UI状态更新完成`);
+            } catch (uiError) {
+                console.error(`[ToolCallHandler] ❌ 更新工具UI失败:`, uiError);
+            }
 
-            console.log(`[ToolCallHandler] ✅ 工具执行成功: ${name}`, result);
+            console.log(`[ToolCallHandler] 工具执行成功: ${name}`, result);
 
-            // ✅ P0: 立即转换 ID 为当前格式,防止切换模型时不匹配
+            // 检测并处理 Code Execution 返回的 file_id
+            const enrichedResult = await enrichToolResultWithFiles(result, name);
+
+            // 立即转换 ID 为当前格式,防止切换模型时不匹配
             const currentFormat = state.apiFormat || 'openai';
             const mappedId = getOrCreateMappedId(id, currentFormat);
 
             // 返回工具结果对象
             return {
-                tool_call_id: mappedId,  // ✅ 使用转换后的 ID
+                tool_call_id: mappedId,  // 使用转换后的 ID
+                _originalId: id,  // ⭐ 保存原始 ID 用于匹配工具名称
+                _toolName: name,  // ⭐ 直接保存工具名称，防止ID匹配失败
                 role: 'tool',
-                content: JSON.stringify(result)
+                content: JSON.stringify(enrichedResult)
             };
 
         } catch (error) {
             console.error(`[ToolCallHandler] ❌ 工具执行失败: ${name}`, error);
+            console.error(`[ToolCallHandler] 错误详情:`, {
+                message: error.message,
+                args: JSON.stringify(args, null, 2)
+            });
 
             // 更新 UI 为失败状态
             updateToolCallStatus(id, 'failed', {
@@ -171,22 +280,45 @@ export async function executeToolCalls(toolCalls) {
                 toolArgs: args
             });
 
-            // ✅ P0: 失败时也转换 ID
+            // 失败时也转换 ID
             const currentFormat = state.apiFormat || 'openai';
             const mappedId = getOrCreateMappedId(id, currentFormat);
 
-            // 即使失败也返回错误信息给 API
-            // 明确告诉模型工具不可用，不要重试
-            const errorMessage = error.message.includes('不存在') || error.message.includes('not found')
-                ? `Tool "${name}" is not available or not registered. This tool cannot be used. Please respond to the user WITHOUT using this tool.`
-                : `Tool execution failed: ${error.message}. This error cannot be fixed by retrying. Please respond to the user based on this error.`;
+            // 保存原始ID和工具名称
+            const baseResult = {
+                tool_call_id: mappedId,
+                _originalId: id,
+                _toolName: name,
+                role: 'tool'
+            };
+
+            // 改进错误消息，明确告知不要重试
+            let errorMessage;
+            if (error.message.includes('Missing required parameter')) {
+                // 参数缺失错误 - 明确是 schema 问题
+                errorMessage = `Tool "${name}" call failed due to missing required parameter. ` +
+                    `This is a parameter schema issue, not a temporary error. ` +
+                    `Do NOT retry this tool call. Please respond to the user explaining the issue. ` +
+                    `Error details: ${error.message}`;
+            } else if (error.message.includes('不存在') || error.message.includes('not found') || error.message.includes('not available')) {
+                // 工具不存在错误
+                errorMessage = `Tool "${name}" is not available or not registered. ` +
+                    `This tool cannot be used. Do NOT retry this tool. ` +
+                    `Please respond to the user WITHOUT using this tool.`;
+            } else {
+                // 其他执行错误
+                errorMessage = `Tool "${name}" execution failed: ${error.message}. ` +
+                    `This error cannot be fixed by retrying with the same parameters. ` +
+                    `Do NOT retry this tool call. Please respond to the user based on this error.`;
+            }
 
             return {
-                tool_call_id: mappedId,  // ✅ 使用转换后的 ID
-                role: 'tool',
+                ...baseResult,
                 content: JSON.stringify({
                     error: errorMessage,
-                    is_error: true
+                    is_error: true,
+                    original_error: error.message,  // 保留原始错误便于调试
+                    failed_args: args  // 保留失败的参数
                 })
             };
         }
@@ -215,7 +347,7 @@ export async function executeToolCalls(toolCalls) {
 export async function handleToolCallStream(toolCalls, apiConfig) {
     console.log('[ToolCallHandler] 🚀 开始工具调用流程');
 
-    // ✅ 保存当前消息元素引用（在 finally 块清空之前）
+    // 保存当前消息元素引用（在 finally 块清空之前）
     const assistantMessageEl = state.currentAssistantMessage?.closest('.message');
     if (assistantMessageEl) {
         console.log('[ToolCallHandler] 保存消息元素引用用于 continuation');
@@ -226,7 +358,7 @@ export async function handleToolCallStream(toolCalls, apiConfig) {
         const toolResults = await executeToolCalls(toolCalls);
 
         // 2. 根据 API 格式选择正确的消息构建器
-        // ✅ 修复：使用提供商的原始 apiFormat，而不是存储格式 state.apiFormat
+        // 使用提供商的原始 apiFormat，而不是存储格式 state.apiFormat
         // 因为请求需要发送到提供商的原始格式，而 state.apiFormat 只是存储格式
         const { getCurrentProvider } = await import('../providers/manager.js');
         const provider = getCurrentProvider();
@@ -240,25 +372,28 @@ export async function handleToolCallStream(toolCalls, apiConfig) {
         });
 
         switch (requestFormat) {
-            case 'gemini':
+            case 'gemini': {
                 const geminiModule = await import('../api/gemini.js');
                 buildToolResultMessages = geminiModule.buildToolResultMessages;
                 console.log('[ToolCallHandler] 使用 Gemini 格式构建工具结果消息');
                 break;
+            }
 
-            case 'claude':
+            case 'claude': {
                 const claudeModule = await import('../api/claude.js');
                 buildToolResultMessages = claudeModule.buildToolResultMessages;
                 console.log('[ToolCallHandler] 使用 Claude 格式构建工具结果消息');
                 break;
+            }
 
             case 'openai':
             case 'openai-responses':
-            default:
+            default: {
                 const openaiModule = await import('../api/openai.js');
                 buildToolResultMessages = openaiModule.buildToolResultMessages;
                 console.log('[ToolCallHandler] 使用 OpenAI 格式构建工具结果消息');
                 break;
+            }
         }
 
         // 3. 构建新的消息数组（包含工具结果）
@@ -271,10 +406,16 @@ export async function handleToolCallStream(toolCalls, apiConfig) {
     } catch (error) {
         console.error('[ToolCallHandler] 工具调用流程失败:', error);
 
+        // 清理工具调用标志，防止状态泄漏
+        state.isToolCallPending = false;
+
         eventBus.emit('ui:notification', {
             message: `工具调用失败: ${error.message}`,
             type: 'error'
         });
+
+        // 强制重置按钮状态
+        eventBus.emit('ui:reset-input-buttons');
     }
 }
 

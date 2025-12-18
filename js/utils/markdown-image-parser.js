@@ -96,7 +96,7 @@ export function parseStreamingMarkdownImages(chunk, buffer = '') {
     const parts = [];
     let lastIndex = 0;
     let match;
-    let hasIncompleteImage = false;
+    const hasIncompleteImage = false;
 
     while ((match = imageRegex.exec(fullText)) !== null) {
         // 添加图片前的文本

@@ -9,17 +9,16 @@
  * - 文本: text/plain
  */
 
+import { categorizeFile } from '../utils/file-helpers.js';
+
 /**
  * 判断 MIME 类型的文件类别
+ * @deprecated Use categorizeFile from file-helpers.js instead
  * @param {string} mimeType - MIME 类型
  * @returns {'image'|'pdf'|'text'|'unknown'} 文件类别
  */
 export function getFileCategory(mimeType) {
-    if (!mimeType) return 'unknown';
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType === 'application/pdf') return 'pdf';
-    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType.startsWith('text/')) return 'text';
-    return 'unknown';
+    return categorizeFile(mimeType);
 }
 
 /**

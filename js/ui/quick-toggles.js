@@ -14,6 +14,8 @@ export function syncQuickToggles() {
     document.getElementById('toggle-stream')?.classList.toggle('active', state.streamEnabled);
     document.getElementById('toggle-thinking')?.classList.toggle('active', state.thinkingEnabled);
     document.getElementById('toggle-websearch')?.classList.toggle('active', state.webSearchEnabled);
+    document.getElementById('toggle-code-exec')?.classList.toggle('active', state.codeExecutionEnabled);
+    document.getElementById('toggle-computer-use')?.classList.toggle('active', state.computerUseEnabled);
 }
 
 /**
@@ -69,6 +71,49 @@ export function initQuickToggles() {
     const attachFileMini = document.getElementById('attach-file-mini');
     if (attachFileMini) {
         attachFileMini.addEventListener('click', handleAttachFile);
+    }
+
+    // ========== Code Execution 快捷按钮 ==========
+    const toggleCodeExec = document.getElementById('toggle-code-exec');
+    if (toggleCodeExec) {
+        // 初始状态
+        toggleCodeExec.classList.toggle('active', state.codeExecutionEnabled);
+
+        // 点击事件
+        toggleCodeExec.addEventListener('click', () => {
+            state.codeExecutionEnabled = !state.codeExecutionEnabled;
+            toggleCodeExec.classList.toggle('active', state.codeExecutionEnabled);
+
+            // 同步设置面板开关
+            const panelSwitch = document.getElementById('code-execution-enabled');
+            if (panelSwitch) panelSwitch.checked = state.codeExecutionEnabled;
+
+            saveCurrentConfig();
+        });
+    }
+
+    // ========== Computer Use 快捷按钮 ==========
+    const toggleComputerUse = document.getElementById('toggle-computer-use');
+    if (toggleComputerUse) {
+        // 仅在 Electron 环境显示
+        if (window.electronAPI?.isElectron()) {
+            toggleComputerUse.style.display = '';
+        }
+
+        // 初始状态
+        toggleComputerUse.classList.toggle('active', state.computerUseEnabled);
+
+        // 点击事件
+        toggleComputerUse.addEventListener('click', () => {
+            state.computerUseEnabled = !state.computerUseEnabled;
+            toggleComputerUse.classList.toggle('active', state.computerUseEnabled);
+
+            // 同步设置面板开关
+            const panelSwitch = document.getElementById('computer-use-enabled');
+            if (panelSwitch) panelSwitch.checked = state.computerUseEnabled;
+
+            saveCurrentConfig();
+        });
     }
 
     console.log('Quick toggles initialized');

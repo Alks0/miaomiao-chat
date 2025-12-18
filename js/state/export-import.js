@@ -5,12 +5,12 @@
 
 import { state } from '../core/state.js';
 import { elements } from '../core/elements.js';
-import { loadAllSessionsFromDB, saveSessionToDB, loadConfig as loadConfigFromDB, loadSavedConfigs as loadSavedConfigsFromDB, saveConfig as saveConfigToDB, saveSavedConfigs as saveSavedConfigsToDB } from './storage.js';
+import { loadAllSessionsFromDB, saveSessionToDB, loadConfig as loadConfigFromDB, loadSavedConfigs as loadSavedConfigsFromDB, saveConfig as saveConfigToDB, saveSavedConfigs as saveSavedConfigsToDB, loadPreference, savePreference } from './storage.js';
 import { loadSavedConfigs } from './config.js';
 import { loadSessions } from './sessions.js';
 import { showNotification } from '../ui/notifications.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
-import { sanitizeMessageForExport } from '../api/format-converter.js';  // ✅ P1: 过滤私有字段
+import { sanitizeMessageForExport } from '../api/format-converter.js';  // 过滤私有字段
 
 /**
  * 生成导出文件名
@@ -19,7 +19,7 @@ import { sanitizeMessageForExport } from '../api/format-converter.js';  // ✅ P
  */
 function generateExportFilename(type) {
     const date = new Date().toISOString().slice(0, 10);
-    return `miaomiao-chat-${type}-${date}.json`;
+    return `webchat-${type}-${date}.json`;
 }
 
 /**
@@ -52,7 +52,7 @@ function filterRuntimeState(config) {
 }
 
 /**
- * ✅ P1: 清理会话中的私有字段
+ * 清理会话中的私有字段
  * @param {Object} session - 会话对象
  * @returns {Object} 清理后的会话对象
  */
@@ -75,7 +75,7 @@ function sanitizeSession(session) {
  */
 export async function exportConfig() {
     try {
-        // ✅ 从 IndexedDB 读取配置
+        // 从 IndexedDB 读取配置
         let currentConfig = null;
         let savedConfigs = [];
 
@@ -94,11 +94,11 @@ export async function exportConfig() {
             savedConfigs = configs ? JSON.parse(configs) : [];
         }
 
-        // ✅ 过滤掉运行时状态（selectedModel）
+        // 过滤掉运行时状态（selectedModel）
         const filteredCurrentConfig = currentConfig ? filterRuntimeState(currentConfig) : null;
         const filteredSavedConfigs = savedConfigs.map(filterRuntimeState);
 
-        // ✅ 导出工具启用状态
+        // 导出工具启用状态
         let toolsEnabled = null;
         try {
             const toolsEnabledJson = await loadPreference('toolsEnabled');
@@ -116,7 +116,7 @@ export async function exportConfig() {
             data: {
                 currentConfig: filteredCurrentConfig,
                 savedConfigs: filteredSavedConfigs,
-                toolsEnabled: toolsEnabled  // ✅ 包含工具状态
+                toolsEnabled: toolsEnabled  // 包含工具状态
             }
         };
 
@@ -135,7 +135,7 @@ export async function exportSessions() {
     try {
         const sessions = await loadAllSessionsFromDB();
 
-        // ✅ P1: 清理会话中的私有字段
+        // 清理会话中的私有字段
         const cleanedSessions = sessions.map(session => sanitizeSession(session));
 
         const exportData = {
@@ -159,7 +159,7 @@ export async function exportSessions() {
  */
 export async function exportAllData() {
     try {
-        // ✅ 从 IndexedDB 读取数据
+        // 从 IndexedDB 读取数据
         let currentConfig = null;
         let savedConfigs = [];
         const sessions = await loadAllSessionsFromDB();
@@ -179,11 +179,11 @@ export async function exportAllData() {
             savedConfigs = configs ? JSON.parse(configs) : [];
         }
 
-        // ✅ 过滤掉运行时状态（selectedModel）
+        // 过滤掉运行时状态（selectedModel）
         const filteredCurrentConfig = currentConfig ? filterRuntimeState(currentConfig) : null;
         const filteredSavedConfigs = savedConfigs.map(filterRuntimeState);
 
-        // ✅ P1: 清理会话中的私有字段
+        // 清理会话中的私有字段
         const cleanedSessions = sessions.map(session => sanitizeSession(session));
 
         const exportData = {
@@ -219,7 +219,7 @@ async function importConfig(data) {
     }
 
     try {
-        // ✅ 导入当前配置（过滤掉运行时状态）
+        // 导入当前配置（过滤掉运行时状态）
         if (data.data.currentConfig) {
             const filtered = filterRuntimeState(data.data.currentConfig);
             if (state.storageMode !== 'localStorage') {
@@ -229,7 +229,7 @@ async function importConfig(data) {
             }
         }
 
-        // ✅ 导入保存的配置（过滤掉运行时状态）
+        // 导入保存的配置（过滤掉运行时状态）
         if (data.data.savedConfigs) {
             const filtered = data.data.savedConfigs.map(filterRuntimeState);
             if (state.storageMode !== 'localStorage') {
@@ -239,11 +239,11 @@ async function importConfig(data) {
             }
         }
 
-        // ✅ 导入工具启用状态
+        // 导入工具启用状态
         if (data.data.toolsEnabled) {
             try {
                 await savePreference('toolsEnabled', JSON.stringify(data.data.toolsEnabled));
-                console.log('[Import] ✅ 工具状态已导入');
+                console.log('[Import] 工具状态已导入');
             } catch (error) {
                 console.warn('[Import] 导入工具状态失败:', error);
             }
@@ -252,7 +252,7 @@ async function importConfig(data) {
         // 重新加载配置列表
         loadSavedConfigs();
 
-        // ✅ 新增：触发模型列表刷新
+        // 新增：触发模型列表刷新
         import('../ui/models.js').then(({ populateModelSelect }) => {
             populateModelSelect();
         }).catch(err => console.warn('Failed to refresh model list:', err));
@@ -326,7 +326,7 @@ async function importFullBackup(data) {
     }
 
     try {
-        // ✅ 导入配置（过滤掉运行时状态）
+        // 导入配置（过滤掉运行时状态）
         if (data.config.currentConfig) {
             const filtered = filterRuntimeState(data.config.currentConfig);
             if (state.storageMode !== 'localStorage') {
@@ -359,7 +359,7 @@ async function importFullBackup(data) {
         loadSavedConfigs();
         await loadSessions();
 
-        // ✅ 新增：触发模型列表刷新
+        // 新增：触发模型列表刷新
         import('../ui/models.js').then(({ populateModelSelect }) => {
             populateModelSelect();
         }).catch(err => console.warn('Failed to refresh model list:', err));

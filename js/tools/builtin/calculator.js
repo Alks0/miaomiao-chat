@@ -1,20 +1,35 @@
 /**
  * 计算器工具
- * 执行安全的数学表达式计算
+ * 使用 math.js 执行安全的数学表达式计算
+ * 无 eval/Function 风险
  */
+
+// 使用全局 math 对象（由 UMD 构建版本提供）
+// math.js 已通过 <script> 标签在 index.html 中加载
+const math = window.math;
+
+if (!math) {
+    throw new Error('math.js 未加载，请确保在 index.html 中包含了 math.js 的 script 标签');
+}
+
+// 配置安全选项
+math.config({
+    number: 'number', // 使用原生 JavaScript 数字
+    precision: 64 // 精度
+});
 
 /**
  * 工具定义（OpenAI 格式）
  */
 export const calculatorTool = {
     name: 'calculator',
-    description: '执行数学计算。支持基本运算（+、-、*、/）、幂运算（**）、括号以及常见数学函数（Math.sin、Math.sqrt 等）。',
+    description: '执行数学计算。支持基本运算（+、-、*、/）、幂运算（^）、括号以及常见数学函数（sin、sqrt、log 等）。',
     parameters: {
         type: 'object',
         properties: {
             expression: {
                 type: 'string',
-                description: '要计算的数学表达式，例如: "2 + 3 * 4", "Math.sqrt(16)", "Math.pow(2, 10)"'
+                description: '要计算的数学表达式，例如: "2 + 3 * 4", "sqrt(16)", "2^10", "sin(pi/2)"'
             }
         },
         required: ['expression']
@@ -36,8 +51,8 @@ export async function calculatorHandler(args) {
         // 安全验证表达式
         validateExpression(expression);
 
-        // 执行计算
-        const result = evaluateExpression(expression);
+        // 使用 math.js 安全执行（无 eval）
+        const result = math.evaluate(expression);
 
         // 检查结果有效性
         if (!isFinite(result)) {
@@ -71,13 +86,8 @@ function validateExpression(expression) {
         throw new Error('表达式过长（最多 500 字符）');
     }
 
-    // 安全白名单：允许的字符
-    const allowedPattern = /^[\d\s+\-*/().,%\w]*$/;
-    if (!allowedPattern.test(expression)) {
-        throw new Error('表达式包含不允许的字符');
-    }
-
-    // 黑名单：禁止的关键字（防止代码注入）
+    // 黑名单：禁止危险的函数调用
+    // math.js 已经限制了作用域，这里是额外的防护层
     const forbiddenKeywords = [
         'eval', 'Function', 'setTimeout', 'setInterval',
         'require', 'import', 'export', 'fetch', 'XMLHttpRequest',
@@ -85,36 +95,11 @@ function validateExpression(expression) {
         '__proto__', 'constructor', 'prototype'
     ];
 
+    const lowerExpression = expression.toLowerCase();
     for (const keyword of forbiddenKeywords) {
-        if (expression.includes(keyword)) {
+        if (lowerExpression.includes(keyword.toLowerCase())) {
             throw new Error(`表达式包含禁止的关键字: ${keyword}`);
         }
-    }
-}
-
-/**
- * 安全执行数学表达式
- * @param {string} expression - 表达式
- * @returns {number} 计算结果
- */
-function evaluateExpression(expression) {
-    // 使用 Function 构造函数（比 eval 稍微安全一些）
-    // 限制在纯数学运算范围内
-    try {
-        // 创建安全的计算环境（只暴露 Math 对象）
-        const safeEval = new Function('Math', `
-            "use strict";
-            return (${expression});
-        `);
-
-        // 执行计算（传入 Math 对象）
-        const result = safeEval(Math);
-
-        return result;
-
-    } catch (error) {
-        // 捕获语法错误或运行时错误
-        throw new Error(`表达式语法错误: ${error.message}`);
     }
 }
 
@@ -145,20 +130,24 @@ export function testCalculator() {
     const testCases = [
         '2 + 3',
         '10 * 5 - 3',
-        'Math.sqrt(16)',
-        'Math.pow(2, 10)',
-        'Math.PI * 2',
-        'Math.sin(Math.PI / 2)',
+        'sqrt(16)',
+        '2^10',
+        'pi * 2',
+        'sin(pi / 2)',
         '(5 + 3) * 2',
-        '100 / 3'
+        '100 / 3',
+        'log(100, 10)', // log base 10
+        'abs(-5)'
     ];
 
-    console.log('=== Calculator 测试 ===');
+    console.log('=== Calculator 测试 (math.js) ===');
 
     for (const expr of testCases) {
         try {
             const result = calculatorHandler({ expression: expr });
-            console.log(`✅ ${expr} = ${result.formatted}`);
+            result.then(res => {
+                console.log(`${expr} = ${res.formatted}`);
+            });
         } catch (error) {
             console.error(`❌ ${expr} -> ${error.message}`);
         }

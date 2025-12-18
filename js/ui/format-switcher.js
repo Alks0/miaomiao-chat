@@ -15,7 +15,7 @@ import { convertFromOpenAI, convertFromGemini, convertFromClaude } from '../mess
  * @param {boolean} shouldFetchModels - 是否获取模型列表
  */
 export function setApiFormat(format, shouldFetchModels = true) {
-    // ✅ 验证格式有效性（支持 openai-responses）
+    // 验证格式有效性（支持 openai-responses）
     if (!['openai', 'openai-responses', 'gemini', 'claude'].includes(format)) {
         console.warn(`无效的 API 格式: ${format}`);
         return;
@@ -50,7 +50,7 @@ export function setApiFormat(format, shouldFetchModels = true) {
         // 先确保从当前格式同步到其他格式
         switch (oldFormat) {
             case 'openai':
-            case 'openai-responses':  // ✅ Responses API 使用相同的消息转换
+            case 'openai-responses':  // Responses API 使用相同的消息转换
                 convertFromOpenAI();
                 break;
             case 'gemini':
@@ -68,7 +68,7 @@ export function setApiFormat(format, shouldFetchModels = true) {
         elements.geminiImageConfig.style.display = format === 'gemini' ? 'block' : 'none';
     }
 
-    // ✅ 更新端点 placeholder（支持 openai-responses）
+    // 更新端点 placeholder（支持 openai-responses）
     const placeholders = {
         openai: 'API 端点 (如: http://localhost:8000/v1/chat/completions)',
         'openai-responses': 'API 端点 (如: https://api.openai.com/v1/responses)',
@@ -92,7 +92,7 @@ export function setApiFormat(format, shouldFetchModels = true) {
  * 初始化格式切换功能
  */
 export function initFormatSwitcher() {
-    // ✅ 旧的格式按钮已移除，现在通过提供商管理切换格式
+    // 旧的格式按钮已移除，现在通过提供商管理切换格式
 
     // 监听配置加载时的格式切换请求（避免循环依赖）
     import('../core/events.js').then(({ eventBus }) => {

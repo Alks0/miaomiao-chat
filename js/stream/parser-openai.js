@@ -6,16 +6,17 @@
 import { recordFirstToken, recordTokens, recalculateStreamTokenCount, finalizeStreamStats, getCurrentStreamStatsData, getPartialStreamStatsData, appendStreamStats } from './stats.js';
 import { updateStreamingMessage, renderFinalTextWithThinking, renderFinalContentWithThinking, cleanupAllIncompleteImages, handleContentArray } from './helpers.js';
 import { saveAssistantMessage } from '../messages/sync.js';
-import { setCurrentMessageIndex } from '../messages/dom-sync.js';  // ✅ Bug 2 修复：导入索引设置函数
+import { setCurrentMessageIndex } from '../messages/dom-sync.js';  // Bug 2 导入索引设置函数
 import { eventBus } from '../core/events.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { parseStreamingMarkdownImages, mergeTextParts } from '../utils/markdown-image-parser.js';
 import { createToolCallAccumulator, handleToolCallStream } from './tool-call-handler.js';
-import { XMLStreamAccumulator } from '../tools/xml-formatter.js';  // ✅ XML 工具调用解析
-import { state } from '../core/state.js';  // ✅ 访问 xmlToolCallingEnabled 配置
-import { ThinkTagParser } from './think-tag-parser.js';  // ✅ <think> 标签解析器
+import { XMLStreamAccumulator } from '../tools/xml-formatter.js';  // XML 工具调用解析
+import { state } from '../core/state.js';  // 访问 xmlToolCallingEnabled 配置
+import { ThinkTagParser } from './think-tag-parser.js';  // <think> 标签解析器
+import { requestStateMachine, RequestState } from '../core/request-state-machine.js';
 
-// ✅ 响应长度限制（防止内存溢出）
+// 响应长度限制（防止内存溢出）
 const MAX_RESPONSE_LENGTH = 200000; // 20万字符
 
 /**
@@ -30,17 +31,17 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
     let buffer = '';
     let textContent = '';
     let thinkingContent = '';
-    let contentParts = [];
-    let totalReceived = 0; // ✅ 追踪总接收字符数
-    let markdownBuffer = ''; // ✅ Markdown 图片缓冲区（用于暂存不完整的图片）
+    const contentParts = [];
+    let totalReceived = 0; // 追踪总接收字符数
+    let markdownBuffer = ''; // Markdown 图片缓冲区（用于暂存不完整的图片）
 
     // ⭐ 工具调用支持
     const toolCallAccumulator = createToolCallAccumulator();
-    const xmlToolCallAccumulator = new XMLStreamAccumulator();  // ✅ XML 工具调用累积器
+    const xmlToolCallAccumulator = new XMLStreamAccumulator();  // XML 工具调用累积器
     let hasToolCalls = false;
-    let hasNativeToolCalls = false;  // ✅ 标记是否检测到原生格式
+    let hasNativeToolCalls = false;  // 标记是否检测到原生格式
 
-    // ✅ <think> 标签解析器（用于 DeepSeek 等模型）
+    // <think> 标签解析器（用于 DeepSeek 等模型）
     const thinkTagParser = new ThinkTagParser();
 
     try {
@@ -63,7 +64,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                     try {
                         const parsed = JSON.parse(data);
 
-                        // ✅ 检测流式响应中的错误（如 429 Too Many Requests）
+                        // 检测流式响应中的错误（如 429 Too Many Requests）
                         if (parsed.error) {
                             const errorCode = parsed.error.code || parsed.error.type;
                             const errorMessage = parsed.error.message || 'Unknown error';
@@ -104,11 +105,11 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                             textContent = parsed.output_text;
                             totalReceived += textContent.length;
 
-                            // ✅ 统计：output_text 也要计入 tokens（否则工具调用后的正文会“停止计数”）
+                            // 统计：output_text 也要计入 tokens（否则工具调用后的正文会“停止计数”）
                             recordFirstToken();
                             recordTokens(textContent);
 
-                            // ✅ 同步到 contentParts（仅当还没有任何文本 part 时，避免重复）
+                            // 同步到 contentParts（仅当还没有任何文本 part 时，避免重复）
                             const hasTextPart = contentParts.some(p => p.type === 'text' && p.text);
                             if (!hasTextPart && textContent) {
                                 contentParts.push({ type: 'text', text: textContent });
@@ -126,7 +127,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                     thinkingContent += item.content;
                                     totalReceived += item.content.length;
 
-                                    // ✅ 合并连续的 thinking parts（只有遇到图片才分段）
+                                    // 合并连续的 thinking parts（只有遇到图片才分段）
                                     const lastPart = contentParts[contentParts.length - 1];
                                     if (lastPart && lastPart.type === 'thinking') {
                                         lastPart.text += item.content;
@@ -144,7 +145,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                         textContent += messageText;
                                         totalReceived += messageText.length;
 
-                                        // ✅ 合并连续的 text parts（只有遇到图片才分段）
+                                        // 合并连续的 text parts（只有遇到图片才分段）
                                         const lastPart = contentParts[contentParts.length - 1];
                                         if (lastPart && lastPart.type === 'text') {
                                             lastPart.text += messageText;
@@ -157,7 +158,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                     else if (Array.isArray(item.content)) {
                                         recordFirstToken();
 
-                                        // ✅ 统计：content 数组里的文本也要计入 tokens
+                                        // 统计：content 数组里的文本也要计入 tokens
                                         const textFromParts = item.content
                                             .filter(p => typeof p?.text === 'string' && p.text)
                                             .map(p => p.text)
@@ -169,7 +170,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                         }
 
                                         const addedLength = await handleContentArray(item.content, contentParts);
-                                        totalReceived += addedLength; // ✅ 修复：计数图片长度
+                                        totalReceived += addedLength; // 计数图片长度
                                     }
                                 }
                             }
@@ -179,11 +180,11 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 textContent = parsed.output_text;
                                 totalReceived += textContent.length;
 
-                                // ✅ 统计：output_text 也要计入 tokens（否则 tokens 会停留在工具调用前）
+                                // 统计：output_text 也要计入 tokens（否则 tokens 会停留在工具调用前）
                                 recordFirstToken();
                                 recordTokens(textContent);
 
-                                // ✅ 同步到 contentParts（仅当还没有任何文本 part 时，避免重复）
+                                // 同步到 contentParts（仅当还没有任何文本 part 时，避免重复）
                                 const hasTextPart = contentParts.some(p => p.type === 'text' && p.text);
                                 if (!hasTextPart && textContent) {
                                     contentParts.push({ type: 'text', text: textContent });
@@ -197,15 +198,15 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                             const delta = parsed.choices?.[0]?.delta;
                             const finishReason = parsed.choices?.[0]?.finish_reason;
 
-                            // ✅ 1. 检测原生 tool_calls（仅在非 XML 模式）
+                            // 1. 检测原生 tool_calls（仅在非 XML 模式）
                             if (delta?.tool_calls && !state.xmlToolCallingEnabled) {
                                 hasToolCalls = true;
-                                hasNativeToolCalls = true;  // ✅ 标记为原生格式
+                                hasNativeToolCalls = true;  // 标记为原生格式
                                 toolCallAccumulator.processDelta(delta.tool_calls);
                                 console.log('[Parser] 检测到原生工具调用增量:', delta.tool_calls);
                             }
 
-                            // ✅ 先处理 delta.content（检测 XML 工具调用），再检查 finishReason
+                            // 先处理 delta.content（检测 XML 工具调用），再检查 finishReason
                             // 保存 XML 解析结果供后续使用（避免重复调用 processDelta）
                             let xmlParseResult = null;
                             if (delta && typeof delta.content === 'string' && state.xmlToolCallingEnabled) {
@@ -225,7 +226,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 }
                             }
 
-                            // ✅ 工具调用完成处理（现在在 XML 检测之后）
+                            // 工具调用完成处理（现在在 XML 检测之后）
                             if (finishReason === 'tool_calls' || (finishReason === 'stop' && hasToolCalls)) {
                                 console.log('[Parser] 工具调用完成，准备执行...');
 
@@ -242,42 +243,47 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 }
 
                                 if (toolCalls.length > 0) {
-                                    // ✅ 注意：工具调用时不结束统计，让统计在 continuation 完成后才最终确定
-                                    // finalizeStreamStats() 会在 continuation 完成时调用
-
-                                    // 渲染内容
-                                    if (contentParts.length > 0) {
-                                        renderFinalContentWithThinking(contentParts, thinkingContent);
-                                    } else if (textContent || thinkingContent) {
-                                        renderFinalTextWithThinking(textContent, thinkingContent);
-                                    }
-
-                                    // ✅ 工具调用时不添加统计 HTML，等 continuation 完成后再添加
-                                    // appendStreamStats() 会在 continuation 完成时调用
-
-                                    // ✅ 保存助手消息（包含工具调用）- 保存部分统计（TTFT 和当前 token 数）
-                                    const messageIndex = saveAssistantMessage({
-                                        textContent: textContent || '(调用工具)',
-                                        thinkingContent,
-                                        contentParts,
-                                        toolCalls, // 保存工具调用信息
-                                        streamStats: getPartialStreamStatsData(),  // ✅ 修复：保存部分统计，供 continuation 聚合
-                                        sessionId
+                                    console.log('[OpenAI] 检测到工具调用:', {
+                                        toolCallsCount: toolCalls.length,
+                                        toolNames: toolCalls.map(tc => tc.name).join(', ')
                                     });
+                                        // 注意：工具调用时不结束统计，让统计在 continuation 完成后才最终确定
+                                        // finalizeStreamStats() 会在 continuation 完成时调用
 
-                                    setCurrentMessageIndex(messageIndex);
+                                        // 渲染内容
+                                        if (contentParts.length > 0) {
+                                            renderFinalContentWithThinking(contentParts, thinkingContent);
+                                        } else if (textContent || thinkingContent) {
+                                            renderFinalTextWithThinking(textContent, thinkingContent);
+                                        }
 
-                                    // ✅ 标记工具调用进行中，阻止 finally 块重置状态
-                                    state.isToolCallPending = true;
+                                        // 工具调用时不添加统计 HTML，等 continuation 完成后再添加
+                                        // appendStreamStats() 会在 continuation 完成时调用
 
-                                    // 执行工具调用流程（异步，不阻塞）
-                                    handleToolCallStream(toolCalls, {
-                                        endpoint: state.endpoint,
-                                        apiKey: state.apiKey,
-                                        model: state.model
-                                    }).catch(error => {
-                                        console.error('[Parser] 工具调用流程失败:', error);
-                                    });
+                                        // 保存助手消息（包含工具调用）- 保存部分统计（TTFT 和当前 token 数）
+                                        const messageIndex = saveAssistantMessage({
+                                            textContent: textContent || '(调用工具)',
+                                            thinkingContent,
+                                            contentParts,
+                                            toolCalls, // 保存工具调用信息
+                                            streamStats: getPartialStreamStatsData(),  // 保存部分统计，供 continuation 聚合
+                                            sessionId
+                                        });
+
+                                        setCurrentMessageIndex(messageIndex);
+
+                                        // 转换到工具调用状态
+                                        requestStateMachine.transition(RequestState.TOOL_CALLING);
+                                        state.isToolCallPending = true; // 向后兼容
+
+                                        // 执行工具调用流程（异步，不阻塞）
+                                        handleToolCallStream(toolCalls, {
+                                            endpoint: state.endpoint,
+                                            apiKey: state.apiKey,
+                                            model: state.model
+                                        }).catch(_error => {
+                                            console.error('[Parser] 工具调用流程失败:', _error);
+                                        });
 
                                     // 提前退出流解析（工具调用完成）
                                     return;
@@ -286,14 +292,14 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
 
                             if (delta) {
                                 // 处理 reasoning_content (OpenAI o1/o3/o4 思维链)
-                                // ✅ 注意：reasoning_content 通常在 content 之前，所以先处理
+                                // 注意：reasoning_content 通常在 content 之前，所以先处理
                                 if (delta.reasoning_content) {
                                     recordFirstToken();
                                     recordTokens(delta.reasoning_content);
                                     thinkingContent += delta.reasoning_content;
                                     totalReceived += delta.reasoning_content.length;
 
-                                    // ✅ 合并连续的 thinking parts（只有遇到图片才分段）
+                                    // 合并连续的 thinking parts（只有遇到图片才分段）
                                     const lastPart = contentParts[contentParts.length - 1];
                                     if (lastPart && lastPart.type === 'thinking') {
                                         lastPart.text += delta.reasoning_content;
@@ -307,7 +313,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                     recordFirstToken();
                                     recordTokens(delta.content);
 
-                                    // ✅ 使用前面保存的 XML 解析结果（避免重复调用 processDelta）
+                                    // 使用前面保存的 XML 解析结果（避免重复调用 processDelta）
                                     let contentToProcess = delta.content;
                                     if (state.xmlToolCallingEnabled && xmlParseResult) {
                                         const { displayText } = xmlParseResult;
@@ -315,7 +321,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                         contentToProcess = displayText.substring(textContent.length); // 只取新增部分
                                     }
 
-                                    // ✅ 解析 <think> 标签（DeepSeek 等模型的思考内容）
+                                    // 解析 <think> 标签（DeepSeek 等模型的思考内容）
                                     const { displayText: thinkParsedText, thinkingDelta } = thinkTagParser.processDelta(contentToProcess);
 
                                     // 处理提取的思考内容
@@ -332,7 +338,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                         }
                                     }
 
-                                    // ✅ 解析 markdown 图片格式: ![image](data:image/jpeg;base64,...)
+                                    // 解析 markdown 图片格式: ![image](data:image/jpeg;base64,...)
                                     // 使用 <think> 解析后的显示文本
                                     const { parts, newBuffer } = parseStreamingMarkdownImages(thinkParsedText, markdownBuffer);
                                     markdownBuffer = newBuffer;
@@ -362,12 +368,12 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 else if (Array.isArray(delta.content)) {
                                     recordFirstToken();
                                     const addedLength = await handleContentArray(delta.content, contentParts);
-                                    totalReceived += addedLength; // ✅ 修复：计数图片长度
+                                    totalReceived += addedLength; // 计数图片长度
                                 }
                             }
                         }
 
-                        // ✅ 检查是否超过长度限制
+                        // 检查是否超过长度限制
                         if (totalReceived > MAX_RESPONSE_LENGTH) {
                             console.warn(`响应超长（${totalReceived} 字符），已强制截断`);
                             eventBus.emit('ui:notification', {
@@ -378,14 +384,14 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                             finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId);
                             return;
                         }
-                    } catch (e) {
-                        console.warn('OpenAI SSE parse error:', e);
+                    } catch (_e) {
+                        console.warn('OpenAI SSE parse error:', _e);
                     }
                 }
             }
         }
 
-        // ✅ 流结束前刷新 <think> 解析器缓冲区
+        // 流结束前刷新 <think> 解析器缓冲区
         const { displayText: finalDisplayText, thinkingDelta: finalThinkingDelta } = thinkTagParser.flush();
         if (finalThinkingDelta) {
             thinkingContent += finalThinkingDelta;
@@ -409,12 +415,12 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
         // 流结束
         finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId);
     } finally {
-        // ✅ 关键修复：释放 reader 锁，防止资源泄漏
+        // 关键释放 reader 锁，防止资源泄漏
         try {
             reader.releaseLock();
-        } catch (e) {
+        } catch (_e) {
             // Reader 可能已被释放或取消，忽略错误
-            console.debug('Reader lock already released:', e);
+            console.debug('Reader lock already released:', _e);
         }
     }
 }
@@ -427,6 +433,13 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
  * @param {string} sessionId - 会话ID
  */
 function finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId) {
+    // 流结束，清除工具调用pending标志（如果没有新的工具调用）
+    // 这样handler的finally块才能正确清理loading状态
+    if (state.isToolCallPending) {
+        console.log('[OpenAI] 流结束，重置 isToolCallPending 标志');
+        state.isToolCallPending = false;
+    }
+
     // 完成统计
     finalizeStreamStats();
 
@@ -440,7 +453,7 @@ function finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessio
         renderFinalTextWithThinking(textContent, thinkingContent);
     }
 
-    // ✅ 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
+    // 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
     recalculateStreamTokenCount({ textContent, thinkingContent, contentParts });
 
     // 添加统计信息
@@ -455,12 +468,12 @@ function finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessio
         sessionId: sessionId, // 🔒 传递会话ID防止串消息
     });
 
-    // ✅ Bug 2 修复：立即设置 dataset.messageIndex
+    // Bug 2 立即设置 dataset.messageIndex
     setCurrentMessageIndex(messageIndex);
 }
 
 /**
- * ✅ 以错误状态完成 OpenAI 流处理
+ * 以错误状态完成 OpenAI 流处理
  * 用于处理流式响应中的 API 错误（如 429）
  * @param {string} textContent - 已接收的文本内容
  * @param {string} thinkingContent - 已接收的思维链内容
@@ -476,7 +489,7 @@ function finalizeOpenAIStreamWithError(textContent, thinkingContent, contentPart
     // 清理所有未完成的图片缓冲区
     cleanupAllIncompleteImages(contentParts);
 
-    // ✅ 使用统一的错误渲染函数（包含折叠的技术详情）
+    // 使用统一的错误渲染函数（包含折叠的技术详情）
     const errorObject = {
         code: errorCode,
         message: errorMessage,
@@ -506,7 +519,7 @@ function finalizeOpenAIStreamWithError(textContent, thinkingContent, contentPart
         }
     }
 
-    // ✅ 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
+    // 兜底：按最终内容重算 token（避免工具调用后正文漏计数）
     recalculateStreamTokenCount({ textContent: finalText, thinkingContent, contentParts });
 
     // 添加统计信息
@@ -527,7 +540,7 @@ function finalizeOpenAIStreamWithError(textContent, thinkingContent, contentPart
         sessionId: sessionId, // 🔒 传递会话ID防止串消息
     });
 
-    // ✅ Bug 2 修复：立即设置 dataset.messageIndex
+    // Bug 2 立即设置 dataset.messageIndex
     setCurrentMessageIndex(messageIndex);
 
     // 触发 UI 状态重置
@@ -536,4 +549,10 @@ function finalizeOpenAIStreamWithError(textContent, thinkingContent, contentPart
         errorMessage,
         partialContent: textContent
     });
+
+    // 强制清理工具调用标志（防止状态泄漏）
+    if (state.isToolCallPending) {
+        console.log('[Parser-OpenAI] 错误状态下强制清理 isToolCallPending');
+        state.isToolCallPending = false;
+    }
 }

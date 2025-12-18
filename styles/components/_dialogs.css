@@ -12,7 +12,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 20000;  /* ✅ 修复：提高 z-index，确保始终在其他模态框（如工具管理）之上 */
+    z-index: var(--z-modal-dialog);
     align-items: center;
     justify-content: center;
 }
@@ -31,14 +31,14 @@
     bottom: 0;
     background: rgba(40, 40, 43, 0.85);
     backdrop-filter: blur(4px);
-    z-index: 1;  /* 遮罩层在底层 */
+    z-index: var(--z-base);
 }
 
 /* 对话框内容 */
 #input-dialog-modal .modal-content,
 #confirm-dialog-modal .modal-content {
     position: relative;
-    z-index: 10;  /* 对话框内容在遮罩层上面 */
+    z-index: var(--z-sticky);
     background: var(--color-bg-surface);
     border: 3px solid var(--color-border-primary);
     box-shadow:
@@ -84,8 +84,8 @@
 
 #input-dialog-modal .modal-header .icon-button,
 #confirm-dialog-modal .modal-header .icon-button {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     background: rgba(0, 0, 0, 0.2);
     border: 2px solid rgba(255, 255, 255, 0.3);
@@ -154,6 +154,8 @@
 #confirm-dialog-modal .btn-primary,
 #confirm-dialog-modal .btn-secondary {
     flex: 1;
+    min-width: 44px;
+    min-height: 44px;
     padding: 10px 16px;
     font-family: 'Press Start 2P', 'Courier New', monospace;
     font-size: 10px;

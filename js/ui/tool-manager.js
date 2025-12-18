@@ -2,10 +2,13 @@
  * 工具调用管理界面
  * 提供完整的工具 CRUD 功能：创建、读取、更新、删除
  * 参考设计：js/providers/ui.js（左右分栏模态框）
+ *
+ * 添加事件监听器管理,防止内存泄漏
  */
 
 import { state } from '../core/state.js';
 import { eventBus } from '../core/events.js';
+import { EventListenerManager } from '../utils/event-listener-manager.js';
 import {
     getAllTools,
     getEnabledTools,
@@ -29,6 +32,8 @@ let modal = null;
 let selectedToolId = null;
 let isEditing = false;
 let removeFocusTrap = null;
+// 全局事件监听器管理器（用于管理持久性监听器）
+let globalListenerManager = null;
 
 // ========== 辅助函数 ==========
 
@@ -81,23 +86,29 @@ function createFocusTrap(container) {
 export function initToolManager() {
     console.log('[Tool Manager] 🔧 初始化工具管理界面...');
 
+    // 创建全局事件监听器管理器
+    if (!globalListenerManager) {
+        globalListenerManager = new EventListenerManager();
+    }
+
     // 创建模态框
     createModal();
 
     // 绑定顶部导航栏按钮
     const toggleBtn = document.getElementById('tools-manager-toggle');
     if (toggleBtn) {
-        toggleBtn.addEventListener('click', openModal);
+        globalListenerManager.add(toggleBtn, 'click', openModal);
     }
 
     // 监听工具系统事件
     setupEventListeners();
 
-    console.log('[Tool Manager] ✅ 工具管理界面已初始化');
+    console.log('[Tool Manager] 工具管理界面已初始化');
 }
 
 /**
  * 创建模态框 DOM
+ * 性能优化：缓存频繁使用的 DOM 元素
  */
 function createModal() {
     modal = document.getElementById('tool-manager-modal');
@@ -106,42 +117,46 @@ function createModal() {
         return;
     }
 
-    // 绑定关闭按钮
+    // 优化：一次性查询所有需要的元素
     const closeBtn = modal.querySelector('.close-tool-manager');
+    const tabBtns = modal.querySelectorAll('.tab-btn');
+    const searchInput = modal.querySelector('#tool-search-input');
+    const addCustomBtn = modal.querySelector('#add-custom-tool-btn');
+
+    // 绑定关闭按钮（使用全局管理器）
     if (closeBtn) {
-        closeBtn.addEventListener('click', closeModal);
+        globalListenerManager.add(closeBtn, 'click', closeModal);
     }
 
     // 绑定 Tab 切换
-    const tabBtns = modal.querySelectorAll('.tab-btn');
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => handleTabSwitch(btn.dataset.tab));
+        globalListenerManager.add(btn, 'click', () => handleTabSwitch(btn.dataset.tab));
     });
 
     // 点击背景关闭
-    modal.addEventListener('click', (e) => {
+    const handleModalClick = (e) => {
         if (e.target === modal) {
             closeModal();
         }
-    });
+    };
+    globalListenerManager.add(modal, 'click', handleModalClick);
 
     // ESC 键关闭
-    document.addEventListener('keydown', (e) => {
+    const handleEscapeKey = (e) => {
         if (e.key === 'Escape' && modal.style.display === 'flex') {
             closeModal();
         }
-    });
+    };
+    globalListenerManager.add(document, 'keydown', handleEscapeKey);
 
     // 绑定搜索框
-    const searchInput = modal.querySelector('#tool-search-input');
     if (searchInput) {
-        searchInput.addEventListener('input', handleToolSearch);
+        globalListenerManager.add(searchInput, 'input', handleToolSearch);
     }
 
     // 绑定添加自定义工具按钮
-    const addCustomBtn = modal.querySelector('#add-custom-tool-btn');
     if (addCustomBtn) {
-        addCustomBtn.addEventListener('click', handleAddCustomTool);
+        globalListenerManager.add(addCustomBtn, 'click', handleAddCustomTool);
     }
 
     // 绑定表单按钮
@@ -253,12 +268,15 @@ export function closeModal() {
 
 /**
  * 渲染工具列表（左侧）
+ * 性能优化：缓存 DOM 查询
  */
 function renderToolsList() {
+    // 优化：缓存容器查询
     const listContainer = modal.querySelector('#tools-list-container');
     if (!listContainer) return;
 
-    const allTools = getAllTools();
+    // 过滤掉 hidden 工具（如 Computer Use）
+    const allTools = getAllTools().filter(t => !t.hidden);
 
     // 按类型分组
     const builtinTools = allTools.filter(t => t.type === 'builtin');
@@ -271,8 +289,12 @@ function renderToolsList() {
         ${renderToolGroup('自定义工具', customTools, 'custom')}
     `;
 
+    // 优化：一次性查询所有元素
+    const toolItems = listContainer.querySelectorAll('.tool-item');
+    const enableSwitches = listContainer.querySelectorAll('.tool-enable-switch');
+
     // 绑定工具项点击事件
-    listContainer.querySelectorAll('.tool-item').forEach(item => {
+    toolItems.forEach(item => {
         item.addEventListener('click', () => {
             const toolId = item.dataset.toolId;
             selectTool(toolId);
@@ -280,7 +302,7 @@ function renderToolsList() {
     });
 
     // 绑定启用开关
-    listContainer.querySelectorAll('.tool-enable-switch').forEach(switchEl => {
+    enableSwitches.forEach(switchEl => {
         switchEl.addEventListener('change', (e) => {
             e.stopPropagation(); // 阻止冒泡到工具项点击
             const toolId = e.target.dataset.toolId;
@@ -583,7 +605,7 @@ function handleAddCustomTool() {
     // 传递工具对象而非 ID
     showToolForm(newTool);
 
-    // ✅ 修复：不立即设置 isEditing，只有当用户开始输入时才设置
+    // 不立即设置 isEditing，只有当用户开始输入时才设置
     // isEditing = true;  // 移除这一行，第 454-461 行的输入监听器会在用户输入时设置
 
     console.log('[Tool Manager] ➕ 创建新工具');
@@ -836,8 +858,8 @@ function loadPermissionsTab() {
     const container = document.getElementById('permissions-list-container');
     if (!container) return;
 
-    // 获取所有工具并渲染权限列表
-    const tools = getAllTools();
+    // 获取所有工具并渲染权限列表（过滤掉 hidden 工具）
+    const tools = getAllTools().filter(t => !t.hidden);
     if (tools.length === 0) {
         container.innerHTML = '<p class="no-data-hint">暂无工具</p>';
         return;
@@ -978,7 +1000,7 @@ async function showToolTestDialog(tool) {
             // 显示成功结果
             resultContent.innerHTML = `
                 <div class="test-result-success">
-                    <h4>✅ 执行成功</h4>
+                    <h4>执行成功</h4>
                     <pre class="result-data">${JSON.stringify(result, null, 2)}</pre>
                 </div>
             `;

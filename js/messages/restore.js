@@ -11,19 +11,8 @@ import { generateMessageId } from '../utils/helpers.js';
 import { rebuildMessageIdMap } from '../core/state-mutations.js';
 import { initVirtualScroll } from '../ui/virtual-scroll.js';
 import { renderHumanizedError } from '../utils/errors.js';
-
-/**
- * 判断附件类型
- * @param {string} mimeType - MIME 类型
- * @returns {'image'|'pdf'|'text'|'unknown'}
- */
-function getAttachmentCategory(mimeType) {
-    if (!mimeType) return 'unknown';
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType === 'application/pdf') return 'pdf';
-    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType.startsWith('text/')) return 'text';
-    return 'unknown';
-}
+import { createToolCallUI, updateToolCallStatus } from '../ui/tool-display.js';  // 工具UI恢复
+import { categorizeFile } from '../utils/file-helpers.js';
 
 /**
  * 解析 Gemini 用户消息内容
@@ -42,7 +31,7 @@ function parseGeminiUserContent(parts) {
                 const inlineData = part.inlineData || part.inline_data;
                 const mimeType = inlineData.mimeType || inlineData.mime_type;
                 const data = inlineData.data;
-                const category = getAttachmentCategory(mimeType);
+                const category = categorizeFile(mimeType);
 
                 // 根据类型生成名称
                 let name = '已上传文件';
@@ -154,9 +143,9 @@ export function renderSessionMessages() {
         return;
     }
 
-    // ✅ 如果消息数量超过阈值，使用虚拟滚动
+    // 如果消息数量超过阈值，使用虚拟滚动
     if (messages.length >= 100) {
-        console.log(`✅ 消息数量 ${messages.length}，启用虚拟滚动模式`);
+        console.log(`消息数量 ${messages.length}，启用虚拟滚动模式`);
         initVirtualScroll(true); // 强制启用
         rebuildMessageIdMap(); // 重建索引映射
         // 虚拟滚动模块会自动渲染
@@ -165,7 +154,7 @@ export function renderSessionMessages() {
 
     // 传统渲染模式（< 100 条消息）
 
-    // ✅ 性能优化：使用 DocumentFragment 批量插入，避免频繁 reflow
+    // 性能优化：使用 DocumentFragment 批量插入，避免频繁 reflow
     const fragment = document.createDocumentFragment();
     const enhancementQueue = []; // 增强操作队列（异步执行）
 
@@ -176,7 +165,7 @@ export function renderSessionMessages() {
             const openaiMsg = state.messages[index]; // 提前获取，用于错误恢复和其他元数据
             const { text, images } = parseGeminiUserContent(msg.parts);
 
-            // ✅ 确保消息有唯一ID（为旧消息生成ID）
+            // 确保消息有唯一ID（为旧消息生成ID）
             if (!msg.id) {
                 msg.id = generateMessageId();
                 // 同步到其他格式
@@ -187,19 +176,18 @@ export function renderSessionMessages() {
             const messageEl = createMessageElement(role, text, images.length > 0 ? images : null, msg.id, openaiMsg?.modelName, openaiMsg?.providerName);
             messageEl.dataset.messageIndex = index;
 
-            // ✅ 添加到 Fragment 而非直接 appendChild（减少 reflow）
+            // 添加到 Fragment 而非直接 appendChild（减少 reflow）
             fragment.appendChild(messageEl);
 
-            // ✅ 将耗时的增强操作加入队列，稍后异步执行
+            // 将耗时的增强操作加入队列，稍后异步执行
             if (role === 'assistant' && !msg.isError) {
                 enhancementQueue.push({
                     messageEl,
                     msg,
-                    openaiMsg,
-                    role
+                    openaiMsg
                 });
             } else if (role === 'assistant' && msg.isError) {
-                // ✅ 增强：错误消息降级渲染
+                // 增强：错误消息降级渲染
                 const contentDiv = messageEl.querySelector('.message-content');
                 if (contentDiv) {
                     if (openaiMsg?.errorHtml) {
@@ -224,7 +212,7 @@ export function renderSessionMessages() {
         state.messages.forEach((msg, index) => {
             const { text, images } = parseUserContent(msg.content);
 
-            // ✅ 确保消息有唯一ID（为旧消息生成ID）
+            // 确保消息有唯一ID（为旧消息生成ID）
             if (!msg.id) {
                 msg.id = generateMessageId();
                 // 同步到其他格式
@@ -235,19 +223,18 @@ export function renderSessionMessages() {
             const messageEl = createMessageElement(msg.role, text, images.length > 0 ? images : null, msg.id, msg.modelName, msg.providerName);
             messageEl.dataset.messageIndex = index;
 
-            // ✅ 添加到 Fragment 而非直接 appendChild（减少 reflow）
+            // 添加到 Fragment 而非直接 appendChild（减少 reflow）
             fragment.appendChild(messageEl);
 
-            // ✅ 将耗时的增强操作加入队列，稍后异步执行
+            // 将耗时的增强操作加入队列，稍后异步执行
             if (msg.role === 'assistant' && !msg.isError) {
                 enhancementQueue.push({
                     messageEl,
                     msg,
-                    openaiMsg: msg,
-                    role: msg.role
+                    openaiMsg: msg
                 });
             } else if (msg.role === 'assistant' && msg.isError) {
-                // ✅ 增强：错误消息降级渲染（OpenAI 格式）
+                // 增强：错误消息降级渲染（OpenAI 格式）
                 const contentDiv = messageEl.querySelector('.message-content');
                 if (contentDiv) {
                     if (msg.errorHtml) {
@@ -270,19 +257,19 @@ export function renderSessionMessages() {
         });
     }
 
-    // ✅ 一次性插入所有消息（只触发一次 reflow）
+    // 一次性插入所有消息（只触发一次 reflow）
     elements.messagesArea.appendChild(fragment);
 
-    // ✅ 异步增强消息（不阻塞 UI）
+    // 异步增强消息（不阻塞 UI）
     if (enhancementQueue.length > 0) {
         requestIdleCallback(() => {
-            enhancementQueue.forEach(({ messageEl, msg, openaiMsg, role }) => {
+            enhancementQueue.forEach(({ messageEl, msg, openaiMsg }) => {
                 enhanceAssistantMessage(messageEl, msg, openaiMsg);
             });
         }, { timeout: 2000 }); // 2秒超时，确保即使在繁忙时也能完成
     }
 
-    // ✅ 重建 messageIdMap（确保索引映射正确）
+    // 重建 messageIdMap（确保索引映射正确）
     rebuildMessageIdMap();
 
     // 滚动到底部
@@ -295,19 +282,92 @@ export function renderSessionMessages() {
 }
 
 /**
- * 异步增强 assistant 消息（思维链、统计、多回复）
- * ✅ 性能优化：使用 requestIdleCallback 避免阻塞 UI
+ * 恢复工具调用UI
+ * @param {Array} toolCalls - 工具调用数组
+ * @param {HTMLElement} messageEl - 消息元素
+ */
+async function restoreToolCallsUI(toolCalls, messageEl) {
+    if (!toolCalls || toolCalls.length === 0) return;
+
+    console.log(`[Restore] 恢复 ${toolCalls.length} 个工具调用UI`);
+
+    const contentDiv = messageEl.querySelector('.message-content');
+    if (!contentDiv) {
+        console.warn('[Restore] 未找到消息内容容器');
+        return;
+    }
+
+    // 导入工具UI函数
+    const { createToolCallUI, updateToolCallStatus } = await import('../ui/tool-display.js');
+
+    // 临时设置 state.currentAssistantMessage 用于 createToolCallUI
+    const prevAssistantMessage = state.currentAssistantMessage;
+    state.currentAssistantMessage = contentDiv;
+
+    try {
+        // 记录插入位置：第一个非工具UI的元素
+        // 这样可以确保所有工具UI都按顺序插入到内容的最前面
+        let insertBeforeElement = null;
+
+        // 找到第一个不是工具UI的子元素
+        for (const child of contentDiv.children) {
+            if (!child.classList.contains('tool-call-container')) {
+                insertBeforeElement = child;
+                break;
+            }
+        }
+
+        // 按顺序恢复所有工具调用
+        for (const toolCall of toolCalls) {
+            // 创建工具UI元素
+            const toolContainer = await createToolCallUI({
+                id: toolCall.id,
+                name: toolCall.name,
+                args: toolCall.arguments || toolCall.input || {}
+            });
+
+            // 关键将工具UI移动到正确位置
+            // createToolCallUI 使用 appendChild 添加到最后，我们需要移动它
+            if (toolContainer && contentDiv.contains(toolContainer)) {
+                // 如果找到了非工具UI元素，插入到它之前；否则保持在当前位置
+                if (insertBeforeElement) {
+                    contentDiv.insertBefore(toolContainer, insertBeforeElement);
+                }
+                // 如果 insertBeforeElement 为 null，说明内容全是工具UI或为空，
+                // 工具UI已经在正确位置（appendChild 添加到了最后），不需要移动
+            }
+
+            // 立即更新为completed状态
+            updateToolCallStatus(toolCall.id, 'completed', {
+                result: { restored: true }
+            });
+        }
+
+        console.log('[Restore] 工具UI恢复完成');
+    } catch (error) {
+        console.error('[Restore] 恢复工具UI失败:', error);
+    } finally {
+        // 恢复 state.currentAssistantMessage
+        state.currentAssistantMessage = prevAssistantMessage;
+    }
+}
+
+/**
+ * 异步增强 assistant 消息（思维链、统计、多回复、工具UI）
+ * 性能优化：使用 requestIdleCallback 避免阻塞 UI
+ * 性能优化：缓存 DOM 查询
  * @param {HTMLElement} messageEl - 消息元素
  * @param {Object} msg - Gemini 或 OpenAI 消息对象
  * @param {Object} openaiMsg - OpenAI 格式消息对象（用于元数据）
  */
-function enhanceAssistantMessage(messageEl, msg, openaiMsg) {
-    const contentDiv = messageEl.querySelector('.message-content');
+function enhanceAssistantMessage(_messageEl, msg, openaiMsg) {
+    // 优化：缓存 querySelector 结果
+    const contentDiv = _messageEl.querySelector('.message-content');
 
-    // ✅ 恢复消息内容（思维链 + 文本/图片）
+    // 恢复消息内容（思维链 + 文本/图片）
     if (contentDiv && openaiMsg) {
         let html = '';
-        let contentRendered = false;  // ✅ 跟踪是否成功渲染了内容
+        let contentRendered = false;  // 跟踪是否成功渲染了内容
 
         // 1. 先渲染思维链（如果有）
         if (openaiMsg.thinkingContent) {
@@ -316,7 +376,7 @@ function enhanceAssistantMessage(messageEl, msg, openaiMsg) {
 
         // 2. 优先渲染 contentParts（text, image）
         if (openaiMsg.contentParts && openaiMsg.contentParts.length > 0) {
-            // ✅ 过滤掉占位符和 thinking 类型（thinking 已经在上面单独渲染过了）
+            // 过滤掉占位符和 thinking 类型（thinking 已经在上面单独渲染过了）
             const validContentParts = openaiMsg.contentParts.filter(
                 p => !(p.type === 'text' && p.text === '(调用工具)') && p.type !== 'thinking'
             );
@@ -349,7 +409,7 @@ function enhanceAssistantMessage(messageEl, msg, openaiMsg) {
             }
         }
 
-        // ✅ 4. 最后的回退：尝试从 Gemini parts 获取内容
+        // 4. 最后的回退：尝试从 Gemini parts 获取内容
         if (!contentRendered && msg && msg.parts && Array.isArray(msg.parts)) {
             const textFromParts = msg.parts
                 .filter(p => p.text && !p.thought)  // 排除思维链
@@ -366,25 +426,21 @@ function enhanceAssistantMessage(messageEl, msg, openaiMsg) {
             contentDiv.innerHTML = html;
         }
 
-        // ✅ 日志记录未渲染的情况
+        // 日志记录未渲染的情况
         if (!contentRendered && !openaiMsg.thinkingContent) {
             console.warn('[Restore] 消息无法渲染内容:', {
-                index: messageEl.dataset.messageIndex,
+                index: _messageEl.dataset.messageIndex,
                 contentParts: openaiMsg.contentParts?.length,
                 content: typeof openaiMsg.content,
                 parts: msg?.parts?.length
             });
         }
     }
-    // 回退：旧格式只有 thinkingContent（无 contentParts）
-    else if (openaiMsg && openaiMsg.thinkingContent && contentDiv) {
-        contentDiv.innerHTML = renderThinkingBlock(openaiMsg.thinkingContent) + contentDiv.innerHTML;
-    }
 
-    // 恢复流统计信息
+    // 优化：恢复流统计信息（缓存 wrapper 查询）
     const statsData = msg.streamStats || (openaiMsg && openaiMsg.streamStats);
     if (statsData) {
-        const wrapper = messageEl.querySelector('.message-content-wrapper');
+        const wrapper = _messageEl.querySelector('.message-content-wrapper');
         if (wrapper) {
             wrapper.insertAdjacentHTML('beforeend', renderStreamStatsFromData(statsData));
         }
@@ -393,9 +449,14 @@ function enhanceAssistantMessage(messageEl, msg, openaiMsg) {
     // 恢复多回复选择器
     if (openaiMsg?.allReplies && openaiMsg.allReplies.length > 1) {
         const selectedIndex = openaiMsg.selectedReplyIndex || 0;
-        renderReplyWithSelector(openaiMsg.allReplies, selectedIndex, messageEl);
+        renderReplyWithSelector(openaiMsg.allReplies, selectedIndex, _messageEl);
     } else {
         // 对于没有多回复的消息，也需要增强代码块、表格、思维链等
-        enhanceCodeBlocks(messageEl);
+        enhanceCodeBlocks(_messageEl);
+    }
+
+    // 恢复工具调用UI（如果有）
+    if (openaiMsg?.toolCalls && openaiMsg.toolCalls.length > 0) {
+        restoreToolCallsUI(openaiMsg.toolCalls, _messageEl);
     }
 }

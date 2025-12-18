@@ -26,7 +26,7 @@ let editModalFocusTrap = null;
  */
 export function initQuickMessagesUI() {
     bindEvents();
-    console.log('✅ Quick Messages UI initialized');
+    console.log('Quick Messages UI initialized');
 }
 
 /**

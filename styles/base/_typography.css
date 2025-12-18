@@ -291,40 +291,7 @@
     padding: 8px;
 }
 
-/* 复制按钮 */
-.copy-code-btn {
-    padding: 4px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: transparent;
-    color: var(--color-text-inverse);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.copy-code-btn:hover {
-    background: var(--md-blue);
-    border-color: var(--md-blue);
-    color: var(--color-text-primary);
-    transform: translateY(-1px);
-}
-
-.copy-code-btn:active {
-    transform: translateY(0);
-}
-
-.copy-code-btn.copied {
-    background: var(--md-teal);
-    border-color: var(--md-teal);
-    color: var(--color-text-primary);
-}
-
-/* 代码块内容 - 优化版（自动换行） */
+/* 代码块内容 - 优化版（自动换行，已废弃，所有代码块现在都使用折叠样式） */
 .code-block-content {
     padding: 0;
     overflow-x: auto;

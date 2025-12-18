@@ -98,7 +98,7 @@ export function getHumanizedError(error, httpStatus = null) {
  * @returns {string} 序列化后的字符串
  */
 function serializeError(error) {
-    // ✅ 增强：检查 null/undefined
+    // 增强：检查 null/undefined
     if (!error || error === null || error === undefined) {
         return JSON.stringify({ error: { message: 'Unknown error' } }, null, 2);
     }
@@ -139,14 +139,14 @@ function serializeError(error) {
  * @returns {string} 错误 HTML
  */
 export function renderHumanizedError(error, httpStatus = null, showDetails = true) {
-    // ✅ 增强：防御性检查
+    // 增强：防御性检查
     if (!error) {
         error = { error: { message: 'Unknown error' } };
     }
 
     const humanized = getHumanizedError(error, httpStatus);
 
-    // ✅ 增强：确保 title 和 hint 存在
+    // 增强：确保 title 和 hint 存在
     const title = humanized?.title || '请求失败';
     const hint = humanized?.hint || '发生未知错误';
 

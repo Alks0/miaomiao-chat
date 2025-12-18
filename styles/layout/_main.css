@@ -24,7 +24,7 @@
         radial-gradient(circle at 40% 40%, var(--md-orange) 0%, transparent 20%);
     opacity: 0.08;
     pointer-events: none;
-    z-index: 0;
+    z-index: var(--z-background);
 }
 
 /* 像素装饰元素容器 */
@@ -35,7 +35,7 @@
     right: 0;
     bottom: 0;
     pointer-events: none;
-    z-index: 1;
+    z-index: var(--z-base);
     overflow: hidden;
 }
 

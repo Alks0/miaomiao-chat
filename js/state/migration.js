@@ -68,7 +68,7 @@ export function acquireMigrationLock() {
     }
 
     localStorage.setItem(MIGRATION_LOCK_KEY, now.toString());
-    console.log('✅ 已获取迁移锁');
+    console.log('已获取迁移锁');
 }
 
 /**
@@ -76,7 +76,7 @@ export function acquireMigrationLock() {
  */
 export function releaseMigrationLock() {
     localStorage.removeItem(MIGRATION_LOCK_KEY);
-    console.log('✅ 已释放迁移锁');
+    console.log('已释放迁移锁');
 }
 
 // ========== 迁移日志 ==========
@@ -143,7 +143,7 @@ export async function backupLocalStorage() {
     // 保存备份到 IndexedDB
     await savePreference('localStorage_backup', backup);
 
-    console.log('✅ localStorage 备份完成:', Object.keys(backup.data));
+    console.log('localStorage 备份完成:', Object.keys(backup.data));
     return backup;
 }
 
@@ -299,7 +299,7 @@ export async function verifyMigration() {
         return false;
     }
 
-    console.log('✅ 迁移验证成功');
+    console.log('迁移验证成功');
     logMigrationStep('验证迁移', '成功', {});
     return true;
 }
@@ -327,7 +327,7 @@ async function cleanupLocalStorage() {
 
     keysToRemove.forEach(key => {
         localStorage.removeItem(key);
-        console.log(`✅ 已清理: ${key}`);
+        console.log(`已清理: ${key}`);
     });
 
     logMigrationStep('清理 localStorage', '完成', { removed: keysToRemove.length });
@@ -354,13 +354,13 @@ export async function rollbackMigration() {
         // 恢复到 localStorage
         Object.entries(backup.data).forEach(([key, value]) => {
             localStorage.setItem(key, value);
-            console.log(`✅ 已恢复: ${key}`);
+            console.log(`已恢复: ${key}`);
         });
 
         // 清除迁移状态
         await savePreference('migration_status', MIGRATION_STATES.NOT_STARTED);
 
-        console.log('✅ 回滚成功');
+        console.log('回滚成功');
 
         eventBus.emit('ui:notification', {
             message: '已回滚到迁移前状态',
@@ -441,7 +441,7 @@ export async function executeMigration() {
         await savePreference('migration_log', migrationLog);
 
         const duration = Date.now() - startTime;
-        console.log(`✅ 数据迁移完成，耗时: ${duration}ms`);
+        console.log(`数据迁移完成，耗时: ${duration}ms`);
 
         // 通知 UI 迁移完成
         eventBus.emit('ui:migration-completed', {

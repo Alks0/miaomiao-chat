@@ -8,7 +8,7 @@ import { elements } from '../core/elements.js';
 import { eventBus } from '../core/events.js';
 import { showNotification } from '../ui/notifications.js';
 import { saveCurrentConfig } from './config.js';
-// ✅ 新增：IndexedDB 快捷消息 API
+// 新增：IndexedDB 快捷消息 API
 import { loadAllQuickMessages, saveQuickMessage, deleteQuickMessage as deleteQuickMessageFromDB } from './storage.js';
 
 /**
@@ -16,7 +16,7 @@ import { loadAllQuickMessages, saveQuickMessage, deleteQuickMessage as deleteQui
  */
 export async function initQuickMessages() {
     await loadQuickMessagesFromStorage();
-    console.log('✅ Quick Messages initialized');
+    console.log('Quick Messages initialized');
 }
 
 /**
@@ -24,7 +24,7 @@ export async function initQuickMessages() {
  */
 async function loadQuickMessagesFromStorage() {
     try {
-        // ✅ 优先从 IndexedDB 加载
+        // 优先从 IndexedDB 加载
         if (state.storageMode !== 'localStorage') {
             const messages = await loadAllQuickMessages();
             state.quickMessages = messages || [];
@@ -51,7 +51,7 @@ async function loadQuickMessagesFromStorage() {
  */
 async function saveQuickMessagesToStorage() {
     try {
-        // ✅ 优先保存到 IndexedDB（逐个保存）
+        // 优先保存到 IndexedDB（逐个保存）
         if (state.storageMode !== 'localStorage') {
             for (const msg of state.quickMessages) {
                 await saveQuickMessage(msg);

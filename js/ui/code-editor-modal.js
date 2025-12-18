@@ -1,10 +1,13 @@
 /**
  * 代码编辑器模态框
  * 支持三个标签页：分析、代码、预览
+ *
+ * 使用 EventListenerManager 管理事件监听器，防止内存泄漏
  */
 
 import { eventBus } from '../core/events.js';
 import { escapeHtml } from '../utils/helpers.js';
+import { EventListenerManager } from '../utils/event-listener-manager.js';
 
 /**
  * 打开代码编辑器模态框
@@ -204,6 +207,9 @@ function generateLanguageOptions(currentLang) {
  * @param {boolean} isReadOnly - 是否只读模式
  */
 function bindModalEvents(modal, originalCode, originalLanguage, onSave, isReadOnly = false) {
+    // 创建事件监听器管理器，确保在关闭时清理所有监听器
+    const listenerManager = new EventListenerManager();
+
     const closeBtn = modal.querySelector('.close-modal-btn');
     const cancelBtn = modal.querySelector('.cancel-btn');
     const saveBtn = modal.querySelector('.save-btn');
@@ -211,27 +217,27 @@ function bindModalEvents(modal, originalCode, originalLanguage, onSave, isReadOn
 
     // 关闭模态框
     const closeModal = () => {
+        listenerManager.cleanup(); // 清理所有事件监听器
         modal.remove();
         document.body.style.overflow = '';
         document.querySelector('.app-container')?.removeAttribute('inert');
     };
 
-    closeBtn.addEventListener('click', closeModal);
-    cancelBtn.addEventListener('click', closeModal);
-    overlay.addEventListener('click', closeModal);
+    listenerManager.add(closeBtn, 'click', closeModal);
+    listenerManager.add(cancelBtn, 'click', closeModal);
+    listenerManager.add(overlay, 'click', closeModal);
 
     // ESC键关闭
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             closeModal();
-            document.removeEventListener('keydown', escHandler);
         }
     };
-    document.addEventListener('keydown', escHandler);
+    listenerManager.add(document, 'keydown', escHandler);
 
     // 保存按钮（只在非只读模式下绑定）
     if (!isReadOnly && saveBtn) {
-        saveBtn.addEventListener('click', () => {
+        const handleSave = () => {
             const textarea = modal.querySelector('#code-editor-textarea');
             const newCode = textarea.value;
             const newLanguage = modal.querySelector('#editor-language-selector').value;
@@ -254,7 +260,8 @@ function bindModalEvents(modal, originalCode, originalLanguage, onSave, isReadOn
                 message: '代码已保存',
                 type: 'success'
             });
-        });
+        };
+        listenerManager.add(saveBtn, 'click', handleSave);
     }
 
     // 只读模式：禁用编辑功能
@@ -275,7 +282,7 @@ function bindModalEvents(modal, originalCode, originalLanguage, onSave, isReadOn
     // 标签页切换
     const tabBtns = modal.querySelectorAll('.tab-btn');
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
+        const handleTabClick = () => {
             const tab = btn.dataset.tab;
             switchTab(modal, tab);
 
@@ -293,58 +300,64 @@ function bindModalEvents(modal, originalCode, originalLanguage, onSave, isReadOn
             if (tab === 'preview') {
                 runLivePreview(modal, textarea.value, language);
             }
-        });
+        };
+        listenerManager.add(btn, 'click', handleTabClick);
     });
 
     // 刷新预览按钮
     const refreshBtn = modal.querySelector('.refresh-preview-btn');
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => {
+        const handleRefresh = () => {
             const textarea = modal.querySelector('#code-editor-textarea');
             const language = modal.querySelector('#editor-language-selector').value;
             updateCodePreview(modal, textarea.value, language);
-        });
+        };
+        listenerManager.add(refreshBtn, 'click', handleRefresh);
     }
 
     // 语言选择器变化
     const langSelector = modal.querySelector('#editor-language-selector');
     if (langSelector) {
-        langSelector.addEventListener('change', () => {
+        const handleLangChange = () => {
             const textarea = modal.querySelector('#code-editor-textarea');
             updateCodePreview(modal, textarea.value, langSelector.value);
-        });
+        };
+        listenerManager.add(langSelector, 'change', handleLangChange);
     }
 
     // 刷新实时预览按钮
     const refreshLivePreviewBtn = modal.querySelector('.refresh-live-preview-btn');
     if (refreshLivePreviewBtn) {
-        refreshLivePreviewBtn.addEventListener('click', () => {
+        const handleRefreshLive = () => {
             const textarea = modal.querySelector('#code-editor-textarea');
             const language = modal.querySelector('#editor-language-selector').value;
             runLivePreview(modal, textarea.value, language);
-        });
+        };
+        listenerManager.add(refreshLivePreviewBtn, 'click', handleRefreshLive);
     }
 
     // 清空控制台按钮
     const clearConsoleBtn = modal.querySelector('.clear-console-btn');
     if (clearConsoleBtn) {
-        clearConsoleBtn.addEventListener('click', () => {
+        const handleClearConsole = () => {
             const consoleContent = modal.querySelector('#preview-console-content');
             if (consoleContent) {
                 consoleContent.innerHTML = '';
             }
-        });
+        };
+        listenerManager.add(clearConsoleBtn, 'click', handleClearConsole);
     }
 
     // 全屏预览按钮
     const fullscreenBtn = modal.querySelector('.fullscreen-preview-btn');
     if (fullscreenBtn) {
-        fullscreenBtn.addEventListener('click', () => {
+        const handleFullscreen = () => {
             const iframe = modal.querySelector('#live-preview-iframe');
             if (iframe) {
                 openFullscreenPreview(iframe.srcdoc);
             }
-        });
+        };
+        listenerManager.add(fullscreenBtn, 'click', handleFullscreen);
     }
 }
 
@@ -388,6 +401,8 @@ function initCodeEditor(modal, textarea, language) {
 
     // 初始化和监听
     updateLineNumbers();
+
+    // 注意: textarea 的事件监听器会在元素被移除时自动清理,无需手动管理
     textarea.addEventListener('input', updateLineNumbers);
     textarea.addEventListener('scroll', () => {
         lineNumbers.scrollTop = textarea.scrollTop;
@@ -657,7 +672,7 @@ async function analyzeCode(modal, code, language) {
 function performStaticAnalysis(code, language) {
     const lines = code.split('\n');
 
-    // ✅ 性能优化：限制分析的代码行数，避免大文件卡顿
+    // 性能优化：限制分析的代码行数，避免大文件卡顿
     const MAX_LINES_FOR_ANALYSIS = 2000;
     const shouldLimitAnalysis = lines.length > MAX_LINES_FOR_ANALYSIS;
     const analysisCode = shouldLimitAnalysis
@@ -1020,10 +1035,14 @@ function openFullscreenPreview(htmlContent) {
     const iframe = fullscreenOverlay.querySelector('.fullscreen-preview-iframe');
     iframe.srcdoc = htmlContent;
 
+    // 使用 AbortController 自动清理事件监听器
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
     // 关闭全屏预览
     const closeFullscreen = () => {
+        abortController.abort(); // 清理所有监听器
         fullscreenOverlay.remove();
-        document.removeEventListener('keydown', escHandler);
     };
 
     // ESC 键关闭
@@ -1032,11 +1051,11 @@ function openFullscreenPreview(htmlContent) {
             closeFullscreen();
         }
     };
-    document.addEventListener('keydown', escHandler);
+    document.addEventListener('keydown', escHandler, { signal });
 
     // 点击关闭按钮
     const closeBtn = fullscreenOverlay.querySelector('.fullscreen-preview-close');
-    closeBtn.addEventListener('click', closeFullscreen);
+    closeBtn.addEventListener('click', closeFullscreen, { signal });
 
     // 动画效果
     requestAnimationFrame(() => {

@@ -3,7 +3,7 @@
     position: fixed;
     top: 70px;
     right: 20px;
-    /* ✅ 使用 CSS Grid 叠加：通知内容和关闭按钮占据同一网格单元 */
+    /* 使用 CSS Grid 叠加：通知内容和关闭按钮占据同一网格单元 */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
     padding: 10px 40px 10px 16px;
@@ -11,7 +11,7 @@
     color: var(--color-text-primary);
     border: var(--border);
     box-shadow: var(--shadow-md);
-    z-index: 99999;  /* 确保在所有模态框之上 */
+    z-index: var(--z-notification);
     font-family: var(--font-mono);
     font-size: 13px;
     animation: slideInRight 0.3s var(--ease);
@@ -27,14 +27,14 @@
 }
 
 .notification-close {
-    /* ✅ 使用 CSS Grid 叠加定位到右侧居中 */
+    /* 使用 CSS Grid 叠加定位到右侧居中 */
     grid-row-start: 1;
     grid-column-start: 1;
     justify-self: end;     /* 水平靠右 */
     align-self: center;    /* 垂直居中 */
     margin-right: 8px;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border: none;
     background: transparent;
     color: inherit;
@@ -45,11 +45,15 @@
     align-items: center;
     justify-content: center;
     transition: transform 0.15s var(--ease);
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .notification-close:hover {
     transform: scale(1.2);
+}
+
+.notification-close:active {
+    transform: scale(0.9);
 }
 
 .notification-close:focus {

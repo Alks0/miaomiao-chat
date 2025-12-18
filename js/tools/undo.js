@@ -101,7 +101,7 @@ export function undo() {
         // 更新可撤销状态
         canUndo = undoStack.length > 0;
 
-        console.log('[Undo] ✅ 撤销成功，已恢复到:', snapshot.datetime);
+        console.log('[Undo] 撤销成功，已恢复到:', snapshot.datetime);
 
         eventBus.emit('tool:undo:executed', {
             undoId: snapshot.id,

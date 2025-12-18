@@ -71,7 +71,7 @@
 .message-images img:hover {
     transform: scale(1.03);
     box-shadow: var(--shadow-md);
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 /* 单张图片 */

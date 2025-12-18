@@ -9,7 +9,7 @@ import { eventBus } from '../core/events.js';
 import { saveCurrentConfig, getDefaultCapabilities } from '../state/config.js';
 import { setApiFormat } from '../ui/format-switcher.js';
 
-// ✅ 密钥统计数据保存防抖
+// 密钥统计数据保存防抖
 let statsUpdateTimeout = null;
 
 /**
@@ -48,7 +48,7 @@ function generateKeyId() {
  */
 export function createProvider(data) {
     // 初始化密钥列表
-    let apiKeys = [];
+    const apiKeys = [];
     let currentKeyId = null;
 
     if (data.apiKey) {
@@ -105,7 +105,7 @@ export function updateProvider(id, updates) {
 
     Object.assign(state.providers[index], updates);
 
-    // ✅ 修复: 如果更新的是当前提供商，立即同步全局状态
+    // 如果更新的是当前提供商，立即同步全局状态
     const provider = state.providers[index];
     if (state.currentProviderId === id ||
         (provider.models && provider.models.some(m => {
@@ -235,7 +235,7 @@ export function removeApiKey(providerId, keyId) {
         provider.currentKeyId = nextKey?.id || null;
         provider.apiKey = nextKey?.key || '';
 
-        // ✅ 修复: 清除模型缓存，确保下次拉取使用新密钥
+        // 清除模型缓存，确保下次拉取使用新密钥
         clearModelsCache(providerId);
         console.log(`[removeApiKey] 删除了当前密钥，已切换到 ${nextKey?.name || '无'}，并清除缓存`);
     }
@@ -262,7 +262,7 @@ export function setCurrentKey(providerId, keyId) {
     provider.currentKeyId = keyId;
     provider.apiKey = key.key; // 同步到兼容字段
 
-    // ✅ 切换密钥时清除模型缓存，确保下次拉取使用新密钥
+    // 切换密钥时清除模型缓存，确保下次拉取使用新密钥
     clearModelsCache(providerId);
 
     saveCurrentConfig();
@@ -290,7 +290,7 @@ export function updateApiKey(providerId, keyId, updates) {
     // 如果更新的是当前密钥的 key 值，同步到兼容字段
     if (provider.currentKeyId === keyId && updates.key) {
         provider.apiKey = updates.key;
-        // ✅ 修复: 清除模型缓存，确保下次拉取使用新密钥
+        // 清除模型缓存，确保下次拉取使用新密钥
         clearModelsCache(providerId);
     }
 
@@ -365,17 +365,18 @@ function getRotatedKey(provider) {
             break;
 
         case 'round-robin':
-        default:
+        default: {
             const index = rotation.currentIndex % enabledKeys.length;
             selectedKey = enabledKeys[index];
             rotation.currentIndex = (index + 1) % enabledKeys.length;
             break;
+        }
     }
 
     // 更新使用统计
     selectedKey.usageCount++;
     selectedKey.lastUsed = Date.now();
-    // ✅ 修复: 保存统计数据（防抖）
+    // 保存统计数据（防抖）
     saveKeyStatsDebounced();
 
     return selectedKey.key;
@@ -400,7 +401,7 @@ export function rotateToNextKey(providerId, markError = false) {
         const currentKey = provider.apiKeys.find(k => k.id === provider.currentKeyId);
         if (currentKey) {
             currentKey.errorCount++;
-            // ✅ 修复: 保存错误统计（防抖）
+            // 保存错误统计（防抖）
             saveKeyStatsDebounced();
         }
     }
@@ -413,18 +414,18 @@ export function rotateToNextKey(providerId, markError = false) {
 
     // 选择下一个密钥
     const nextKey = enabledKeys[0];
-    const previousKeyId = provider.currentKeyId;  // ✅ 保存旧密钥ID
+    const previousKeyId = provider.currentKeyId;  // 保存旧密钥ID
 
     provider.currentKeyId = nextKey.id;
     provider.apiKey = nextKey.key;
 
-    // ✅ 修复: 清除模型缓存，确保下次拉取使用新密钥
+    // 清除模型缓存，确保下次拉取使用新密钥
     clearModelsCache(providerId);
 
     saveCurrentConfig();
     eventBus.emit('providers:key-rotated', { providerId, keyId: nextKey.id });
 
-    // ✅ 修复: 发送通知给用户
+    // 发送通知给用户
     eventBus.emit('ui:notification', {
         message: `已自动切换到备用密钥: ${nextKey.name}`,
         type: 'info',
@@ -463,13 +464,13 @@ export function setKeyRotationConfig(providerId, config) {
 function syncProviderState(provider) {
     if (!provider) return;
 
-    // ✅ 同步 apiFormat
+    // 同步 apiFormat
     if (state.apiFormat !== provider.apiFormat) {
         state.apiFormat = provider.apiFormat;
         console.log(`[syncProviderState] 同步 apiFormat: ${provider.apiFormat}`);
     }
 
-    // ✅ 同步 Gemini 特有配置
+    // 同步 Gemini 特有配置
     if (provider.apiFormat === 'gemini' && provider.geminiApiKeyInHeader !== undefined) {
         state.geminiApiKeyInHeader = provider.geminiApiKeyInHeader;
         console.log(`[syncProviderState] 同步 geminiApiKeyInHeader: ${provider.geminiApiKeyInHeader}`);
@@ -481,12 +482,12 @@ function syncProviderState(provider) {
  * @returns {Object|undefined} 当前提供商对象
  */
 export function getCurrentProvider() {
-    // ✅ 优先1: 使用存储的 currentProviderId（避免同名模型冲突）
+    // 优先1: 使用存储的 currentProviderId（避免同名模型冲突）
     if (state.currentProviderId) {
         const provider = state.providers.find(p => p.id === state.currentProviderId);
         if (provider && provider.enabled) {
             console.log(`[getCurrentProvider] 使用 currentProviderId: ${provider.name} (${provider.id})`);
-            // ✅ 修复: 同步全局状态
+            // 同步全局状态
             syncProviderState(provider);
             return provider;
         } else {
@@ -508,12 +509,12 @@ export function getCurrentProvider() {
     }
 
     // 3. 如果有选中的模型，找到包含该模型的提供商
-    // ✅ 修复: 优先匹配 apiFormat，并支持对象数组格式
+    // 优先匹配 apiFormat，并支持对象数组格式
     if (selectedModel) {
         const matchingProviders = state.providers.filter(p => {
             if (!p.enabled || !p.models) return false;
 
-            // ✅ 兼容字符串和对象格式
+            // 兼容字符串和对象格式
             return p.models.some(m => {
                 if (typeof m === 'string') return m === selectedModel;
                 if (typeof m === 'object' && m.id) return m.id === selectedModel;
@@ -522,7 +523,7 @@ export function getCurrentProvider() {
         });
 
         if (matchingProviders.length > 0) {
-            // ✅ 优先返回 apiFormat 匹配的提供商
+            // 优先返回 apiFormat 匹配的提供商
             const formatMatched = matchingProviders.find(p => p.apiFormat === state.apiFormat);
             const provider = formatMatched || matchingProviders[0];
 
@@ -530,7 +531,7 @@ export function getCurrentProvider() {
             if (matchingProviders.length > 1) {
                 console.warn(`[getCurrentProvider] 多个提供商包含模型 ${selectedModel}, 使用: ${provider.name} (apiFormat: ${provider.apiFormat})`);
             }
-            // ✅ 修复: 同步全局状态
+            // 同步全局状态
             syncProviderState(provider);
             return provider;
         }
@@ -540,7 +541,7 @@ export function getCurrentProvider() {
     const firstEnabled = state.providers.find(p => p.enabled);
     if (firstEnabled) {
         console.log(`[getCurrentProvider] 使用第一个启用的提供商: ${firstEnabled.name}`);
-        // ✅ 修复: 同步全局状态
+        // 同步全局状态
         syncProviderState(firstEnabled);
         return firstEnabled;
     }
@@ -548,7 +549,7 @@ export function getCurrentProvider() {
     // 5. 最后返回第一个提供商（即使未启用）
     const fallback = state.providers[0];
     console.warn(`[getCurrentProvider] 使用第一个提供商（可能未启用）: ${fallback?.name || 'none'}`);
-    // ✅ 修复: 同步全局状态
+    // 同步全局状态
     syncProviderState(fallback);
     return fallback;
 }
@@ -614,11 +615,11 @@ export function getCurrentModelCapabilities() {
 
     // 查找模型配置（兼容字符串和对象格式）
     const modelConfig = provider.models.find(m => {
-        // ✅ 兼容字符串格式: "gpt-4o"
+        // 兼容字符串格式: "gpt-4o"
         if (typeof m === 'string') {
             return m === selectedModel;
         }
-        // ✅ 兼容对象格式: {id: "gpt-4o", name: "GPT-4 Omni", capabilities: {...}}
+        // 兼容对象格式: {id: "gpt-4o", name: "GPT-4 Omni", capabilities: {...}}
         if (typeof m === 'object' && m.id) {
             return m.id === selectedModel;
         }
@@ -630,13 +631,13 @@ export function getCurrentModelCapabilities() {
         return getDefaultCapabilities(provider.apiFormat);
     }
 
-    // ✅ 如果是字符串格式，返回默认能力
+    // 如果是字符串格式，返回默认能力
     if (typeof modelConfig === 'string') {
         console.log(`[getCurrentModelCapabilities] 模型 ${selectedModel} 使用默认能力（v1格式）`);
         return getDefaultCapabilities(provider.apiFormat);
     }
 
-    // ✅ 返回模型的能力配置（v2格式）
+    // 返回模型的能力配置（v2格式）
     const capabilities = modelConfig.capabilities || getDefaultCapabilities(provider.apiFormat);
     console.log(`[getCurrentModelCapabilities] 模型 ${selectedModel} 能力:`, capabilities);
     return capabilities;
@@ -674,7 +675,7 @@ function getDefaultProviderName(format) {
 
 // 模型缓存 (5分钟有效期)
 const modelsCache = new Map();
-const CACHE_DURATION = 30 * 60 * 1000; // ✅ 延长到 30分钟（减少API请求频率）
+const CACHE_DURATION = 30 * 60 * 1000; // 延长到 30分钟（减少API请求频率）
 
 /**
  * 添加单个模型到提供商
@@ -725,7 +726,7 @@ export function addModelToProvider(providerId, modelData) {
     provider.models.push(modelObj);
     saveCurrentConfig();
     eventBus.emit('providers:models-changed', { providerId, provider });
-    console.log(`✅ 已添加模型 ${modelObj.id} 到提供商 ${provider.name}`);
+    console.log(`已添加模型 ${modelObj.id} 到提供商 ${provider.name}`);
 
     return true;
 }
@@ -740,7 +741,7 @@ export function removeModelFromProvider(providerId, modelId) {
     const provider = state.providers.find(p => p.id === providerId);
     if (!provider || !provider.models) return false;
 
-    // ✅ 兼容字符串和对象格式查找
+    // 兼容字符串和对象格式查找
     const index = provider.models.findIndex(m => {
         if (typeof m === 'string') return m === modelId;
         if (typeof m === 'object' && m.id) return m.id === modelId;
@@ -752,7 +753,7 @@ export function removeModelFromProvider(providerId, modelId) {
     provider.models.splice(index, 1);
     saveCurrentConfig();
     eventBus.emit('providers:models-changed', { providerId, provider });
-    console.log(`✅ 已移除模型 ${modelId} 从提供商 ${provider.name}`);
+    console.log(`已移除模型 ${modelId} 从提供商 ${provider.name}`);
 
     return true;
 }
@@ -807,7 +808,7 @@ export function addModelsToProvider(providerId, modelDataList) {
     if (addedCount > 0) {
         saveCurrentConfig();
         eventBus.emit('providers:models-changed', { providerId, provider });
-        console.log(`✅ 批量添加了 ${addedCount} 个模型到提供商 ${provider.name}`);
+        console.log(`批量添加了 ${addedCount} 个模型到提供商 ${provider.name}`);
     }
 
     return addedCount;
@@ -865,7 +866,7 @@ export function clearModelsCache(providerId) {
 async function fetchModelsFromAPI(provider) {
     const { apiFormat, endpoint, geminiApiKeyInHeader } = provider;
 
-    // ✅ 修复: 使用 getActiveApiKey 获取当前活动的密钥
+    // 使用 getActiveApiKey 获取当前活动的密钥
     const apiKey = getActiveApiKey(provider.id);
 
     let allModels = [];
@@ -990,7 +991,7 @@ async function fetchModelsFromAPI(provider) {
 export function migrateFromLegacyConfig() {
     // 如果已有提供商,跳过迁移
     if (state.providers.length > 0) {
-        console.log('✅ 提供商系统已初始化,跳过迁移');
+        console.log('提供商系统已初始化,跳过迁移');
         return;
     }
 
@@ -1003,7 +1004,7 @@ export function migrateFromLegacyConfig() {
         apiKeys: { ...state.apiKeys },
         customModels: { ...state.customModels },
         geminiApiKeyInHeader: state.geminiApiKeyInHeader,
-        selectedModel: elements.modelSelect?.value || state.selectedModel || ''  // ✅ 备份当前选中的模型
+        selectedModel: elements.modelSelect?.value || state.selectedModel || ''  // 备份当前选中的模型
     };
     localStorage.setItem('config-backup-pre-migration', JSON.stringify(backup));
     console.log('💾 已备份旧配置到 localStorage.config-backup-pre-migration');
@@ -1012,7 +1013,7 @@ export function migrateFromLegacyConfig() {
     ['openai', 'gemini', 'claude'].forEach(format => {
         // 如果有 API Key 或端点,说明用户配置过这个格式
         if (state.apiKeys[format] || state.endpoints[format]) {
-            // ✅ 智能迁移模型列表
+            // 智能迁移模型列表
             const models = [];
 
             // 1. 如果有自定义模型，添加到列表
@@ -1040,11 +1041,11 @@ export function migrateFromLegacyConfig() {
                 apiFormat: format,
                 endpoint: state.endpoints[format] || getDefaultEndpoint(format),
                 apiKey: state.apiKeys[format] || '',
-                models: models,  // ✅ 迁移模型列表
+                models: models,  // 迁移模型列表
                 geminiApiKeyInHeader: format === 'gemini' ? state.geminiApiKeyInHeader : false
             });
 
-            console.log(`  ✅ 迁移 ${format} → "${provider.name}" (${models.length} 个模型: ${models.join(', ')})`);
+            console.log(`  迁移 ${format} → "${provider.name}" (${models.length} 个模型: ${models.join(', ')})`);
         }
     });
 
@@ -1072,8 +1073,8 @@ export function migrateFromLegacyConfig() {
             models: models,
             geminiApiKeyInHeader: state.apiFormat === 'gemini' ? state.geminiApiKeyInHeader : false
         });
-        console.log(`  ✅ 创建默认提供商 "${provider.name}" (${models.length} 个模型)`);
+        console.log(`  创建默认提供商 "${provider.name}" (${models.length} 个模型)`);
     }
 
-    console.log(`✅ 迁移完成: 创建了 ${state.providers.length} 个提供商`);
+    console.log(`迁移完成: 创建了 ${state.providers.length} 个提供商`);
 }

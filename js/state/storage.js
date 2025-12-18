@@ -7,16 +7,16 @@ import { eventBus } from '../core/events.js';
 
 // IndexedDB 配置
 const DB_NAME = 'GeminiChatDB';
-const DB_VERSION = 3;  // ✅ 升级到版本 3（添加 MCP 服务器存储）
+const DB_VERSION = 3;  // 升级到版本 3（添加 MCP 服务器存储）
 const STORE_NAME = 'sessions';
 
-// ✅ 新增：对象存储名称常量
+// 新增：对象存储名称常量
 const STORES = {
     SESSIONS: 'sessions',
     CONFIG: 'config',
     PREFERENCES: 'preferences',
     QUICK_MESSAGES: 'quickMessages',
-    MCP_SERVERS: 'mcpServers'  // ✅ 版本 3 新增
+    MCP_SERVERS: 'mcpServers'  // 版本 3 新增
 };
 
 let db = null;
@@ -33,7 +33,7 @@ export function isIndexedDBAvailable() {
             return false;
         }
 
-        // ✅ 实际测试访问（处理 Safari/Firefox 跟踪保护）
+        // 实际测试访问（处理 Safari/Firefox 跟踪保护）
         // 尝试打开一个测试数据库
         const testRequest = indexedDB.open('test-db-availability');
 
@@ -114,7 +114,7 @@ export async function requestPersistentStorage() {
         try {
             const isPersisted = await navigator.storage.persist();
             if (isPersisted) {
-                console.log('✅ 已获取持久化存储权限（数据不会被自动清理）');
+                console.log('已获取持久化存储权限（数据不会被自动清理）');
             } else {
                 console.warn('⚠️ 持久化存储权限被拒绝（Android/iOS 可能在 7 天后清理数据）');
                 console.log('💡 提示：定期访问应用可防止数据被清理');
@@ -153,7 +153,7 @@ export async function checkPersistentStorage() {
  */
 export function initDB() {
     return new Promise((resolve, reject) => {
-        // ✅ 增强降级处理：检测 IndexedDB 可用性
+        // 增强降级处理：检测 IndexedDB 可用性
         if (!isIndexedDBAvailable()) {
             console.warn('IndexedDB 不可用，将使用 localStorage 降级模式');
             resolve(null);
@@ -164,7 +164,7 @@ export function initDB() {
 
         request.onerror = () => {
             console.error('IndexedDB 打开失败:', request.error);
-            // ✅ 降级处理：不抛出错误，返回 null
+            // 降级处理：不抛出错误，返回 null
             console.warn('IndexedDB 初始化失败，将使用 localStorage 降级模式');
             resolve(null);
         };
@@ -187,22 +187,22 @@ export function initDB() {
                 if (!database.objectStoreNames.contains(STORES.SESSIONS)) {
                     const store = database.createObjectStore(STORES.SESSIONS, { keyPath: 'id' });
                     store.createIndex('updatedAt', 'updatedAt', { unique: false });
-                    console.log('✅ 创建对象存储: sessions');
+                    console.log('创建对象存储: sessions');
                 }
             }
 
-            // ✅ 版本 2: 创建配置、偏好设置、快捷消息存储
+            // 版本 2: 创建配置、偏好设置、快捷消息存储
             if (oldVersion < 2) {
                 // 创建配置存储
                 if (!database.objectStoreNames.contains(STORES.CONFIG)) {
                     database.createObjectStore(STORES.CONFIG, { keyPath: 'key' });
-                    console.log('✅ 创建对象存储: config');
+                    console.log('创建对象存储: config');
                 }
 
                 // 创建偏好设置存储
                 if (!database.objectStoreNames.contains(STORES.PREFERENCES)) {
                     database.createObjectStore(STORES.PREFERENCES, { keyPath: 'key' });
-                    console.log('✅ 创建对象存储: preferences');
+                    console.log('创建对象存储: preferences');
                 }
 
                 // 创建快捷消息存储
@@ -210,18 +210,18 @@ export function initDB() {
                     const qmStore = database.createObjectStore(STORES.QUICK_MESSAGES, { keyPath: 'id' });
                     qmStore.createIndex('category', 'category', { unique: false });
                     qmStore.createIndex('updatedAt', 'updatedAt', { unique: false });
-                    console.log('✅ 创建对象存储: quickMessages');
+                    console.log('创建对象存储: quickMessages');
                 }
             }
 
-            // ✅ 版本 3: 创建 MCP 服务器存储
+            // 版本 3: 创建 MCP 服务器存储
             if (oldVersion < 3) {
                 if (!database.objectStoreNames.contains(STORES.MCP_SERVERS)) {
                     const mcpStore = database.createObjectStore(STORES.MCP_SERVERS, { keyPath: 'id' });
                     mcpStore.createIndex('type', 'type', { unique: false });
                     mcpStore.createIndex('enabled', 'enabled', { unique: false });
                     mcpStore.createIndex('updatedAt', 'updatedAt', { unique: false });
-                    console.log('✅ 创建对象存储: mcpServers');
+                    console.log('创建对象存储: mcpServers');
                 }
             }
         };
@@ -360,7 +360,7 @@ export function getDB() {
     return db;
 }
 
-// ========== ✅ 通用存储 API ==========
+// ========== 通用存储 API ==========
 
 /**
  * 通用保存函数（带配额检测）
@@ -387,7 +387,7 @@ export async function saveToStore(storeName, key, value) {
                 const error = request.error;
                 console.error(`保存到 ${storeName} 失败:`, error);
 
-                // ✅ 配额检测
+                // 配额检测
                 if (error && (error.name === 'QuotaExceededError' ||
                              error.message?.includes('quota') ||
                              error.message?.includes('storage'))) {
@@ -508,7 +508,7 @@ export async function loadAllFromStore(storeName) {
     });
 }
 
-// ========== ✅ 配置存储 API ==========
+// ========== 配置存储 API ==========
 
 /**
  * 保存当前配置
@@ -544,7 +544,7 @@ export async function loadSavedConfigs() {
     return loadFromStore(STORES.CONFIG, 'saved_configs');
 }
 
-// ========== ✅ 偏好设置存储 API ==========
+// ========== 偏好设置存储 API ==========
 
 /**
  * 保存偏好设置
@@ -578,7 +578,7 @@ export async function loadAllPreferences() {
     return prefs;
 }
 
-// ========== ✅ 快捷消息存储 API ==========
+// ========== 快捷消息存储 API ==========
 
 /**
  * 保存快捷消息
@@ -696,7 +696,7 @@ export async function saveMCPServer(server) {
 
             // 监听请求成功
             request.onsuccess = () => {
-                console.log(`[Storage] ✅ 保存 MCP 服务器: ${server.id}`);
+                console.log(`[Storage] 保存 MCP 服务器: ${server.id}`);
                 resolve();
             };
 
@@ -743,7 +743,7 @@ export async function loadAllMCPServers() {
             request.onsuccess = () => {
                 // 按更新时间排序，最新的在前
                 const servers = request.result.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-                console.log(`[Storage] ✅ 加载 ${servers.length} 个 MCP 服务器`);
+                console.log(`[Storage] 加载 ${servers.length} 个 MCP 服务器`);
                 resolve(servers);
             };
             request.onerror = () => {
@@ -806,7 +806,7 @@ export async function deleteMCPServer(serverId) {
             const request = store.delete(serverId);
 
             request.onsuccess = () => {
-                console.log(`[Storage] ✅ 删除 MCP 服务器: ${serverId}`);
+                console.log(`[Storage] 删除 MCP 服务器: ${serverId}`);
                 resolve();
             };
             request.onerror = () => {
@@ -855,7 +855,7 @@ export async function saveAllMCPServers(servers) {
             });
 
             transaction.oncomplete = () => {
-                console.log(`[Storage] ✅ 批量保存 ${servers.length} 个 MCP 服务器`);
+                console.log(`[Storage] 批量保存 ${servers.length} 个 MCP 服务器`);
                 resolve();
             };
             transaction.onerror = () => {
@@ -927,7 +927,7 @@ export async function migrateMCPServersFromLocalStorage() {
         localStorage.setItem(MIGRATION_COMPLETE_KEY, 'true');
         localStorage.removeItem(MIGRATION_LOCK_KEY);
 
-        console.log(`[Storage] ✅ 成功迁移 ${servers.length} 个 MCP 服务器到 IndexedDB`);
+        console.log(`[Storage] 成功迁移 ${servers.length} 个 MCP 服务器到 IndexedDB`);
         return servers.length;
 
     } catch (error) {
@@ -945,36 +945,25 @@ export async function migrateMCPServersFromLocalStorage() {
  * @returns {Promise<void>}
  */
 export async function updateMCPServer(serverId, updates) {
-    return new Promise(async (resolve, reject) => {
-        if (!db) {
-            reject(new Error('数据库未初始化'));
-            return;
-        }
+    if (!db) {
+        throw new Error('数据库未初始化');
+    }
 
-        try {
-            // 先加载现有服务器
-            const existingServer = await loadMCPServer(serverId);
-            if (!existingServer) {
-                reject(new Error(`MCP 服务器不存在: ${serverId}`));
-                return;
-            }
+    // 先加载现有服务器
+    const existingServer = await loadMCPServer(serverId);
+    if (!existingServer) {
+        throw new Error(`MCP 服务器不存在: ${serverId}`);
+    }
 
-            // 合并更新
-            const updatedServer = {
-                ...existingServer,
-                ...updates,
-                id: serverId,  // 确保 ID 不变
-                updatedAt: Date.now()
-            };
+    // 合并更新
+    const updatedServer = {
+        ...existingServer,
+        ...updates,
+        id: serverId,  // 确保 ID 不变
+        updatedAt: Date.now()
+    };
 
-            // 保存更新后的服务器
-            await saveMCPServer(updatedServer);
-            console.log(`[Storage] ✅ 更新 MCP 服务器: ${serverId}`);
-            resolve();
-
-        } catch (error) {
-            console.error('[Storage] ❌ 更新 MCP 服务器失败:', error);
-            reject(error);
-        }
-    });
+    // 保存更新后的服务器
+    await saveMCPServer(updatedServer);
+    console.log(`[Storage] 更新 MCP 服务器: ${serverId}`);
 }

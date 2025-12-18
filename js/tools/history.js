@@ -282,7 +282,7 @@ export function importToolHistory(data, options = {}) {
  */
 function saveToolHistory() {
     try {
-        // ✅ 输入验证：确保 toolCallHistory 是数组
+        // 输入验证：确保 toolCallHistory 是数组
         if (!Array.isArray(state.toolCallHistory)) {
             console.error('[ToolHistory] ❌ toolCallHistory 不是数组，无法保存');
             state.toolCallHistory = []; // 重置为空数组
@@ -304,7 +304,7 @@ export function loadToolHistory() {
         if (saved) {
             const parsed = JSON.parse(saved);
 
-            // ✅ 输入验证：确保加载的数据是数组
+            // 输入验证：确保加载的数据是数组
             if (!Array.isArray(parsed)) {
                 console.error('[ToolHistory] ❌ 加载的数据不是数组，已重置');
                 state.toolCallHistory = [];

@@ -3,7 +3,9 @@
  * 用于将工具转换为 CherryStudio 风格的 XML 格式
  */
 
-// ✅ 修复: 工具 ID 生成计数器（避免短时间内重复）
+import { TOOL_ID_COUNTER_MAX, XML_MAX_BUFFER_SIZE, XML_MAX_TOOL_CONTENT_LENGTH } from '../utils/constants.js';
+
+// 工具 ID 生成计数器（避免短时间内重复）
 let toolIdCounter = 0;
 
 /**
@@ -13,7 +15,7 @@ let toolIdCounter = 0;
 function generateToolCallId() {
     // 使用时间戳 + 计数器 + 随机数三重保障
     const timestamp = Date.now();
-    const counter = (toolIdCounter++ % 10000).toString().padStart(4, '0');
+    const counter = (toolIdCounter++ % TOOL_ID_COUNTER_MAX).toString().padStart(4, '0');
     const random = Math.random().toString(36).substring(2, 11);
     return `xml_tool_${timestamp}_${counter}_${random}`;
 }
@@ -24,17 +26,18 @@ function generateToolCallId() {
 function escapeXML(str) {
     if (typeof str !== 'string') return '';
 
-    // ✅ 修复1: 过滤非法 XML 字符（控制字符，除了 \t \n \r）
+    // 修复1: 过滤非法 XML 字符（控制字符，除了 \t \n \r）
+    // eslint-disable-next-line no-control-regex
     str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 
-    // ✅ 修复2: 转义顺序很重要（& 必须最先处理）
+    // 修复2: 转义顺序很重要（& 必须最先处理）
     return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;')
-        .replace(/\r/g, '&#xD;'); // ✅ 修复3: 转义回车符
+        .replace(/\r/g, '&#xD;'); // 修复3: 转义回车符
 }
 
 /**
@@ -43,7 +46,7 @@ function escapeXML(str) {
 function unescapeXML(str) {
     if (typeof str !== 'string') return '';
 
-    // ✅ 修复4: 添加解码函数（顺序与编码相反，& 必须最后）
+    // 修复4: 添加解码函数（顺序与编码相反，& 必须最后）
     return str
         .replace(/&apos;/g, "'")
         .replace(/&quot;/g, '"')
@@ -156,10 +159,9 @@ export function extractXMLToolCalls(text) {
     if (!text || typeof text !== 'string') return [];
 
     const toolCalls = [];
-    let index = 0;
 
     // 格式 1: tool_use 格式 (CherryStudio 风格)
-    // ✅ 修复 ReDoS: 使用两步解析避免灾难性回溯
+    // 修复 ReDoS: 使用两步解析避免灾难性回溯
     const toolUseBlockRegex = /<tool_use>([\s\S]*?)<\/tool_use>/gi;
     let match;
     while ((match = toolUseBlockRegex.exec(text)) !== null) {
@@ -181,7 +183,7 @@ export function extractXMLToolCalls(text) {
                 console.log('[XML Parser] 提取到 tool_use 格式工具调用:', name);
             } catch (error) {
                 console.error('[XML Parser] tool_use 格式解析参数失败:', argsText.substring(0, 100), error);
-                // ✅ 修复: 返回错误对象而不是跳过
+                // 返回错误对象而不是跳过
                 toolCalls.push({
                     id: generateToolCallId(),
                     name,
@@ -194,7 +196,7 @@ export function extractXMLToolCalls(text) {
     }
 
     // 格式 2: function_call 格式 (一些代理使用)
-    // ✅ 修复 ReDoS: 使用两步解析避免灾难性回溯
+    // 修复 ReDoS: 使用两步解析避免灾难性回溯
     const functionCallBlockRegex = /<function_call>([\s\S]*?)<\/function_call>/gi;
     while ((match = functionCallBlockRegex.exec(text)) !== null) {
         const block = match[1];
@@ -215,7 +217,7 @@ export function extractXMLToolCalls(text) {
                 console.log('[XML Parser] 提取到 function_call 格式工具调用:', name);
             } catch (error) {
                 console.error('[XML Parser] function_call 格式解析参数失败:', argsText.substring(0, 100), error);
-                // ✅ 修复: 返回错误对象而不是跳过
+                // 返回错误对象而不是跳过
                 toolCalls.push({
                     id: generateToolCallId(),
                     name,
@@ -300,7 +302,7 @@ export class XMLStreamAccumulator {
             this.buffer += deltaText;
 
             // 错误边界 - 检测过长的 buffer（防止内存泄漏）
-            if (this.buffer.length > 50000) {
+            if (this.buffer.length > XML_MAX_BUFFER_SIZE) {
                 console.error('[XMLStreamAccumulator] Buffer 过长，可能存在格式错误');
                 this.buffer = this.buffer.slice(-1000);
                 this.inToolUse = false;
@@ -365,7 +367,11 @@ export class XMLStreamAccumulator {
                     }
 
                     const afterTag = this.currentThinking.substring(thinkingEndMatch.index + '</thinking>'.length);
-                    this.buffer = afterTag;
+
+                    // 立即将思考块后的文本添加到 displayText
+                    // 如果思考块后 Claude 停止输出，afterTag 会丢失
+                    this.displayText += afterTag;
+                    this.buffer = '';  // 清空 buffer（已添加到 displayText）
                     this.currentThinking = '';
                 }
             }
@@ -373,7 +379,7 @@ export class XMLStreamAccumulator {
             else if (this.inToolUse) {
                 this.currentToolXML += deltaText;
 
-                if (this.currentToolXML.length > 10000) {
+                if (this.currentToolXML.length > XML_MAX_TOOL_CONTENT_LENGTH) {
                     console.error('[XMLStreamAccumulator] 单个工具调用过长，跳过');
                     this.inToolUse = false;
                     this.currentToolXML = '';
@@ -406,7 +412,11 @@ export class XMLStreamAccumulator {
 
                     const closingTag = endMatch[0];
                     const afterTag = this.currentToolXML.substring(endMatch.index + closingTag.length);
-                    this.buffer = afterTag;
+
+                    // 立即将工具调用后的文本添加到 displayText
+                    // 如果工具调用后 Claude 停止输出，afterTag 会丢失
+                    this.displayText += afterTag;
+                    this.buffer = '';  // 清空 buffer（已添加到 displayText）
                     this.currentToolXML = '';
                 }
             } else {
@@ -436,9 +446,13 @@ export class XMLStreamAccumulator {
 
     /**
      * 获取已完成的工具调用
+     * 返回副本并清空数组，防止重复调用返回相同工具
      */
     getCompletedCalls() {
-        return this.completedCalls;
+        const calls = [...this.completedCalls];
+        this.completedCalls = [];  // 清空已处理的工具
+        console.log(`[XMLStreamAccumulator] 返回 ${calls.length} 个工具调用并清空缓存`);
+        return calls;
     }
 
     /**

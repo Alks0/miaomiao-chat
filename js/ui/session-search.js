@@ -17,7 +17,7 @@ let currentQuery = '';
  */
 export function initSessionSearch() {
     bindSearchEvents();
-    console.log('✅ Session Search initialized');
+    console.log('Session Search initialized');
 }
 
 /**

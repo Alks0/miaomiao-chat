@@ -32,22 +32,19 @@ export function showNotification(message, type = 'info') {
     closeBtn.className = 'notification-close';
     closeBtn.innerHTML = '×';
     closeBtn.setAttribute('aria-label', '关闭通知');
-    closeBtn.onclick = () => {
+    // 提取移除函数,避免重复代码和潜在的内存泄漏
+    const removeNotification = () => {
         notification.style.animation = 'slideOut 0.3s ease-out';
         setTimeout(() => notification.remove(), 300);
     };
+
+    closeBtn.onclick = removeNotification;
     notification.appendChild(closeBtn);
 
     document.body.appendChild(notification);
 
-    // 3秒后自动移除
-    const autoCloseTimeout = setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-
-    // 如果用户手动关闭，取消自动关闭
-    closeBtn.addEventListener('click', () => clearTimeout(autoCloseTimeout), { once: true });
+    // 3秒后自动移除(元素被移除时,所有事件监听器会自动清理)
+    setTimeout(removeNotification, 3000);
 }
 
 // ========== 事件监听 ==========

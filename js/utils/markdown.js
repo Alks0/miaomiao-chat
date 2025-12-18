@@ -4,11 +4,9 @@
  */
 
 import { escapeHtml, extractBase64Images, restoreBase64Images } from './helpers.js';
+import { MAX_MARKDOWN_LENGTH } from './constants.js';
 
-// 单块 Markdown 最大长度（避免性能问题）
-const MAX_MARKDOWN_LENGTH = 100000;
-
-// ✅ 性能优化：DOMPurify 配置常量（避免每次创建对象）
+// 性能优化：DOMPurify 配置常量（避免每次创建对象）
 const DOMPURIFY_CONFIG = {
     ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'code', 'pre', 'a',
@@ -16,11 +14,11 @@ const DOMPURIFY_CONFIG = {
         'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr',
         'th', 'td', 'img', 'hr', 'del', 'span', 'div',
         'sup', 'sub', 'mark', 'small', 'b', 'i', 'u', 's',
-        // ✅ KaTeX MathML 支持（数学公式渲染）
+        // KaTeX MathML 支持（数学公式渲染）
         'math', 'semantics', 'mrow', 'mi', 'mn', 'mo', 'mfrac', 'msup', 'msub',
         'munder', 'mover', 'munderover', 'msqrt', 'mroot', 'mtext', 'mspace',
         'mtable', 'mtr', 'mtd', 'annotation', 'annotation-xml',
-        // ✅ SVG 支持（图标、图形渲染）
+        // SVG 支持（图标、图形渲染）
         'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
         'ellipse', 'g', 'defs', 'use', 'symbol', 'marker', 'clipPath',
         'linearGradient', 'radialGradient', 'stop', 'text', 'tspan'
@@ -28,24 +26,24 @@ const DOMPURIFY_CONFIG = {
     ALLOWED_ATTR: [
         'href', 'src', 'alt', 'title', 'class', 'style',
         'id', 'data-*', 'aria-*', 'role', 'target', 'rel',
-        // ✅ KaTeX 需要的 MathML 属性
+        // KaTeX 需要的 MathML 属性
         'xmlns', 'encoding', 'mathvariant', 'mathsize', 'mathcolor',
         'mathbackground', 'displaystyle', 'scriptlevel',
-        // ✅ SVG 需要的属性
+        // SVG 需要的属性
         'viewBox', 'width', 'height', 'fill', 'stroke', 'stroke-width',
         'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray',
         'd', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
         'points', 'transform', 'opacity', 'fill-opacity', 'stroke-opacity',
         'gradientUnits', 'gradientTransform', 'offset', 'stop-color'
     ],
-    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'style', 'form', 'input', 'button'],
     FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur', 'oninput', 'onchange'],
     ALLOW_DATA_ATTR: true,
     ALLOW_ARIA_ATTR: true
 };
 
-// ✅ 性能优化：简单的 LRU 缓存（缓存最近解析的结果）
+// 性能优化：简单的 LRU 缓存（缓存最近解析的结果）
 class MarkdownCache {
     constructor(maxSize = 50) {
         this.cache = new Map();
@@ -104,7 +102,7 @@ function generateCacheKey(text) {
 
 /**
  * 安全地解析 Markdown
- * ✅ 支持 LaTeX 数学公式渲染
+ * 支持 LaTeX 数学公式渲染
  * @param {string} text - Markdown 文本
  * @returns {string} HTML 字符串
  */
@@ -114,7 +112,7 @@ export function safeMarkedParse(text) {
         return escapeHtml(text).replace(/\n/g, '<br>');
     }
 
-    // ✅ 性能优化：检查缓存
+    // 性能优化：检查缓存
     const cacheKey = generateCacheKey(text);
     const cached = markdownCache.get(cacheKey);
     if (cached) {
@@ -122,7 +120,7 @@ export function safeMarkedParse(text) {
     }
 
     try {
-        // ✅ 1. 先提取 LaTeX 公式（避免被 marked 解析）
+        // 1. 先提取 LaTeX 公式（避免被 marked 解析）
         const { text: textWithoutLatex, formulas } = extractLatexFormulas(text);
 
         // 2. 然后提取 base64 图片
@@ -148,7 +146,7 @@ export function safeMarkedParse(text) {
                 remaining = remaining.substring(splitIndex);
 
                 try {
-                    // ✅ 优化：先解析，再统一净化（避免重复 sanitize）
+                    // 优化：先解析，再统一净化（避免重复 sanitize）
                     const chunkHtml = marked.parse(chunk);
                     chunks.push(chunkHtml);
                 } catch (e) {
@@ -156,21 +154,21 @@ export function safeMarkedParse(text) {
                     chunks.push(`<pre>${escapeHtml(chunk)}</pre>`);
                 }
             }
-            // ✅ 优化：合并后统一净化，而不是每块都净化
+            // 优化：合并后统一净化，而不是每块都净化
             html = chunks.join('');
         } else {
             html = marked.parse(cleanText);
         }
 
         // ⚠️ 关键安全措施：使用 DOMPurify 净化 HTML，防止 XSS 攻击
-        // ✅ 性能优化：使用预定义的配置常量
+        // 性能优化：使用预定义的配置常量
         if (typeof DOMPurify !== 'undefined') {
             html = DOMPurify.sanitize(html, DOMPURIFY_CONFIG);
         } else {
             console.warn('DOMPurify 未加载，HTML 未经净化可能存在 XSS 风险！');
         }
 
-        // ✅ 3. 还原 LaTeX 公式（在还原图片之前）
+        // 3. 还原 LaTeX 公式（在还原图片之前）
         if (formulas.length > 0) {
             html = restoreLatexFormulas(html, formulas);
         }
@@ -180,7 +178,7 @@ export function safeMarkedParse(text) {
             html = restoreBase64Images(html, images);
         }
 
-        // ✅ 性能优化：将结果存入缓存
+        // 性能优化：将结果存入缓存
         markdownCache.set(cacheKey, html);
 
         return html;
@@ -196,7 +194,7 @@ export function safeMarkedParse(text) {
  */
 export function clearMarkdownCache() {
     markdownCache.clear();
-    console.log('✅ Markdown 缓存已清除');
+    console.log('Markdown 缓存已清除');
 }
 
 /**
@@ -208,7 +206,7 @@ export function getMarkdownCacheStats() {
 
 /**
  * 提取 LaTeX 公式（避免被 Markdown 解析器误处理）
- * ✅ 支持行内公式 $...$ 和块级公式 $$...$$
+ * 支持行内公式 $...$ 和块级公式 $$...$$
  * @param {string} text - 原始文本
  * @returns {Object} { text: 处理后的文本, formulas: 公式数组 }
  */
@@ -245,7 +243,7 @@ function extractLatexFormulas(text) {
 
 /**
  * 还原 LaTeX 公式为渲染后的 HTML
- * ✅ 使用 KaTeX 渲染数学公式
+ * 使用 KaTeX 渲染数学公式
  * @param {string} html - HTML 内容
  * @param {Array} formulas - 公式数组
  * @returns {string} 还原后的 HTML

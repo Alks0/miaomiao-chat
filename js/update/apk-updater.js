@@ -9,14 +9,18 @@ import { showNotification } from '../ui/notifications.js';
 // Capacitor Filesystem 插件（通过全局对象访问）
 const getFilesystem = () => window.Capacitor?.Plugins?.Filesystem;
 
+// 获取自定义 AndroidInstaller 插件（通过全局对象访问）
+// Java 端用 @CapacitorPlugin 注册的插件会自动暴露在 Plugins 中
+const getAndroidInstaller = () => window.Capacitor?.Plugins?.AndroidInstaller;
+
 // GitHub 仓库配置
 const GITHUB_OWNER = 'Alks0';
 const GITHUB_REPO = 'miaomiao-chat';
-// 公开仓库直接使用 GitHub API
-const UPDATE_CHECK_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
+const GITHUB_API_BASE = 'https://api.github.com';
+const UPDATE_CHECK_URL = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 
 // 当前应用版本（运行时从 Capacitor 获取）
-let CURRENT_VERSION = '1.1.6'; // 默认值
+const CURRENT_VERSION = '1.1.7'; // 默认值
 
 /**
  * 获取当前应用版本号
@@ -72,7 +76,7 @@ export async function checkForUpdates() {
                 version: latestVersion,
                 releaseNotes: data.body || '查看 GitHub 了解更新内容',
                 downloadUrl: apkAsset.browser_download_url,
-                fileName: apkAsset.name,  // ✅ 直接使用 asset 名称
+                fileName: apkAsset.name,  // 直接使用 asset 名称
                 fileSize: apkAsset.size
             };
         }
@@ -126,7 +130,7 @@ export async function downloadAndInstallAPK(downloadUrl, fileName, silent = fals
             throw new Error('Filesystem plugin not available');
         }
 
-        // ✅ 方案1：尝试使用 Capacitor HTTP 原生下载（绕过 CORS）
+        // 方案1：尝试使用 Capacitor HTTP 原生下载（绕过 CORS）
         let blob;
         try {
             // Capacitor 4+ 的 HTTP API 在核心包中
@@ -135,7 +139,7 @@ export async function downloadAndInstallAPK(downloadUrl, fileName, silent = fals
             if (Http && Http.downloadFile) {
                 console.log('[APK Updater] 使用 Capacitor HTTP 原生下载');
 
-                const fileName = `miaomiao-chat-update-${Date.now()}.apk`;
+                const fileName = `webchat-update-${Date.now()}.apk`;
                 const result = await Http.downloadFile({
                     url: downloadUrl,
                     filePath: fileName,
@@ -156,10 +160,15 @@ export async function downloadAndInstallAPK(downloadUrl, fileName, silent = fals
             console.warn('[APK Updater] Capacitor HTTP 不可用，降级到代理下载:', httpError);
         }
 
-        // ✅ 方案2：直接下载（公开仓库，Capacitor 环境无 CORS 限制）
-        console.log('[APK Updater] 直接下载 APK:', downloadUrl);
+        // 方案2：使用代理下载（绕过 CORS 限制）
+        // GitHub Releases 的直接下载会遇到 CORS 问题
+        // Worker 支持格式: /download/{filename}
+        // 使用传入的 fileName（从 GitHub API 获取的真实文件名）
+        const proxyUrl = `https://dawn-feather-d2e6.alks2636777.workers.dev/download/${fileName}`;
 
-        const response = await fetch(downloadUrl, {
+        console.log('[APK Updater] 使用代理下载 APK:', proxyUrl);
+
+        const response = await fetch(proxyUrl, {
             method: 'GET'
         });
 
@@ -177,7 +186,7 @@ export async function downloadAndInstallAPK(downloadUrl, fileName, silent = fals
             try {
                 const base64Data = reader.result.split(',')[1];
 
-                const fileName = `miaomiao-chat-update-${Date.now()}.apk`;
+                const fileName = `webchat-update-${Date.now()}.apk`;
                 const fileResult = await Filesystem.writeFile({
                     path: fileName,
                     data: base64Data,
@@ -238,18 +247,17 @@ async function installAPK(fileUri, silent) {
     try {
         console.log('[APK Updater] 准备安装 APK:', fileUri);
 
-        // ✅ 使用 Capacitor 插件
-        if (!window.Capacitor || !window.Capacitor.Plugins.AndroidInstaller) {
+        // 使用全局 Capacitor 对象访问插件
+        const installer = getAndroidInstaller();
+        if (!installer) {
             throw new Error('AndroidInstaller plugin not available');
         }
 
-        const { AndroidInstaller } = window.Capacitor.Plugins;
-
         // 检查安装权限
-        const permissionResult = await AndroidInstaller.checkInstallPermission();
+        const permissionResult = await installer.checkInstallPermission();
         if (!permissionResult.granted) {
             console.warn('[APK Updater] 缺少安装权限，请求权限...');
-            await AndroidInstaller.requestInstallPermission();
+            await installer.requestInstallPermission();
 
             // ⚠️ 权限请求会跳转到系统设置，用户需要手动授权
             // 此时应该停止安装流程，提示用户授权后重新下载
@@ -257,7 +265,7 @@ async function installAPK(fileUri, silent) {
         }
 
         // 安装 APK
-        await AndroidInstaller.installAPK({ uri: fileUri });
+        await installer.installAPK({ uri: fileUri });
 
         console.log('[APK Updater] 安装请求已发送');
     } catch (error) {
@@ -309,10 +317,10 @@ export async function initAPKUpdater() {
  * @param {Object} updateInfo - 更新信息
  */
 async function showUpdateDialog(updateInfo) {
-    // ✅ 存储更新信息供 update-modal.js 使用
+    // 存储更新信息供 update-modal.js 使用
     window._currentUpdateInfo = updateInfo;
 
-    // ✅ 调用统一的 UI 模块
+    // 调用统一的 UI 模块
     const { showUpdateModal } = await import('./update-modal.js');
     showUpdateModal({
         version: updateInfo.version,

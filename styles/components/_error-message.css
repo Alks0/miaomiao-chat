@@ -29,7 +29,7 @@
 
 .error-humanized-hint {
     font-size: 13px;
-    color: #666;
+    color: var(--color-text-secondary);
     line-height: 1.4;
 }
 
@@ -81,13 +81,9 @@
     background: rgba(255, 107, 107, 0.1);
 }
 
-.dark-theme .error-humanized-hint {
-    color: var(--md-muted);
-}
-
 .dark-theme .error-technical pre {
-    background: #333333;
-    border-color: var(--md-border);
-    color: #E5E5E5;
+    background: var(--color-bg-elevated);
+    border-color: var(--color-border-primary);
+    color: var(--color-text-primary);
 }
 

@@ -29,6 +29,7 @@ import { eventBus } from '../core/events.js';
 import { generateId } from '../utils/helpers.js';
 import { mcpClient } from './mcp/client.js';
 import { savePreference, loadPreference } from '../state/storage.js';
+import { state } from '../core/state.js';  // 用于检查 computerUseEnabled
 
 // ========== 模块私有状态 ==========
 
@@ -124,7 +125,7 @@ export function registerBuiltinTool(toolId, toolDefinition, handler) {
     // 添加到名称索引
     addToNameIndex(toolDefinition.name || toolId, toolId);
 
-    console.log(`[Tools] ✅ 已注册内置工具: ${toolId}`);
+    console.log(`[Tools] 已注册内置工具: ${toolId}`);
 
     // 发布事件
     eventBus.emit('tool:registered', { toolId, type: 'builtin' });
@@ -159,7 +160,7 @@ export function registerMCPTool(serverId, toolName, toolDefinition) {
     // 添加到名称索引
     addToNameIndex(toolName, toolId);
 
-    console.log(`[Tools] ✅ 已注册 MCP 工具: ${toolId} (来自 ${serverId})`);
+    console.log(`[Tools] 已注册 MCP 工具: ${toolId} (来自 ${serverId})`);
 
     // 发布事件
     eventBus.emit('tool:registered', { toolId, type: 'mcp', serverId });
@@ -188,7 +189,7 @@ export function registerCustomTool(toolConfig) {
     // 添加到名称索引
     addToNameIndex(toolConfig.name || toolId, toolId);
 
-    console.log(`[Tools] ✅ 已注册自定义工具: ${toolId}`);
+    console.log(`[Tools] 已注册自定义工具: ${toolId}`);
 
     eventBus.emit('tool:registered', { toolId, type: 'custom' });
     eventBus.emit('tools:added', { toolId });
@@ -222,7 +223,24 @@ export function getEnabledTools() {
  * @returns {Array} 转换后的工具列表
  */
 export function getToolsForAPI(apiFormat) {
-    const enabledTools = getEnabledTools();
+    let enabledTools = getEnabledTools();
+
+    // 特殊处理：Computer Use 工具
+    // - Claude 原生模式: 使用原生 Computer Use（beta header），过滤掉自定义 computer 工具
+    // - Claude XML 模式: 使用自定义 computer 工具（保留）
+    // - OpenAI/Gemini: 使用自定义 computer 工具（如果启用了 computerUseEnabled）
+    if (apiFormat === 'claude' && !state.xmlToolCallingEnabled) {
+        // Claude 原生模式：过滤掉自定义 computer 工具（使用原生版本）
+        enabledTools = enabledTools.filter(tool => tool.name !== 'computer');
+    } else if (apiFormat === 'claude' && state.xmlToolCallingEnabled) {
+        // Claude XML 模式：保留自定义 computer 工具
+        // 不需要过滤，直接使用 enabledTools
+    } else if (apiFormat !== 'claude') {
+        // OpenAI/Gemini: 根据 state.computerUseEnabled 决定是否包含
+        if (!state.computerUseEnabled) {
+            enabledTools = enabledTools.filter(tool => tool.name !== 'computer');
+        }
+    }
 
     switch (apiFormat) {
         case 'openai':
@@ -300,7 +318,8 @@ function convertToOpenAIFormat(tool) {
         function: {
             name: tool.name || tool.id,
             description: tool.description,
-            parameters: tool.inputSchema
+            // 兼容多种字段命名: parameters (builtin), inputSchema (MCP), input_schema (Claude)
+            parameters: tool.parameters || tool.inputSchema || tool.input_schema || { type: 'object', properties: {} }
         }
     };
 }
@@ -311,10 +330,13 @@ function convertToOpenAIFormat(tool) {
  * @returns {Object} Gemini 格式
  */
 function convertToGeminiFormat(tool) {
+    // 兼容多种字段命名: parameters (builtin), inputSchema (MCP), input_schema (Claude)
+    const schema = tool.parameters || tool.inputSchema || tool.input_schema || { type: 'object', properties: {} };
+
     return {
         name: tool.name || tool.id,
         description: tool.description,
-        parameters: cleanSchemaForGemini(tool.inputSchema)
+        parameters: cleanSchemaForGemini(schema)
     };
 }
 
@@ -377,10 +399,13 @@ function cleanSchemaForGemini(schema) {
  * @returns {Object} Claude 格式
  */
 function convertToClaudeFormat(tool) {
+    // Claude 使用 input_schema，兼容多种字段命名
+    const schema = tool.input_schema || tool.inputSchema || tool.parameters || { type: 'object', properties: {} };
+
     return {
         name: tool.name || tool.id,
         description: tool.description,
-        input_schema: tool.inputSchema
+        input_schema: schema
     };
 }
 
@@ -507,7 +532,7 @@ export function debugTools() {
     toolRegistry.forEach((tool, id) => {
         const enabled = toolEnabled.get(id);
         const type = toolTypes.get(id);
-        console.log(`  ${enabled ? '✅' : '⭕'} [${type}] ${id} - ${tool.description}`);
+        console.log(`  ${enabled ? '' : '⭕'} [${type}] ${id} - ${tool.description}`);
     });
 }
 
@@ -572,11 +597,17 @@ async function saveToolStates() {
         // 将 Map 转换为普通对象
         const states = {};
         toolEnabled.forEach((enabled, toolId) => {
+            // 跳过隐藏工具的状态保存（由初始化代码控制）
+            const tool = toolRegistry.get(toolId);
+            if (tool && tool.hidden) {
+                return; // forEach 的 return 相当于 continue
+            }
+
             states[toolId] = enabled;
         });
 
         await savePreference('toolsEnabled', JSON.stringify(states));
-        console.log('[Tools] ✅ 工具状态已保存');
+        console.log('[Tools] 工具状态已保存');
     } catch (error) {
         console.error('[Tools] ❌ 保存工具状态失败:', error);
     }
@@ -599,12 +630,21 @@ export async function loadToolStates() {
         // 恢复工具状态
         for (const [toolId, enabled] of Object.entries(states)) {
             if (toolRegistry.has(toolId)) {
+                const tool = toolRegistry.get(toolId);
+
+                // 跳过隐藏工具的状态加载（保持初始化时的设置）
+                // 例如 computer 工具在 init.js 中被强制启用，不应被持久化状态覆盖
+                if (tool.hidden) {
+                    console.log(`[Tools] 跳过隐藏工具 "${toolId}" 的状态恢复（保持初始化设置）`);
+                    continue;
+                }
+
                 toolEnabled.set(toolId, enabled);
                 restoredCount++;
             }
         }
 
-        console.log(`[Tools] ✅ 已恢复 ${restoredCount} 个工具的状态`);
+        console.log(`[Tools] 已恢复 ${restoredCount} 个工具的状态`);
     } catch (error) {
         console.error('[Tools] ❌ 加载工具状态失败:', error);
     }

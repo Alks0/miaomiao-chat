@@ -84,7 +84,7 @@ export const emojiToIcon = {
     '⚙️': 'settings',
     '📦': 'package',
     '🔌': 'plug',
-    '✅': 'checkCircle',
+    '': 'checkCircle',
     '❌': 'xCircle',
     '⏱️': 'clock',
     '🔄': 'loader',

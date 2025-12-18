@@ -11,7 +11,7 @@
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.7);
-    z-index: 10000;
+    z-index: var(--z-modal-settings);
     align-items: center;
     justify-content: center;
 }
@@ -276,7 +276,7 @@
     top: 0;
     background: var(--mcp-tools-bg);
     padding-bottom: 0.25rem;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .dark-theme .mcp-tools-list {
@@ -345,7 +345,7 @@
     padding: 1.5rem;
     overflow-y: auto;
     animation: slideInRight 0.3s ease-out;
-    z-index: 100; /* 确保表单面板在按钮区域之上 */
+    z-index: var(--z-dropdown);
 }
 
 @keyframes slideInRight {

@@ -96,7 +96,7 @@
 
 .code-collapse-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     padding: 8px 16px;
     background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);

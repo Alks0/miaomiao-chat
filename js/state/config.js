@@ -5,7 +5,7 @@
 
 import { state, elements } from '../core/state.js';
 import { eventBus } from '../core/events.js';
-// ✅ 新增：IndexedDB 存储 API
+// 新增：IndexedDB 存储 API
 import { saveConfig as saveConfigToDB, loadConfig as loadConfigFromDB, saveSavedConfigs as saveSavedConfigsToDB, loadSavedConfigs as loadSavedConfigsFromDB } from './storage.js';
 
 // ⭐ 配置版本管理
@@ -16,12 +16,12 @@ let saveConfigTimeout = null;
 
 /**
  * 立即保存当前配置（用于页面关闭时）
- * ✅ 优化：同时保存到 localStorage（同步）确保数据不丢失
+ * 优化：同时保存到 localStorage（同步）确保数据不丢失
  */
 export async function saveCurrentConfigImmediate() {
     const config = buildConfigObject();
 
-    // ✅ 关键：先同步保存到 localStorage，确保页面关闭前数据已保存
+    // 关键：先同步保存到 localStorage，确保页面关闭前数据已保存
     try {
         localStorage.setItem('geminiChatConfig', JSON.stringify(config));
     } catch (e) {
@@ -42,12 +42,12 @@ export async function saveCurrentConfigImmediate() {
 
 /**
  * 防抖保存配置（避免频繁写入）
- * ✅ 优化：立即保存到 localStorage（同步），延迟保存到 IndexedDB（异步）
+ * 优化：立即保存到 localStorage（同步），延迟保存到 IndexedDB（异步）
  */
 export function saveCurrentConfig() {
     const config = buildConfigObject();
 
-    // ✅ 立即同步保存到 localStorage（确保数据不丢失）
+    // 立即同步保存到 localStorage（确保数据不丢失）
     try {
         localStorage.setItem('geminiChatConfig', JSON.stringify(config));
     } catch (e) {
@@ -81,7 +81,7 @@ function buildConfigObject() {
         // ⭐ 配置版本号（用于自动升级）
         configVersion: CONFIG_VERSION,
 
-        // ✅ 更新时间戳（用于比较 IndexedDB 和 localStorage 的新旧）
+        // 更新时间戳（用于比较 IndexedDB 和 localStorage 的新旧）
         updatedAt: Date.now(),
 
         // 旧配置 (保持兼容，添加防御性检查)
@@ -91,7 +91,7 @@ function buildConfigObject() {
         // 但在配置导出时会被 export-import.js 的 filterRuntimeState() 过滤掉
         selectedModel: state.selectedModel ?? elements?.modelSelect?.value ?? '',
         apiFormat: state?.apiFormat ?? 'openai',
-        imageSize: state?.imageSize ?? '2K',  // ✅ 修复: 使用 ?? 保留空字符串
+        imageSize: state?.imageSize ?? '2K',  // 使用 ?? 保留空字符串
         replyCount: state?.replyCount ?? 1,
 
         // 功能开关
@@ -179,7 +179,7 @@ function upgradeProviderModels(provider) {
                 name: provider.customModel,
                 capabilities: getDefaultCapabilities(provider.apiFormat)
             }];
-            console.log(`  ✅ 从 customModel 迁移: ${provider.customModel}`);
+            console.log(`  从 customModel 迁移: ${provider.customModel}`);
         } else {
             provider.models = [];
         }
@@ -188,7 +188,7 @@ function upgradeProviderModels(provider) {
 
     // 检查第一个元素的类型
     if (typeof provider.models[0] === 'object' && provider.models[0].id) {
-        console.log(`  ✅ Provider "${provider.name}" 已是新格式，跳过`);
+        console.log(`  Provider "${provider.name}" 已是新格式，跳过`);
         return provider;  // 已经是对象数组
     }
 
@@ -265,7 +265,7 @@ export async function loadConfig() {
     let lsConfig = null;
 
     try {
-        // ✅ 同时读取 IndexedDB 和 localStorage
+        // 同时读取 IndexedDB 和 localStorage
         if (state.storageMode !== 'localStorage') {
             idbConfig = await loadConfigFromDB();
             console.log('[loadConfig] IndexedDB:', idbConfig ? `有数据 (updatedAt: ${idbConfig.updatedAt})` : '无数据');
@@ -282,7 +282,7 @@ export async function loadConfig() {
             console.warn('[loadConfig] localStorage 解析失败:', e);
         }
 
-        // ✅ 比较两个来源，使用更新的那个
+        // 比较两个来源，使用更新的那个
         if (idbConfig && lsConfig) {
             const idbTime = idbConfig.updatedAt || 0;
             const lsTime = lsConfig.updatedAt || 0;
@@ -308,7 +308,7 @@ export async function loadConfig() {
         // 应用配置到 state
         applyConfigToState(savedConfig);
 
-        // ✅ 验证 currentProviderId 是否有效
+        // 验证 currentProviderId 是否有效
         if (state.currentProviderId) {
             const provider = state.providers.find(p => p.id === state.currentProviderId);
             if (!provider || !provider.enabled) {
@@ -317,7 +317,7 @@ export async function loadConfig() {
             } else {
                 console.log(`[loadConfig] currentProviderId 有效: ${provider.name} (${provider.id})`);
 
-                // ✅ 修复: 同步 provider 的 geminiApiKeyInHeader 到 state（用于 API 请求）
+                // 同步 provider 的 geminiApiKeyInHeader 到 state（用于 API 请求）
                 if (provider.apiFormat === 'gemini' && provider.geminiApiKeyInHeader !== undefined) {
                     state.geminiApiKeyInHeader = provider.geminiApiKeyInHeader;
                     console.log(`🔄 同步 geminiApiKeyInHeader: ${state.geminiApiKeyInHeader}`);
@@ -357,7 +357,7 @@ function applyConfigToState(config) {
         // 备份旧配置（防止升级失败）
         try {
             localStorage.setItem('config_backup_v' + configVersion, JSON.stringify(config));
-            console.log('✅ 旧配置已备份到 config_backup_v' + configVersion);
+            console.log('旧配置已备份到 config_backup_v' + configVersion);
         } catch (e) {
             console.error('❌ 配置备份失败:', e);
         }
@@ -365,7 +365,7 @@ function applyConfigToState(config) {
         // 执行升级
         try {
             config = upgradeConfig(config, configVersion, CONFIG_VERSION);
-            console.log('✅ 配置升级成功');
+            console.log('配置升级成功');
         } catch (error) {
             console.error('❌ 配置升级失败:', error);
             // 尝试从备份恢复
@@ -376,7 +376,7 @@ function applyConfigToState(config) {
             }
         }
     } else if (configVersion === CONFIG_VERSION) {
-        console.log('✅ 配置版本已是最新，无需升级');
+        console.log('配置版本已是最新，无需升级');
     } else {
         console.warn(`⚠️ 配置版本 v${configVersion} 高于当前支持的版本 v${CONFIG_VERSION}，可能存在兼容性问题`);
     }
@@ -465,13 +465,13 @@ function applyConfigToState(config) {
     state.quickMessages = config.quickMessages ?? [];
     state.quickMessagesCategories = config.quickMessagesCategories ?? ['常用', '问候', '告别'];
 
-    // ✅ 恢复 selectedModel（用于刷新页面后的恢复）
+    // 恢复 selectedModel（用于刷新页面后的恢复）
     // ⚠️ 注意：导入配置时，selectedModel 会被 export-import.js 过滤掉，所以这里不会覆盖当前模型选择
     if (config.selectedModel !== undefined) {
         state.selectedModel = config.selectedModel;
     }
 
-    // ✅ 自动迁移旧格式providers（没有 models 字段）
+    // 自动迁移旧格式providers（没有 models 字段）
     state.providers.forEach(provider => {
         if (!provider.models) {
             provider.models = [];
@@ -481,7 +481,7 @@ function applyConfigToState(config) {
             }
         }
 
-        // ✅ 自动迁移：添加多密钥管理字段（v1.1.12+）
+        // 自动迁移：添加多密钥管理字段（v1.1.12+）
         if (!provider.apiKeys) {
             provider.apiKeys = [];
             // 如果有旧的 apiKey，迁移到 apiKeys[]
@@ -533,7 +533,7 @@ function applyConfigToState(config) {
             configPanel.style.display = 'block';
         }
 
-        console.log(`✅ API格式已恢复为: ${config.apiFormat}`);
+        console.log(`API格式已恢复为: ${config.apiFormat}`);
     }
 }
 
@@ -542,7 +542,7 @@ function applyConfigToState(config) {
  */
 export async function loadSavedConfigs() {
     try {
-        // ✅ 优先从 IndexedDB 加载
+        // 优先从 IndexedDB 加载
         if (state.storageMode !== 'localStorage') {
             const configs = await loadSavedConfigsFromDB();
             if (configs) {
@@ -571,7 +571,7 @@ export async function loadSavedConfigs() {
  */
 export async function saveSavedConfigs() {
     try {
-        // ✅ 优先保存到 IndexedDB
+        // 优先保存到 IndexedDB
         if (state.storageMode !== 'localStorage') {
             await saveSavedConfigsToDB(state.savedConfigs);
             console.log('[saveSavedConfigs] 配置列表已保存到 IndexedDB');
@@ -804,5 +804,5 @@ export function syncUIWithState() {
         btn.classList.toggle('active', btn.dataset.format === state.apiFormat);
     });
 
-    console.log('✅ UI synced with state');
+    console.log('UI synced with state');
 }

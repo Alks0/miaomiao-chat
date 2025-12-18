@@ -10,11 +10,12 @@ import { eventBus } from '../core/events.js';
 import { removeMessageAt, removeMessagesAfter } from '../core/state-mutations.js';
 import { updateImagePreview, autoResizeTextarea } from '../ui/input.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
-import { canEditMessage, safeDeleteMessage, findAssociatedToolResults } from '../tools/message-compat.js';
-import { clearThoughtSignatures, hasThoughtSignatures } from '../api/format-converter.js';  // ✅ P1: thoughtSignature 清理
+import { canEditMessage, safeDeleteMessage } from '../tools/message-compat.js';
+import { clearThoughtSignatures, hasThoughtSignatures } from '../api/format-converter.js';  // thoughtSignature 清理
+import { categorizeFile } from '../utils/file-helpers.js';
 
 /**
- * ✅ 自动调整文本框高度（通用函数）
+ * 自动调整文本框高度（通用函数）
  * @param {HTMLTextAreaElement} textarea - 文本框元素
  * @param {number} minHeight - 最小高度（默认 60px）
  * @param {number} maxHeight - 最大高度（默认 400px）
@@ -28,14 +29,14 @@ function autoResizeGeneric(textarea, minHeight = 60, maxHeight = 400) {
 
 /**
  * 根据消息ID查找索引
- * ✅ 优化：使用 messageIdMap 快速查找，避免 O(n) 遍历
+ * 优化：使用 messageIdMap 快速查找，避免 O(n) 遍历
  * @param {string} messageId - 消息ID
  * @returns {number} 消息索引，-1 表示未找到
  */
 function getMessageIndexById(messageId) {
     if (!messageId) return -1;
 
-    // ✅ 优先使用 messageIdMap（O(1) 查找）
+    // 优先使用 messageIdMap（O(1) 查找）
     if (state.messageIdMap && state.messageIdMap.has(messageId)) {
         return state.messageIdMap.get(messageId);
     }
@@ -94,7 +95,7 @@ export function enterEditMode(messageEl) {
     updateImagePreview();
     console.log('[editor.js] updateImagePreview 已调用');
 
-    // ✅ 自动调整输入框高度以适应加载的内容
+    // 自动调整输入框高度以适应加载的内容
     autoResizeTextarea();
 
     // 聚焦输入框
@@ -110,7 +111,7 @@ export function enterEditMode(messageEl) {
 
 /**
  * 原地编辑消息（内联编辑）
- * ✅ 修复：保留图片数据，避免编辑后图片丢失
+ * 保留图片数据，避免编辑后图片丢失
  * @param {HTMLElement} messageEl - 消息元素
  */
 export function editMessageInPlace(messageEl) {
@@ -124,8 +125,8 @@ export function editMessageInPlace(messageEl) {
 
     // 获取当前内容和图片
     let textContent = '';
-    let images = [];
-    let thinkingContent = '';  // ✅ 思维链内容
+    const images = [];
+    let thinkingContent = '';  // 思维链内容
 
     if (state.apiFormat === 'gemini') {
         const message = state.geminiContents[index];
@@ -187,12 +188,12 @@ export function editMessageInPlace(messageEl) {
     const originalHTML = contentDiv.innerHTML;
     contentDiv.innerHTML = '';
 
-    // ✅ 图片管理区域（现有图片 + 添加按钮）
+    // 图片管理区域（现有图片 + 添加按钮）
     const imageManager = document.createElement('div');
     imageManager.className = 'edit-image-manager';
 
     // 创建可编辑的图片数组副本
-    let editableImages = [...images];
+    const editableImages = [...images];
 
     // 渲染图片预览
     const renderImagePreviews = () => {
@@ -261,7 +262,7 @@ export function editMessageInPlace(messageEl) {
 
     renderImagePreviews();
 
-    // ✅ 思维链编辑区域（仅AI消息显示）
+    // 思维链编辑区域（仅AI消息显示）
     let thinkingTextarea = null;
     if (role === 'assistant') {
         const thinkingSection = document.createElement('div');
@@ -276,7 +277,7 @@ export function editMessageInPlace(messageEl) {
         thinkingTextarea.rows = 5;
         thinkingTextarea.placeholder = '留空则删除思维链';
 
-        // ✅ 初始化时自动调整高度
+        // 初始化时自动调整高度
         setTimeout(() => autoResizeGeneric(thinkingTextarea, 80, 400), 0);
         thinkingTextarea.addEventListener('input', () => autoResizeGeneric(thinkingTextarea, 80, 400));
 
@@ -291,7 +292,7 @@ export function editMessageInPlace(messageEl) {
     textarea.value = textContent;
     textarea.rows = 3;
 
-    // ✅ 初始化时自动调整高度
+    // 初始化时自动调整高度
     setTimeout(() => autoResizeGeneric(textarea, 60, 400), 0);
     textarea.addEventListener('input', () => autoResizeGeneric(textarea, 60, 400));
 
@@ -304,9 +305,9 @@ export function editMessageInPlace(messageEl) {
     saveBtn.textContent = '保存';
     saveBtn.onclick = () => {
         const newContent = textarea.value.trim();
-        const newThinking = thinkingTextarea?.value.trim() || null;  // ✅ 获取思维链
+        const newThinking = thinkingTextarea?.value.trim() || null;  // 获取思维链
 
-        // ✅ 验证：防止保存空消息
+        // 验证：防止保存空消息
         if (!newContent && editableImages.length === 0) {
             eventBus.emit('ui:notification', {
                 message: '消息不能为空（至少需要文本或图片）',
@@ -315,7 +316,7 @@ export function editMessageInPlace(messageEl) {
             return;
         }
 
-        // ✅ 根据是否有思维链选择不同的更新函数
+        // 根据是否有思维链选择不同的更新函数
         if (role === 'assistant' && thinkingTextarea) {
             updateMessageWithThinking(index, newContent, newThinking, editableImages, role);
         } else {
@@ -380,7 +381,7 @@ export function updateMessageContent(index, newContent, role) {
         }
     }
 
-    // ✅ P1: 编辑消息后清除后续 thoughtSignature（所有格式）
+    // 编辑消息后清除后续 thoughtSignature（所有格式）
     if (hasThoughtSignatures(state.messages, index + 1)) {
         const clearedCount = clearThoughtSignatures(state.messages, index + 1);
 
@@ -414,7 +415,7 @@ export function updateMessageContent(index, newContent, role) {
 
 /**
  * 更新消息内容并保留图片（同步更新三种格式）
- * ✅ 修复：编辑消息时不会丢失图片数据
+ * 编辑消息时不会丢失图片数据
  * @param {number} index - 消息索引
  * @param {string} newText - 新文本内容
  * @param {Array} images - 图片数组
@@ -460,7 +461,7 @@ export function updateMessageContentWithImages(index, newText, images, role) {
         }
     }
 
-    // ✅ P1: 编辑消息后清除后续 thoughtSignature（所有格式）
+    // 编辑消息后清除后续 thoughtSignature（所有格式）
     if (hasThoughtSignatures(state.messages, index + 1)) {
         const clearedCount = clearThoughtSignatures(state.messages, index + 1);
 
@@ -506,7 +507,7 @@ export async function deleteMessage(messageEl) {
         return;
     }
 
-    // ✅ 使用工具调用兼容的安全删除（自动处理关联的工具结果消息）
+    // 使用工具调用兼容的安全删除（自动处理关联的工具结果消息）
     const result = safeDeleteMessage(index);
 
     if (!result.success) {
@@ -554,7 +555,7 @@ export async function deleteMessage(messageEl) {
  * @param {number} index - 起始索引
  */
 export function removeMessagesAfterAll(index) {
-    // ✅ 使用安全的状态更新函数
+    // 使用安全的状态更新函数
     removeMessagesAfter(index);
 
     const nodes = Array.from(elements.messagesArea.querySelectorAll('.message'));
@@ -642,7 +643,7 @@ export async function handleRetry(messageEl) {
  * @returns {number} 消息索引，-1 表示未找到
  */
 function resolveMessageIndex(messageEl) {
-    // ✅ 优先使用消息ID查找（稳定且准确）
+    // 优先使用消息ID查找（稳定且准确）
     const messageId = messageEl.dataset?.messageId;
     if (messageId) {
         const index = getMessageIndexById(messageId);
@@ -664,25 +665,12 @@ function resolveMessageIndex(messageEl) {
 }
 
 /**
- * 判断附件类型
- * @param {string} mimeType - MIME 类型
- * @returns {'image'|'pdf'|'text'|'unknown'}
- */
-function getAttachmentCategory(mimeType) {
-    if (!mimeType) return 'unknown';
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType === 'application/pdf') return 'pdf';
-    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType.startsWith('text/')) return 'text';
-    return 'unknown';
-}
-
-/**
  * 获取附件显示名称
  * @param {string} mimeType - MIME 类型
  * @returns {string}
  */
 function getAttachmentDisplayName(mimeType) {
-    const category = getAttachmentCategory(mimeType);
+    const category = categorizeFile(mimeType);
     if (category === 'image') return '已上传图片';
     if (category === 'pdf') return '已上传PDF';
     if (mimeType === 'text/markdown') return '已上传MD';
@@ -759,7 +747,7 @@ function parseGeminiUserContent(parts) {
                 const inlineData = part.inlineData || part.inline_data;
                 const mimeType = inlineData.mimeType || inlineData.mime_type;
                 const data = inlineData.data;
-                const category = getAttachmentCategory(mimeType);
+                const category = categorizeFile(mimeType);
 
                 attachments.push({
                     name: getAttachmentDisplayName(mimeType),
@@ -778,7 +766,7 @@ function parseGeminiUserContent(parts) {
 
 // 监听编辑请求
 eventBus.on('message:edit-requested', ({ messageEl }) => {
-    // ✅ 工具调用兼容性检查
+    // 工具调用兼容性检查
     const index = resolveMessageIndex(messageEl);
     if (index !== -1) {
         const checkResult = canEditMessage(index);
@@ -809,7 +797,7 @@ eventBus.on('message:retry-requested', ({ messageEl }) => {
 
 /**
  * 添加新图片到编辑中的消息
- * ✅ 完整的图片管理功能
+ * 完整的图片管理功能
  * @param {Array} editableImages - 可编辑的图片数组
  * @param {Function} renderCallback - 渲染回调函数
  */
@@ -911,7 +899,7 @@ function fileToBase64(file) {
 
 /**
  * 更新消息内容（支持思维链编辑）
- * ✅ 同步更新三种格式，并清除签名
+ * 同步更新三种格式，并清除签名
  * @param {number} index - 消息索引
  * @param {string} newText - 新文本内容
  * @param {string|null} newThinking - 新思维链内容
@@ -919,7 +907,7 @@ function fileToBase64(file) {
  * @param {string} role - 角色
  */
 export function updateMessageWithThinking(index, newText, newThinking, images, role) {
-    // ✅ 构建 contentParts（用于渲染）
+    // 构建 contentParts（用于渲染）
     const contentParts = [];
 
     // 添加思维链部分（如果存在）
@@ -938,7 +926,7 @@ export function updateMessageWithThinking(index, newText, newThinking, images, r
     // 更新 OpenAI 格式
     if (state.messages[index]) {
         state.messages[index].thinkingContent = newThinking;
-        state.messages[index].contentParts = contentParts;  // ✅ 关键：更新 contentParts
+        state.messages[index].contentParts = contentParts;  // 关键：更新 contentParts
 
         if (images.length > 0) {
             state.messages[index].content = [
@@ -971,7 +959,7 @@ export function updateMessageWithThinking(index, newText, newThinking, images, r
         }
 
         state.geminiContents[index].parts = parts;
-        state.geminiContents[index].contentParts = contentParts;  // ✅ 关键：更新 contentParts（用于显示）
+        state.geminiContents[index].contentParts = contentParts;  // 关键：更新 contentParts（用于显示）
         delete state.geminiContents[index].thoughtSignature;
     }
 
@@ -992,12 +980,12 @@ export function updateMessageWithThinking(index, newText, newThinking, images, r
         content.push({ type: 'text', text: newText });
 
         state.claudeContents[index].content = content;
-        state.claudeContents[index].thinkingContent = newThinking;  // ✅ 关键：Claude 思维链作为额外属性
-        state.claudeContents[index].contentParts = contentParts;    // ✅ 关键：更新 contentParts（用于显示）
+        state.claudeContents[index].thinkingContent = newThinking;  // 关键：Claude 思维链作为额外属性
+        state.claudeContents[index].contentParts = contentParts;    // 关键：更新 contentParts（用于显示）
         delete state.claudeContents[index].thinkingSignature;
     }
 
-    // ✅ 清除后续签名（与智能签名清除逻辑一致）
+    // 清除后续签名（与智能签名清除逻辑一致）
     if (index < state.messages.length - 1 && hasThoughtSignatures(state.messages, index + 1)) {
         const clearedCount = clearThoughtSignatures(state.messages, index + 1);
 

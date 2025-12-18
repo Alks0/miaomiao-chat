@@ -126,7 +126,7 @@
 
 /* 图片包装器（带下载按钮） */
 .image-wrapper {
-    /* ✅ 使用 CSS Grid 让按钮和图片重叠，不需要 position: absolute */
+    /* 使用 CSS Grid 让按钮和图片重叠，不需要 position: absolute */
     display: inline-grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
     margin: 10px 0;
@@ -134,7 +134,7 @@
 }
 
 .image-wrapper img {
-    /* ✅ 图片占据网格的第1行第1列 */
+    /* 图片占据网格的第1行第1列 */
     grid-row-start: 1;
     grid-column-start: 1;
     max-width: 100%;
@@ -145,15 +145,15 @@
 }
 
 .download-image-btn {
-    /* ✅ 按钮也占据网格的第1行第1列（与图片重叠） */
+    /* 按钮也占据网格的第1行第1列（与图片重叠） */
     grid-row-start: 1;
     grid-column-start: 1;
-    /* ✅ 使用 justify-self 和 align-self 定位到右上角 */
+    /* 使用 justify-self 和 align-self 定位到右上角 */
     justify-self: end; /* 右对齐 */
     align-self: start; /* 上对齐 */
     margin: 8px; /* 距离边缘的间距 */
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border: var(--border);
     border-radius: 4px;
     background: var(--color-bg-surface);
@@ -162,12 +162,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* ✅ 使用 opacity: 0 + transform: scale(0.8) */
+    /* 使用 opacity: 0 + transform: scale(0.8) */
     opacity: 0;
     transform: scale(0.8);
     transition: all 0.15s var(--ease);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .image-wrapper:hover .download-image-btn {
@@ -180,7 +180,7 @@
     background: var(--md-teal);
 }
 
-/* ✅ 移动端：始终显示下载按钮（触摸设备没有 hover 状态） */
+/* 移动端：始终显示下载按钮（触摸设备没有 hover 状态） */
 @media (hover: none) {
     .download-image-btn {
         opacity: 1;

@@ -10,7 +10,7 @@ import { processVariables } from '../utils/variables.js';
 import { compressImage } from '../utils/images.js';
 import { filterMessagesByCapabilities } from '../utils/message-filter.js';
 import { getCurrentModelCapabilities, getCurrentProvider } from '../providers/manager.js';
-import { getOrCreateMappedId } from './format-converter.js';  // ✅ P0: ID 重映射
+import { getOrCreateMappedId } from './format-converter.js';  // ID 重映射
 
 /**
  * 将 OpenAI 格式的消息完整转换为 Gemini 格式
@@ -33,7 +33,7 @@ function convertOpenAIMessageToGemini(msg) {
                     args = {};
                 }
 
-                // ✅ P0: ID 重映射（OpenAI → Gemini）
+                // ID 重映射（OpenAI → Gemini）
                 const geminiId = getOrCreateMappedId(tc.id, 'gemini');
 
                 const functionCall = {
@@ -41,18 +41,18 @@ function convertOpenAIMessageToGemini(msg) {
                     args: args
                 };
 
-                // ✅ 仅当 ID 存在且不是自动生成的 gemini_ 前缀时才包含
+                // 仅当 ID 存在且不是自动生成的 gemini_ 前缀时才包含
                 if (geminiId && !geminiId.startsWith('gemini_')) {
                     functionCall.id = geminiId;
                 }
 
                 const part = { functionCall };
 
-                // ✅ P1: 恢复 thoughtSignature（如果存在）
+                // 恢复 thoughtSignature（如果存在）
                 // Gemini 2.5+ thinking 模式要求：functionCall 部分必须包含 thoughtSignature
                 if (tc._thoughtSignature) {
                     part.thoughtSignature = tc._thoughtSignature;
-                    console.log('[Gemini Converter] ✅ 恢复 thoughtSignature:', tc._thoughtSignature?.substring(0, 20) + '...');
+                    console.log('[Gemini Converter] 恢复 thoughtSignature:', tc._thoughtSignature?.substring(0, 20) + '...');
                 } else {
                     console.warn('[Gemini Converter] ⚠️ 工具调用缺少 thoughtSignature:', tc.function?.name);
                 }
@@ -74,17 +74,95 @@ function convertOpenAIMessageToGemini(msg) {
             resultContent = { value: msg.content };
         }
 
-        // ✅ P0: ID 重映射（OpenAI → Gemini）
+        // ID 重映射（OpenAI → Gemini）
         const geminiId = getOrCreateMappedId(msg.tool_call_id, 'gemini');
 
-        // 查找对应的工具调用消息以获取 name
-        // 注意：Gemini 需要通过 name 匹配，不是 ID
+        // 多模态支持：检测并转换图片数据
+        // 支持格式：
+        // 1. { image: "data:image/png;base64,..." }
+        // 2. { image: { inlineData: { mimeType, data } } }
+        // 3. { image: { mimeType, data } }
+        // 4. { text: "...", image: "..." } (混合)
+        const responseParts = [];
+
+        // 处理多模态返回（图片 + 文本）
+        if (resultContent && typeof resultContent === 'object') {
+            // 检查是否包含图片字段
+            if (resultContent.image) {
+                const imageData = resultContent.image;
+
+                // 处理 base64 格式: "data:image/png;base64,..."
+                if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+                    const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+                    if (match) {
+                        responseParts.push({
+                            inlineData: {
+                                mimeType: match[1],
+                                data: match[2]
+                            }
+                        });
+                    }
+                }
+                // 处理已经是 inlineData 格式: { inlineData: { mimeType, data } }
+                else if (imageData.inlineData) {
+                    responseParts.push({
+                        inlineData: imageData.inlineData
+                    });
+                }
+                // 处理简化格式: { mimeType, data }
+                else if (imageData.mimeType && imageData.data) {
+                    responseParts.push({
+                        inlineData: {
+                            mimeType: imageData.mimeType,
+                            data: imageData.data
+                        }
+                    });
+                }
+            }
+
+            // 检查是否包含文本字段
+            if (resultContent.text) {
+                // 过滤掉图片占位符（避免重复显示）
+                // 当同时有图片和文本时，移除 [Image #N] 格式的占位符
+                let textContent = resultContent.text;
+                if (responseParts.some(p => p.inlineData)) {
+                    // 移除形如 [Image #1] 的占位符
+                    textContent = textContent.replace(/\[Image #\d+\]/g, '').trim();
+                }
+
+                // 只在有实际文本内容时才添加
+                if (textContent) {
+                    responseParts.push({ text: textContent });
+                }
+            }
+
+            // 如果有其他字段但不是 image/text，包装为 result
+            const otherFields = { ...resultContent };
+            delete otherFields.image;
+            delete otherFields.text;
+            if (Object.keys(otherFields).length > 0) {
+                responseParts.push({ text: JSON.stringify(otherFields) });
+            }
+        }
+
+        // 如果没有检测到多模态内容，使用原始格式
+        if (responseParts.length === 0) {
+            responseParts.push({
+                text: typeof resultContent === 'string'
+                    ? resultContent
+                    : JSON.stringify(resultContent)
+            });
+        }
+
+        // 构建 functionResponse
         const functionResponse = {
-            name: msg._toolName || 'unknown',  // 需要在前面设置
-            response: { result: resultContent }
+            name: msg._toolName || 'unknown',
+            response: responseParts.length === 1 && responseParts[0].text && !(resultContent && typeof resultContent === 'object' && resultContent.image)
+                ? { result: resultContent }  // 单纯文本保持原格式（向后兼容）
+                : { parts: responseParts }  // 多模态使用 parts 格式
         };
 
-        // ✅ 仅当 ID 存在且不是自动生成的时才包含
+        // 仅当 ID 存在且不是自动生成的时才包含
         if (geminiId && !geminiId.startsWith('gemini_')) {
             functionResponse.id = geminiId;
         }
@@ -110,7 +188,7 @@ function convertOpenAIMessageToGemini(msg) {
         for (const part of msg.content) {
             if (part.type === 'text' && part.text) {
                 const textPart = { text: part.text };
-                // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                // 保留 part 级别的 thoughtSignature（如果存在）
                 if (part.thoughtSignature) {
                     textPart.thoughtSignature = part.thoughtSignature;
                 }
@@ -119,7 +197,7 @@ function convertOpenAIMessageToGemini(msg) {
                 // ⚠️ Gemini 的思维链格式不同，暂时作为普通文本处理
                 // 或者可以在外层添加 thoughtSignature 标记
                 const thinkingPart = { text: `[Thinking]\n${part.text}` };
-                // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                // 保留 part 级别的 thoughtSignature（如果存在）
                 if (part.thoughtSignature) {
                     thinkingPart.thoughtSignature = part.thoughtSignature;
                 }
@@ -136,7 +214,7 @@ function convertOpenAIMessageToGemini(msg) {
                                 data: match[2]
                             }
                         };
-                        // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                        // 保留 part 级别的 thoughtSignature（如果存在）
                         if (part.thoughtSignature) {
                             imagePart.thoughtSignature = part.thoughtSignature;
                         }
@@ -154,7 +232,7 @@ function convertOpenAIMessageToGemini(msg) {
                             data: match[2]
                         }
                     };
-                    // ✅ 保留 part 级别的 thoughtSignature（如果存在）
+                    // 保留 part 级别的 thoughtSignature（如果存在）
                     if (part.thoughtSignature) {
                         filePart.thoughtSignature = part.thoughtSignature;
                     }
@@ -166,7 +244,7 @@ function convertOpenAIMessageToGemini(msg) {
 
     const result = { role: geminiRole, parts };
 
-    // ✅ 保留 thoughtSignature（如果存在）
+    // 保留 thoughtSignature（如果存在）
     // 这个签名来自之前的 API 响应，需要原样传回
     if (msg.thoughtSignature) {
         result.thoughtSignature = msg.thoughtSignature;
@@ -231,12 +309,12 @@ async function processContentsForRequest(contents) {
 
 /**
  * 构建带 thoughtSignature 的 Gemini contents
- * ✅ 全局传播签名：如果任何 content 有签名，所有 contents 都必须有
+ * 全局传播签名：如果任何 content 有签名，所有 contents 都必须有
  * @param {Array} contents - Gemini 格式的消息数组
  * @returns {Array} 处理后的消息数组
  */
 function buildGeminiContentsWithSignatures(contents) {
-    // ✅ 第一遍扫描：检查是否有任何 content 或 part 包含 thoughtSignature
+    // 第一遍扫描：检查是否有任何 content 或 part 包含 thoughtSignature
     let globalSignature = null;
 
     for (const content of contents) {
@@ -258,9 +336,9 @@ function buildGeminiContentsWithSignatures(contents) {
         }
     }
 
-    // ✅ 第二遍处理：如果找到签名，应用到所有 contents 的所有 parts
+    // 第二遍处理：如果找到签名，应用到所有 contents 的所有 parts
     if (globalSignature) {
-        console.log('[Gemini] ✅ 将 thoughtSignature 应用到所有', contents.length, '个 contents');
+        console.log('[Gemini] 将 thoughtSignature 应用到所有', contents.length, '个 contents');
         return contents.map(content => ({
             role: content.role,
             parts: content.parts.map(part => ({
@@ -270,7 +348,7 @@ function buildGeminiContentsWithSignatures(contents) {
         }));
     }
 
-    // ✅ 没有找到签名：保持原样（不自动生成签名）
+    // 没有找到签名：保持原样（不自动生成签名）
     // 根据 Gemini 官方文档：签名应该从 API 响应中接收并原样传回，而不是客户端生成
     console.log('[Gemini] ℹ️ 未找到 thoughtSignature，保持原样');
     return contents.map(content => ({
@@ -291,7 +369,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     // 根据流式模式选择正确的端点
     const action = state.streamEnabled ? 'streamGenerateContent' : 'generateContent';
 
-    // ✅ 智能端点处理：根据提供商的原始 apiFormat 决定端点格式
+    // 智能端点处理：根据提供商的原始 apiFormat 决定端点格式
     const provider = getCurrentProvider();
     const isNativeGeminiProvider = provider && provider.apiFormat === 'gemini';
 
@@ -362,7 +440,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     }
 
     // 处理 contents：先从 OpenAI 格式过滤消息，再转换为 Gemini 格式
-    // ✅ 根据模型能力过滤消息（在格式转换前，OpenAI格式）
+    // 根据模型能力过滤消息（在格式转换前，OpenAI格式）
     let openaiMessages = state.messages.filter(m => !m.isError);
 
     const capabilities = getCurrentModelCapabilities();
@@ -374,7 +452,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
         });
     }
 
-    // ✅ 转换为 Gemini 格式（使用完整转换函数，保留所有内容）
+    // 转换为 Gemini 格式（使用完整转换函数，保留所有内容）
     const geminiContents = openaiMessages
         .map(msg => convertOpenAIMessageToGemini(msg))
         .filter(msg => msg.parts && msg.parts.length > 0); // 过滤掉空消息
@@ -389,7 +467,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     // 压缩历史图片以减小请求体积
     const processedContents = await processContentsForRequest(geminiContents);
 
-    // ✅ 开场对话插入到对话历史之前（Gemini 的 systemInstruction 是独立参数）
+    // 开场对话插入到对话历史之前（Gemini 的 systemInstruction 是独立参数）
     let finalContents = processedContents;
     if (state.prefillEnabled) {
         const opening = getOpeningMessages('gemini');
@@ -398,14 +476,14 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
         }
     }
 
-    // ✅ 预填充消息追加到末尾（用户最新消息之后）
+    // 预填充消息追加到末尾（用户最新消息之后）
     if (state.prefillEnabled) {
         const prefill = getPrefillMessages('gemini');
         finalContents = [...finalContents, ...prefill];
     }
 
     // 构建带 thoughtSignature 的 contents
-    // ✅ 只传播从 API 响应中接收到的签名，不自动生成新签名
+    // 只传播从 API 响应中接收到的签名，不自动生成新签名
     const contentsWithSignatures = buildGeminiContentsWithSignatures(finalContents);
 
     const requestBody = {
@@ -414,7 +492,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
         safetySettings: safetySettings,
     };
 
-    // ✅ 添加 System Instruction (独立于预填充开关)
+    // 添加 System Instruction (独立于预填充开关)
     const systemParts = [];
 
     // 1. 优先使用 geminiSystemParts（多段系统提示）- 仅在开关启用时
@@ -439,7 +517,13 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
     // ⭐ 添加工具调用支持 (Function Calling)
     const tools = [];
 
-    // 保留原有的 google_search（用户要求保持不变）
+    // 1. Code Execution 工具（新增）
+    if (state.codeExecutionEnabled) {
+        tools.push({ codeExecution: {} });
+        console.log('[Gemini] 📊 Code Execution 工具已启用');
+    }
+
+    // 2. Google Search 工具（保持不变）
     if (state.webSearchEnabled) {
         tools.push({ googleSearch: {} });
         tools.push({ urlContext: {} });  // 可选：允许读取 URL 内容
@@ -461,15 +545,15 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
 
     if (tools.length > 0) {
         if (state.xmlToolCallingEnabled) {
-            // ✅ XML 模式：只注入 XML 到 systemInstruction，不使用原生 tools 字段
+            // XML 模式：只注入 XML 到 systemInstruction，不使用原生 tools 字段
             const { injectToolsToGemini, getXMLInjectionStats } = await import('../tools/tool-injection.js');
             injectToolsToGemini(requestBody, tools);
 
-            // ✅ P1: 性能监控
+            // 性能监控
             const stats = getXMLInjectionStats(tools);
             console.log('[Gemini] 📊 XML 模式启用，注入统计:', stats);
         } else {
-            // ✅ 原生模式：使用标准 tools 字段
+            // 原生模式：使用标准 tools 字段
             requestBody.tools = tools;
             console.log('[Gemini] 📊 原生 tools 模式，工具数量:', tools.length);
         }
@@ -518,7 +602,7 @@ export async function sendGeminiRequest(baseEndpoint, apiKey, model, signal = nu
  * @returns {Array} OpenAI 格式的消息数组（存储在 state.messages 中）
  */
 export function buildToolResultMessages(toolCalls, toolResults) {
-    // ✅ XML 模式：使用 XML 格式而不是原生 tool_calls
+    // XML 模式：使用 XML 格式而不是原生 tool_calls
     if (state.xmlToolCallingEnabled) {
         // 构建 XML 格式的工具调用文本
         let toolCallXML = '';
@@ -550,14 +634,14 @@ export function buildToolResultMessages(toolCalls, toolResults) {
     }
 
     // 原生模式：使用 tool_calls 格式
-    // ✅ 与 OpenAI 保持一致：返回 OpenAI 格式
+    // 与 OpenAI 保持一致：返回 OpenAI 格式
     // sendGeminiRequest 会将这些消息转换为 Gemini 格式
     const messages = [
         // 1. 添加助手消息（包含工具调用）- OpenAI 格式
-        // ✅ content 字段必须存在（OpenAI API 要求）
+        // content 字段必须存在（OpenAI API 要求）
         {
             role: 'assistant',
-            content: '',  // ✅ 修复：添加 content 字段（空字符串）
+            content: '',  // 添加 content 字段（空字符串）
             tool_calls: toolCalls.map(tc => ({
                 id: tc.id || `gemini_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 type: 'function',
@@ -565,18 +649,21 @@ export function buildToolResultMessages(toolCalls, toolResults) {
                     name: tc.name,
                     arguments: JSON.stringify(tc.arguments)
                 },
-                // ✅ P1: 保存 thoughtSignature 到私有字段
+                // 保存 thoughtSignature 到私有字段
                 _thoughtSignature: tc.thoughtSignature || null
             }))
         },
         // 2. 添加工具结果消息 - OpenAI 格式（附加工具名称用于 Gemini 转换）
         ...toolResults.map(result => {
-            // 查找对应的工具调用以获取名称
-            const toolCall = toolCalls.find(tc => tc.id === result.tool_call_id);
-            return {
-                ...result,
-                _toolName: toolCall?.name  // ⭐ 附加工具名称（Gemini 转换时需要）
-            };
+            // 优先使用已有的 _toolName，否则通过ID查找
+            // 使用 _originalId 进行匹配（避免ID转换导致的匹配失败）
+            if (!result._toolName) {
+                const toolCall = toolCalls.find(tc =>
+                    tc.id === result._originalId || tc.id === result.tool_call_id
+                );
+                result._toolName = toolCall?.name || 'unknown';
+            }
+            return result;
         })
     ];
 

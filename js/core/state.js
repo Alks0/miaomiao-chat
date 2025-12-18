@@ -5,7 +5,7 @@
  * 未来可选优化：取消注释 ReactiveState 类以启用响应式状态管理
  */
 
-import { eventBus } from './events.js';
+// import { eventBus } from './events.js'; // Unused in current non-reactive state implementation
 
 /* ===== 响应式状态管理（可选，未启用）=====
 class ReactiveState {
@@ -93,7 +93,7 @@ export const state = {
     geminiContents: [], // Gemini 原生格式消息
     claudeContents: [], // Claude 原生格式消息
 
-    // ✅ 消息 ID 映射（解决索引不一致问题）
+    // 消息 ID 映射（解决索引不一致问题）
     // messageId -> 数组索引，用于快速查找和防止删除错位
     messageIdMap: new Map(), // Map<messageId, number>
 
@@ -110,6 +110,7 @@ export const state = {
     maxImageBufferSize: 100 * 1024 * 1024, // 100MB
     uploadedImages: [],
     imageSize: '2K', // '2K' | '4K'
+    fastImageCompression: false, // 高速压缩模式（512px 超级压缩）
 
     // 消息编辑
     lastUserMessage: null,
@@ -178,6 +179,24 @@ export const state = {
     // ⭐ 新增：输出详细度配置
     verbosityEnabled: false,  // 是否启用输出详细度控制
     outputVerbosity: 'medium',  // 'low' | 'medium' | 'high'
+
+    // ⭐ Code Execution 开关
+    codeExecutionEnabled: false,  // 代码执行功能（支持 Gemini、OpenAI、Claude）
+
+    // ⭐ Computer Use 开关和配置（仅 Electron 环境）
+    computerUseEnabled: false,  // 计算机控制功能（仅 Claude + Electron）
+    computerUsePermissions: {
+        mouse: true,        // 允许鼠标控制
+        keyboard: true,     // 允许键盘控制
+        screenshot: true,   // 允许屏幕截图
+        bash: true,         // 允许执行 Bash 命令
+        textEditor: true    // 允许编辑文件
+    },
+    bashConfig: {
+        workingDirectory: '',  // 默认工作目录（空表示应用根目录）
+        timeout: 30,           // 超时时间（秒）
+        requireConfirmation: false  // 是否需要用户确认
+    },
 
     // 工具调用兜底
     xmlToolCallingEnabled: false,  // XML 工具调用兜底（兼容不支持原生 tools 的后端）
@@ -253,7 +272,7 @@ export const state = {
     tools: []            // 工具列表（内置 + MCP + 自定义）
 };
 
-// ✅ 重新导出 elements（便于其他模块导入）
+// 重新导出 elements（便于其他模块导入）
 export { elements } from './elements.js';
 
 // 便捷函数

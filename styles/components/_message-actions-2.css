@@ -1,6 +1,6 @@
 /* ========== 消息操作按钮 ========== */
 .message-actions {
-    /* ✅ 使用 CSS Grid 叠加定位到右上角 */
+    /* 使用 CSS Grid 叠加定位到右上角 */
     grid-row-start: 1;
     grid-column-start: 1;
     grid-column-end: 3;    /* 跨越两列（头像列 + 内容列） */
@@ -11,7 +11,7 @@
     gap: 4px;
     opacity: 0;
     transition: opacity 0.2s;
-    z-index: 10;           /* 确保在内容上方 */
+    z-index: var(--z-sticky);
 }
 
 .message:hover .message-actions,
@@ -58,7 +58,7 @@
     color: var(--color-text-primary);
 }
 
-/* ✅ 引用按钮特殊样式 */
+/* 引用按钮特殊样式 */
 .msg-action-btn.quote-msg:hover {
     background: var(--md-teal);
     color: var(--color-text-primary);

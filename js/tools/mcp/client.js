@@ -39,7 +39,7 @@ export class MCPClient {
         this.connections = new Map(); // serverId -> connection
         this.tools = new Map(); // toolId -> tool definition
 
-        // ✅ 重试配置
+        // 重试配置
         this.retryConfig = {
             maxRetries: 3,          // 最大重试 3 次
             initialDelay: 1000,     // 初始延迟 1 秒
@@ -82,7 +82,7 @@ export class MCPClient {
             };
         }
 
-        // ✅ 使用重试机制连接
+        // 使用重试机制连接
         return await this._connectWithRetry(config);
     }
 
@@ -154,7 +154,7 @@ export class MCPClient {
      * @param {Object} args - 工具参数
      * @returns {Promise<Object>} 工具执行结果
      */
-    async callTool(toolId, args) {
+    async callTool(toolId, args, options = {}) {
         const tool = this.tools.get(toolId);
         if (!tool) {
             throw new Error(`工具不存在: ${toolId}`);
@@ -169,6 +169,11 @@ export class MCPClient {
 
         console.log(`[MCP] 🔧 调用工具: ${toolId}`, args);
 
+        // 检查是否已取消
+        if (options.signal?.aborted) {
+            throw new Error('工具执行已取消');
+        }
+
         try {
             let result;
 
@@ -180,11 +185,16 @@ export class MCPClient {
                     arguments: args
                 });
             } else {
-                // 远程调用
-                result = await this._callRemoteTool(connection, name, args);
+                // 远程调用（传递 signal）
+                result = await this._callRemoteTool(connection, name, args, options);
             }
 
-            console.log(`[MCP] ✅ 工具执行成功: ${toolId}`);
+            // 再次检查是否在执行过程中被取消
+            if (options.signal?.aborted) {
+                throw new Error('工具执行已取消');
+            }
+
+            console.log(`[MCP] 工具执行成功: ${toolId}`);
 
             return {
                 success: true,
@@ -223,7 +233,7 @@ export class MCPClient {
     // ========== 私有方法 ==========
 
     /**
-     * ✅ 使用重试机制连接（指数退避）
+     * 使用重试机制连接（指数退避）
      * @private
      */
     async _connectWithRetry(config) {
@@ -264,7 +274,7 @@ export class MCPClient {
                 // 发现工具
                 await this._discoverTools(id, connection);
 
-                console.log(`[MCP] ✅ 已连接到 MCP 服务器: ${name} (${type})`);
+                console.log(`[MCP] 已连接到 MCP 服务器: ${name} (${type})`);
                 eventBus.emit('mcp:connected', { serverId: id, config });
 
                 return { success: true };
@@ -310,7 +320,7 @@ export class MCPClient {
     }
 
     /**
-     * ✅ 带超时的连接执行
+     * 带超时的连接执行
      * @private
      */
     async _connectWithTimeout(connectFn, timeout) {
@@ -323,7 +333,7 @@ export class MCPClient {
     }
 
     /**
-     * ✅ 错误分类
+     * 错误分类
      * @private
      */
     _classifyError(error) {
@@ -364,7 +374,7 @@ export class MCPClient {
     }
 
     /**
-     * ✅ 延迟辅助函数
+     * 延迟辅助函数
      * @private
      */
     _delay(ms) {
@@ -440,7 +450,7 @@ export class MCPClient {
             // WebSocket 连接
             const ws = new WebSocket(url);
 
-            // ✅ 等待 WebSocket 连接并发送初始化请求
+            // 等待 WebSocket 连接并发送初始化请求
             await new Promise((resolve, reject) => {
                 let initHandler = null; // 保存处理器引用，便于清理
 
@@ -464,8 +474,8 @@ export class MCPClient {
                             protocolVersion: '2024-11-05',
                             capabilities: {},
                             clientInfo: {
-                                name: 'webchat',
-                                version: '1.1.6'
+                                name: 'miaomiao-chat',
+                                version: '1.1.7'
                             }
                         }
                     };
@@ -474,7 +484,7 @@ export class MCPClient {
                     initHandler = (event) => {
                         const response = JSON.parse(event.data);
                         if (response.id === 1) {
-                            console.log(`[MCP] ✅ WebSocket 初始化成功:`, response);
+                            console.log(`[MCP] WebSocket 初始化成功:`, response);
                             ws.removeEventListener('message', initHandler);
                             clearTimeout(timeout);
 
@@ -502,7 +512,7 @@ export class MCPClient {
                 };
             });
 
-            // ✅ 设置自动重连（异常断开时）
+            // 设置自动重连（异常断开时）
             ws.onclose = (event) => {
                 // 非正常关闭 && 连接仍存在（用户未手动删除）
                 if (!event.wasClean && this.connections.has(id)) {
@@ -527,7 +537,7 @@ export class MCPClient {
 
                                 const result = await this.connect(server);
                                 if (result.success) {
-                                    console.log(`[MCP] ✅ 自动重连成功: ${config.name}`);
+                                    console.log(`[MCP] 自动重连成功: ${config.name}`);
                                 } else {
                                     console.error(`[MCP] ❌ 自动重连失败: ${config.name}`);
                                     eventBus.emit('mcp:reconnect-failed', {
@@ -567,7 +577,7 @@ export class MCPClient {
                 requestHeaders['Authorization'] = `Bearer ${apiKey}`;
             }
 
-            // ✅ 执行 MCP 初始化握手
+            // 执行 MCP 初始化握手
             console.log(`[MCP] 🔗 建立 HTTP 连接并初始化: ${url}`);
 
             try {
@@ -587,8 +597,8 @@ export class MCPClient {
                             protocolVersion: '2024-11-05',
                             capabilities: {},
                             clientInfo: {
-                                name: 'webchat',
-                                version: '1.1.6'
+                                name: 'miaomiao-chat',
+                                version: '1.1.7'
                             }
                         }
                     })
@@ -598,7 +608,7 @@ export class MCPClient {
                     throw new Error(`初始化失败: ${initResponse.status}`);
                 }
 
-                // ✅ 检查响应类型（JSON 或 SSE）
+                // 检查响应类型（JSON 或 SSE）
                 const contentType = initResponse.headers.get('content-type') || '';
                 let initData;
 
@@ -612,7 +622,7 @@ export class MCPClient {
                     initData = await initResponse.json();
                 }
 
-                console.log(`[MCP] ✅ 初始化成功:`, initData);
+                console.log(`[MCP] 初始化成功:`, initData);
 
                 // 2. 发送 initialized 通知（无需等待响应）
                 fetch(url, {
@@ -679,7 +689,7 @@ export class MCPClient {
                 });
             }
 
-            console.log(`[MCP] ✅ 发现 ${toolsList.length} 个工具: ${serverId}`);
+            console.log(`[MCP] 发现 ${toolsList.length} 个工具: ${serverId}`);
 
             eventBus.emit('mcp:tools-discovered', {
                 serverId,
@@ -704,9 +714,9 @@ export class MCPClient {
             return new Promise((resolve, reject) => {
                 const requestId = Date.now().toString();
 
-                // ✅ 使用配置的超时时间
+                // 使用配置的超时时间
                 const timeout = setTimeout(() => {
-                    // ✅ 修复: 超时后清理 handler，避免内存泄漏
+                    // 超时后清理 handler，避免内存泄漏
                     ws.removeEventListener('message', handler);
                     reject(new Error(`WebSocket 列表工具超时 (${this.retryConfig.connectionTimeout}ms)`));
                 }, this.retryConfig.connectionTimeout);
@@ -740,7 +750,7 @@ export class MCPClient {
 
             console.log(`[MCP] 📤 发送请求到 ${url}:`, requestBody);
 
-            // ✅ 修复: 添加 HTTP 请求超时控制
+            // 添加 HTTP 请求超时控制
             const abortController = new AbortController();
             const timeoutId = setTimeout(() => {
                 abortController.abort();
@@ -771,7 +781,7 @@ export class MCPClient {
                 const contentType = response.headers.get('content-type');
                 console.log(`[MCP] Content-Type: ${contentType}`);
 
-                // ✅ 根据 Content-Type 解析响应
+                // 根据 Content-Type 解析响应
                 let data;
                 if (contentType && contentType.includes('text/event-stream')) {
                     console.log('[MCP] 解析 SSE 格式响应');
@@ -791,7 +801,7 @@ export class MCPClient {
                 return data.result?.tools || [];
             } catch (error) {
                 clearTimeout(timeoutId);
-                // ✅ 修复: 将 AbortError 转换为有意义的超时错误
+                // 将 AbortError 转换为有意义的超时错误
                 if (error.name === 'AbortError') {
                     throw new Error(`HTTP 列表工具超时 (${this.retryConfig.connectionTimeout}ms)`);
                 }
@@ -804,7 +814,7 @@ export class MCPClient {
      * 远程调用工具
      * @private
      */
-    async _callRemoteTool(connection, toolName, args) {
+    async _callRemoteTool(connection, toolName, args, options = {}) {
         const { protocol, url, ws, headers } = connection;
 
         if (protocol === 'websocket') {
@@ -812,9 +822,9 @@ export class MCPClient {
             return new Promise((resolve, reject) => {
                 const requestId = Date.now().toString();
 
-                // ✅ 使用配置的超时时间
+                // 使用配置的超时时间
                 const timeout = setTimeout(() => {
-                    // ✅ 修复: 超时后清理 handler，避免内存泄漏
+                    // 超时后清理 handler，避免内存泄漏
                     ws.removeEventListener('message', handler);
                     reject(new Error(`WebSocket 工具调用超时 (${this.retryConfig.toolCallTimeout}ms)`));
                 }, this.retryConfig.toolCallTimeout);
@@ -833,6 +843,15 @@ export class MCPClient {
                     }
                 };
 
+                // 监听外部取消信号
+                if (options.signal) {
+                    options.signal.addEventListener('abort', () => {
+                        clearTimeout(timeout);
+                        ws.removeEventListener('message', handler);
+                        reject(new Error('工具执行已取消'));
+                    });
+                }
+
                 ws.addEventListener('message', handler);
 
                 ws.send(JSON.stringify({
@@ -849,11 +868,19 @@ export class MCPClient {
             // HTTP: 发送 POST 请求（标准 JSON-RPC 2.0 格式）
             // 注意：POST 到基础 URL，而不是 /tools/call
 
-            // ✅ 修复: 添加 HTTP 请求超时控制
+            // 使用外部 signal 或创建内部超时控制
             const abortController = new AbortController();
             const timeoutId = setTimeout(() => {
                 abortController.abort();
             }, this.retryConfig.toolCallTimeout);
+
+            // 如果有外部 signal，同时监听
+            if (options.signal) {
+                options.signal.addEventListener('abort', () => {
+                    clearTimeout(timeoutId);
+                    abortController.abort();
+                });
+            }
 
             try {
                 const response = await fetch(url, {
@@ -881,7 +908,7 @@ export class MCPClient {
                     throw new Error(`HTTP 请求失败: ${response.status}`);
                 }
 
-                // ✅ 根据 Content-Type 解析响应
+                // 根据 Content-Type 解析响应
                 const contentType = response.headers.get('content-type');
                 let data;
 
@@ -901,7 +928,7 @@ export class MCPClient {
                 return data.result;
             } catch (error) {
                 clearTimeout(timeoutId);
-                // ✅ 修复: 将 AbortError 转换为有意义的超时错误
+                // 将 AbortError 转换为有意义的超时错误
                 if (error.name === 'AbortError') {
                     throw new Error(`HTTP 工具调用超时 (${this.retryConfig.toolCallTimeout}ms)`);
                 }
@@ -973,9 +1000,9 @@ export const mcpClient = new MCPClient();
  * @param {Object} args - 参数
  * @returns {Promise<Object>} 执行结果
  */
-export async function callMCPTool(serverId, toolName, args) {
+export async function callMCPTool(serverId, toolName, args, options = {}) {
     const toolId = `${serverId}/${toolName}`;
-    return await mcpClient.callTool(toolId, args);
+    return await mcpClient.callTool(toolId, args, options);
 }
 
 console.log('[MCP] 📡 MCP 客户端已加载');

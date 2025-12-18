@@ -1,6 +1,6 @@
 /* ========== 消息样式 ========== */
 .message {
-    /* ✅ 使用 CSS Grid 代替 flex，支持操作按钮叠加 */
+    /* 使用 CSS Grid 代替 flex，支持操作按钮叠加 */
     display: grid;
     grid-template-columns: auto 1fr; /* 头像自动宽度，内容占满剩余空间 */
     gap: 12px;
@@ -136,7 +136,7 @@
     animation: editingPulse 2s ease-in-out infinite;
 }
 
-/* ✅ 编辑状态下用户消息文字颜色修正（避免白字配浅背景） */
+/* 编辑状态下用户消息文字颜色修正（避免白字配浅背景） */
 .message.user.editing .message-content {
     color: var(--text-primary);
 }
@@ -201,7 +201,7 @@
 }
 
 /* ========== 编辑模式 - 图片管理 ========== */
-/* ✅ 图片编辑界面样式 */
+/* 图片编辑界面样式 */
 .edit-image-manager {
     margin-bottom: 12px;
 }
@@ -225,7 +225,7 @@
     background: var(--color-bg-surface);
     box-shadow: var(--shadow-sm);
     transition: all 0.15s var(--ease);
-    /* ✅ 使用 CSS Grid 让按钮和图片重叠，不需要 position: absolute */
+    /* 使用 CSS Grid 让按钮和图片重叠，不需要 position: absolute */
     display: grid;
     grid-template: 1fr / 1fr; /* 单行单列网格 */
 }
@@ -236,7 +236,7 @@
 }
 
 .edit-image-item img {
-    /* ✅ 图片占据网格的第1行第1列 */
+    /* 图片占据网格的第1行第1列 */
     grid-row-start: 1;
     grid-column-start: 1;
     width: 100%;
@@ -247,10 +247,10 @@
 }
 
 .edit-image-remove {
-    /* ✅ 按钮也占据网格的第1行第1列（与图片重叠） */
+    /* 按钮也占据网格的第1行第1列（与图片重叠） */
     grid-row-start: 1;
     grid-column-start: 1;
-    /* ✅ 使用 justify-self 和 align-self 定位到右上角 */
+    /* 使用 justify-self 和 align-self 定位到右上角 */
     justify-self: end; /* 右对齐 */
     align-self: start; /* 上对齐 */
     margin: 4px; /* 距离边缘的间距 */
@@ -267,12 +267,12 @@
     font-weight: 700;
     font-size: 18px;
     line-height: 1;
-    /* ✅ 照着 .remove-image 修改：opacity: 0 + transform: scale(0.8) */
+    /* 照着 .remove-image 修改：opacity: 0 + transform: scale(0.8) */
     opacity: 0;
     transform: scale(0.8);
     transition: all 0.15s var(--ease);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 .edit-image-item:hover .edit-image-remove {
@@ -285,7 +285,7 @@
     background: var(--md-red);
 }
 
-/* ✅ 移动端：始终显示删除按钮（触摸设备没有 hover 状态） */
+/* 移动端：始终显示删除按钮（触摸设备没有 hover 状态） */
 @media (hover: none) {
     .edit-image-remove {
         opacity: 1;
@@ -417,7 +417,7 @@
 }
 
 /* ========== LaTeX 数学公式 ========== */
-/* ✅ KaTeX 渲染样式增强 */
+/* KaTeX 渲染样式增强 */
 .katex-display-wrapper {
     margin: 16px 0;
     padding: 16px;
@@ -467,7 +467,7 @@
 }
 
 /* ========== 表格增强 ========== */
-/* ✅ 表格包装器和工具栏 */
+/* 表格包装器和工具栏 */
 .table-wrapper {
     margin: 16px 0;
     border: var(--border);
@@ -489,21 +489,31 @@
 .table-export-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 8px 16px;
+    min-width: 44px;
+    min-height: 44px;
     background: var(--color-bg-surface);
     border: var(--border);
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
-    border-radius: 2px;
+    border-radius: 4px;
     transition: all 0.15s var(--ease);
+    box-shadow: var(--shadow-sm);
 }
 
 .table-export-btn:hover {
     background: var(--md-teal);
-    transform: translate(1px, -1px);
+    transform: translate(2px, -2px);
+    box-shadow: none;
+}
+
+.table-export-btn:active {
+    transform: translate(1px, 1px) scale(0.98);
 }
 
 .table-info {
@@ -590,7 +600,7 @@
     border: var(--border);
     border-radius: 4px;
     resize: vertical;
-    /* ✅ 使用优化后的transition，与 .edit-textarea 一致 */
+    /* 使用优化后的transition，与 .edit-textarea 一致 */
     transition: border-color 0.2s var(--ease),
                 box-shadow 0.2s var(--ease);
     will-change: height;

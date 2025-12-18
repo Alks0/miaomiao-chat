@@ -197,6 +197,21 @@
     line-height: 1.6;
 }
 
+.result-image {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.result-image.no-text {
+    margin-bottom: 0;
+}
+
+.result-text {
+    white-space: pre-wrap;
+    margin-bottom: 12px;
+}
+
 .result-json {
     font-family: var(--font-mono);
     font-size: 11px;

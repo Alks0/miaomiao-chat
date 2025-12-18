@@ -9,12 +9,12 @@
  * @returns {string} 转义后的 HTML 安全文本
  */
 export function escapeHtml(text) {
-    // ✅ 增强：处理 null/undefined
+    // 增强：处理 null/undefined
     if (text === null || text === undefined) {
         return '';
     }
 
-    // ✅ 增强：非字符串转为字符串
+    // 增强：非字符串转为字符串
     if (typeof text !== 'string') {
         text = String(text);
     }
@@ -62,7 +62,7 @@ export function extractBase64Images(text) {
     // 匹配 markdown 图片语法: ![alt](data:image/...;base64,...)
     const imgRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)\)/g;
 
-    let result = text.replace(imgRegex, (match, alt, dataUrl) => {
+    const result = text.replace(imgRegex, (match, alt, dataUrl) => {
         const index = images.length;
         images.push({ alt, dataUrl });
         // 使用 HTML 注释作为占位符，不会被 markdown 解析
@@ -121,7 +121,7 @@ export function generateSessionName(content, maxLength = 25) {
     if (!content) return '新会话';
 
     // 1. 清理内容：合并换行和多余空白
-    let cleaned = content
+    const cleaned = content
         .replace(/\n+/g, ' ')           // 换行转空格
         .replace(/\s+/g, ' ')           // 多个空白合并为一个
         .replace(/[^\w\u4e00-\u9fff\s]/g, '') // 保留字母、数字、中文和空格
