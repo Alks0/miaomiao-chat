@@ -211,3 +211,44 @@ export function toClaudeMessage(role, content, attachments = null) {
 
     return { role: normalizedRole, content: content || '' };
 }
+
+/**
+ * 将整个会话转换为 Markdown 字符串
+ * @param {Object} session - 会话对象
+ * @returns {string} Markdown 字符串
+ */
+export function sessionToMarkdown(session) {
+    if (!session || !session.messages) return '';
+
+    let markdown = `# ${session.name || 'Untitled Session'}\n\n`;
+
+    session.messages.forEach((msg) => {
+        // 跳过系统消息
+        if (msg.role === 'system') return;
+
+        const roleName = msg.role === 'user' ? 'User' : 'Assistant';
+        markdown += `## ${roleName}\n\n`;
+
+        // 处理思考过程 (如果存在)
+        if (msg.thought) {
+            markdown += `> **Thinking:**\n> ${msg.thought.replace(/\n/g, '\n> ')}\n\n`;
+        }
+
+        // 处理主要内容
+        if (Array.isArray(msg.content)) {
+            // 处理多模态内容数组
+            const textContent = msg.content
+                .filter(part => part.type === 'text')
+                .map(part => part.text)
+                .join('\n');
+            markdown += `${textContent}\n\n`;
+        } else {
+            markdown += `${msg.content || ''}\n\n`;
+        }
+
+        // 分隔符
+        markdown += `---\n\n`;
+    });
+
+    return markdown.trim();
+}

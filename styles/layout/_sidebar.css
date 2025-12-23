@@ -237,6 +237,11 @@
     background: var(--md-yellow);
 }
 
+.session-action-btn.export:hover {
+    background: var(--md-blue);
+    color: white;
+}
+
 .session-action-btn.delete:hover {
     background: var(--md-coral);
 }

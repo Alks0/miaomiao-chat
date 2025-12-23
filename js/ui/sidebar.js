@@ -8,6 +8,9 @@ import { eventBus } from '../core/events.js';
 import { switchToSession, deleteSession, renameSession, createNewSession } from '../state/sessions.js';
 import { escapeHtml } from '../utils/helpers.js';
 import { getCurrentQuery, highlightMatch } from './session-search.js';
+import { sessionToMarkdown } from '../messages/converters.js';
+import { getIcon } from '../utils/icons.js';
+import { showNotification } from './notifications.js';
 // 新增：IndexedDB 偏好设置 API
 import { savePreference, loadPreference } from '../state/storage.js';
 // 新增：自定义对话框（替代 Electron 中不支持的 prompt/confirm）
@@ -243,6 +246,22 @@ export function updateSessionList() {
                 });
             }
 
+            // 导出按钮
+            const exportBtn = element.querySelector('.export-session-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const markdown = sessionToMarkdown(sessionData);
+                        await navigator.clipboard.writeText(markdown);
+                        showNotification('会话已作为 Markdown 复制到剪切板', 'success');
+                    } catch (err) {
+                        console.error('导出失败:', err);
+                        showNotification('导出失败: ' + err.message, 'error');
+                    }
+                });
+            }
+
             // 标记为已绑定，避免重复绑定
             element._eventsBound = true;
         };
@@ -295,16 +314,14 @@ export function updateSessionList() {
                     ${hasBackgroundTask ? '<span class="session-generating">生成中...</span>' : ''}
                 </div>
                 <div class="session-actions">
+                    <button class="session-action-btn export-session-btn export" title="复制为 Markdown" aria-label="复制此会话为 Markdown">
+                        ${getIcon('copy', { size: 14 })}
+                    </button>
                     <button class="session-action-btn rename-session-btn" title="重命名" aria-label="重命名会话">
-                        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
+                        ${getIcon('edit', { size: 14 })}
                     </button>
                     <button class="session-action-btn delete-session-btn delete" title="删除" aria-label="删除会话">
-                        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                        </svg>
+                        ${getIcon('trash', { size: 14 })}
                     </button>
                 </div>
             `;

@@ -5,7 +5,7 @@
 
 import { state } from '../core/state.js';
 import { elements } from '../core/elements.js';
-import { saveCurrentConfig, syncUIWithState } from '../state/config.js';
+import { saveCurrentConfig, syncUIWithState, saveSavedConfigs } from '../state/config.js';
 import { eventBus } from '../core/events.js';
 import { syncQuickToggles } from './quick-toggles.js';
 import { showNotification } from './notifications.js';
@@ -373,6 +373,7 @@ async function handleSaveConfig() {
 
     state.currentConfigName = name;
     saveCurrentConfig();
+    await saveSavedConfigs(); // 保存配置列表到持久化存储
     updateConfigSelect();
     showNotification(`配置已保存: ${name}`, 'info');
 }
@@ -402,6 +403,7 @@ async function handleDeleteConfig() {
     }
 
     saveCurrentConfig();
+    await saveSavedConfigs(); // 保存配置列表到持久化存储
     updateConfigSelect();
     showNotification(`已删除配置: ${config.name}`, 'info');
 }

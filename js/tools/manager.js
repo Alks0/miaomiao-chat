@@ -172,9 +172,10 @@ export function registerMCPTool(serverId, toolName, toolDefinition) {
 /**
  * 注册自定义工具（用户添加）
  * @param {Object} toolConfig - 工具配置
+ * @param {boolean} skipSave - 是否跳过保存（加载时使用）
  * @returns {string} 工具 ID
  */
-export function registerCustomTool(toolConfig) {
+export function registerCustomTool(toolConfig, skipSave = false) {
     const toolId = toolConfig.id || `custom_${generateId()}`;
 
     toolRegistry.set(toolId, {
@@ -190,6 +191,11 @@ export function registerCustomTool(toolConfig) {
     addToNameIndex(toolConfig.name || toolId, toolId);
 
     console.log(`[Tools] 已注册自定义工具: ${toolId}`);
+
+    // 保存到持久化存储（除非是加载时）
+    if (!skipSave) {
+        saveCustomTools();
+    }
 
     eventBus.emit('tool:registered', { toolId, type: 'custom' });
     eventBus.emit('tools:added', { toolId });
@@ -474,6 +480,11 @@ export function removeTool(toolId) {
 
     console.log(`[Tools] ❌ 已移除工具: ${toolId}`);
 
+    // 保存到持久化存储（仅自定义工具）
+    if (toolType === 'custom') {
+        saveCustomTools();
+    }
+
     // 发布事件
     eventBus.emit('tool:removed', { toolId });
     eventBus.emit('tools:removed', { toolId });
@@ -511,13 +522,15 @@ export function clearMCPTools(serverId) {
  */
 export function getToolStats() {
     const tools = Array.from(toolRegistry.values());
+    // 过滤掉隐藏工具（如 Computer Use），仅统计用户可见工具
+    const visibleTools = tools.filter(t => !t.hidden);
 
     return {
-        total: tools.length,
-        enabled: tools.filter(t => toolEnabled.get(t.id)).length,
-        builtin: tools.filter(t => t.type === 'builtin').length,
-        mcp: tools.filter(t => t.type === 'mcp').length,
-        custom: tools.filter(t => t.type === 'custom').length
+        total: visibleTools.length,
+        enabled: visibleTools.filter(t => toolEnabled.get(t.id)).length,
+        builtin: visibleTools.filter(t => t.type === 'builtin').length,
+        mcp: visibleTools.filter(t => t.type === 'mcp').length,
+        custom: visibleTools.filter(t => t.type === 'custom').length
     };
 }
 
@@ -647,5 +660,58 @@ export async function loadToolStates() {
         console.log(`[Tools] 已恢复 ${restoredCount} 个工具的状态`);
     } catch (error) {
         console.error('[Tools] ❌ 加载工具状态失败:', error);
+    }
+}
+
+/**
+ * 保存所有自定义工具到持久化存储
+ */
+export async function saveCustomTools() {
+    try {
+        // 获取所有自定义工具
+        const customTools = [];
+        for (const [toolId, tool] of toolRegistry.entries()) {
+            if (toolTypes.get(toolId) === 'custom') {
+                customTools.push({
+                    id: toolId,
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.parameters,
+                    enabled: toolEnabled.get(toolId),
+                    permissions: tool.permissions,
+                    rateLimit: tool.rateLimit
+                });
+            }
+        }
+
+        await savePreference('customTools', JSON.stringify(customTools));
+        console.log(`[Tools] 已保存 ${customTools.length} 个自定义工具`);
+    } catch (error) {
+        console.error('[Tools] ❌ 保存自定义工具失败:', error);
+    }
+}
+
+/**
+ * 从持久化存储加载自定义工具
+ */
+export async function loadCustomTools() {
+    try {
+        const toolsJson = await loadPreference('customTools');
+        if (!toolsJson) {
+            console.log('[Tools] 没有已保存的自定义工具');
+            return;
+        }
+
+        const tools = JSON.parse(toolsJson);
+        let loadedCount = 0;
+
+        for (const toolConfig of tools) {
+            registerCustomTool(toolConfig, true); // skipSave = true，加载时不触发保存
+            loadedCount++;
+        }
+
+        console.log(`[Tools] 已加载 ${loadedCount} 个自定义工具`);
+    } catch (error) {
+        console.error('[Tools] ❌ 加载自定义工具失败:', error);
     }
 }

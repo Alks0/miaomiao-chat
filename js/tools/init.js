@@ -3,7 +3,7 @@
  * 注册所有内置工具
  */
 
-import { registerBuiltinTool, loadToolStates } from './manager.js';
+import { registerBuiltinTool, loadToolStates, loadCustomTools } from './manager.js';
 import { calculatorTool, calculatorHandler } from './builtin/calculator.js';
 import { datetimeTool, datetimeHandler } from './builtin/datetime.js';
 import { unitConverterTool, unitConverterHandler } from './builtin/unit-converter.js';
@@ -20,6 +20,13 @@ export async function initTools() {
 
     // 注册内置工具
     await registerBuiltins();
+
+    // 加载自定义工具
+    try {
+        await loadCustomTools();
+    } catch (error) {
+        console.warn('[Tools] 加载自定义工具失败:', error);
+    }
 
     // 加载工具启用状态
     try {
