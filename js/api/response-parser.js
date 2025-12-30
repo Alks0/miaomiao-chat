@@ -4,9 +4,9 @@
  */
 
 import { parseMarkdownImages } from '../utils/markdown-image-parser.js';
-import { extractXMLToolCalls } from '../tools/xml-formatter.js';  // ✅ XML 工具调用解析
-import { state } from '../core/state.js';  // ✅ 访问 xmlToolCallingEnabled 配置
-import { parseThinkTags } from '../stream/think-tag-parser.js';  // ✅ <think> 标签解析器
+import { extractXMLToolCalls } from '../tools/xml-formatter.js';
+import { state } from '../core/state.js';
+import { parseThinkTags } from '../stream/think-tag-parser.js';
 
 /**
  * 解析 API 响应数据
@@ -84,7 +84,7 @@ export function parseApiResponse(data, format = 'openai') {
                     // Gemini 2.5/3 的思维链可能在 part.thought 为 true 时
                     thinkingContent += part.text || '';
                 } else if (part.text) {
-                    // ✅ 解析 <think> 标签
+                    // 解析 <think> 标签
                     const { displayText: thinkParsedText, thinkingContent: thinkContent } = parseThinkTags(part.text);
                     if (thinkContent) {
                         thinkingContent += thinkContent;
@@ -107,17 +107,15 @@ export function parseApiResponse(data, format = 'openai') {
             const reasoningTokens = data.usageMetadata?.thoughts_token_count ||
                                    data.usage?.completion_tokens_details?.reasoning_tokens;
 
-            // ✅ 修复: 添加 contentParts 字段用于渲染图片
             const contentParts = [];
 
-            // ✅ 先添加思维链（如果有）
+            // 先添加思维链（如果有）
             if (thinkingContent) {
                 contentParts.push({ type: 'thinking', text: thinkingContent });
             }
 
             for (const part of candidate.content.parts) {
                 if (part.text && !part.thought) {
-                    // ✅ 解析 <think> 标签后的文本
                     const { displayText: thinkParsedText } = parseThinkTags(part.text);
                     if (thinkParsedText) {
                         contentParts.push({ type: 'text', text: thinkParsedText });
@@ -137,7 +135,7 @@ export function parseApiResponse(data, format = 'openai') {
                 thoughtSignature: thoughtSignature,
                 groundingMetadata: candidate.groundingMetadata,
                 reasoningTokens: reasoningTokens || null,
-                contentParts: contentParts.length > 0 ? contentParts : null, // ✅ 新增字段
+                contentParts: contentParts.length > 0 ? contentParts : null,
             };
         }
 
@@ -204,7 +202,6 @@ export function parseApiResponse(data, format = 'openai') {
 
             data.content.forEach(block => {
                 if (block.type === 'text') {
-                    // ✅ 解析 <think> 标签
                     const { displayText: thinkParsedText, thinkingContent: thinkContent } = parseThinkTags(block.text);
                     if (thinkContent) {
                         thinkingContent += thinkContent;
@@ -218,7 +215,6 @@ export function parseApiResponse(data, format = 'openai') {
                     thinkingContent += block.thinking;
                     contentParts.push({ type: 'thinking', text: block.thinking });
                 } else if (block.type === 'image') {
-                    // ✅ Claude 格式的图片
                     const source = block.source;
                     if (source.type === 'base64') {
                         const dataUrl = `data:${source.media_type};base64,${source.data}`;
@@ -233,7 +229,67 @@ export function parseApiResponse(data, format = 'openai') {
                 content: textContent,
                 claudeContent: data.content,
                 thinkingContent: thinkingContent || null,
-                contentParts: contentParts.length > 0 ? contentParts : null, // ✅ 新增字段
+                contentParts: contentParts.length > 0 ? contentParts : null,
+            };
+        }
+
+        case 'openai-responses': {
+            // OpenAI Responses API 格式
+            // 响应结构: { output: [...], output_text: "..." }
+            if (data.error) return null;
+
+            let textContent = '';
+            let thinkingContent = '';
+            const contentParts = [];
+
+            // 1. 优先从 output[] 数组解析
+            if (data.output && Array.isArray(data.output)) {
+                for (const item of data.output) {
+                    if (item.type === 'reasoning' && item.content) {
+                        // 推理/思维链内容
+                        thinkingContent += item.content;
+                        contentParts.push({ type: 'thinking', text: item.content });
+                    }
+                    else if (item.type === 'message') {
+                        // 消息内容
+                        const messageText = item.text || '';
+                        if (messageText) {
+                            textContent += messageText;
+                            contentParts.push({ type: 'text', text: messageText });
+                        }
+                        // 处理 content 数组
+                        else if (Array.isArray(item.content)) {
+                            for (const part of item.content) {
+                                if (part.type === 'output_text' && part.text) {
+                                    textContent += part.text;
+                                    contentParts.push({ type: 'text', text: part.text });
+                                } else if (part.type === 'text' && part.text) {
+                                    textContent += part.text;
+                                    contentParts.push({ type: 'text', text: part.text });
+                                } else if (part.type === 'image_url' && part.image_url?.url) {
+                                    contentParts.push({ type: 'image_url', url: part.image_url.url, complete: true });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. 兜底：使用 output_text 快捷字段
+            if (!textContent && data.output_text) {
+                textContent = data.output_text;
+                contentParts.push({ type: 'text', text: textContent });
+            }
+
+            // 3. 如果没有任何内容，返回 null
+            if (!textContent && !thinkingContent && contentParts.length === 0) {
+                return null;
+            }
+
+            return {
+                content: textContent,
+                thinkingContent: thinkingContent || null,
+                contentParts: contentParts.length > 0 ? contentParts : null,
             };
         }
 
@@ -246,7 +302,7 @@ export function parseApiResponse(data, format = 'openai') {
             const finishReason = data.choices[0].finish_reason;
             console.log('OpenAI message:', message);
 
-            // ✅ 1. 检测原生 tool_calls（仅在非 XML 模式）
+            // 检测原生 tool_calls（仅在非 XML 模式）
             if (message.tool_calls && finishReason === 'tool_calls' && !state.xmlToolCallingEnabled) {
                 const toolCalls = message.tool_calls.map(tc => ({
                     id: tc.id,
@@ -264,7 +320,7 @@ export function parseApiResponse(data, format = 'openai') {
                 };
             }
 
-            // ✅ 2. 兜底：检测 XML <tool_use>
+            // 兜底：检测 XML <tool_use>
             if (state.xmlToolCallingEnabled && message.content && typeof message.content === 'string') {
                 const xmlToolCalls = extractXMLToolCalls(message.content);
 
@@ -293,21 +349,21 @@ export function parseApiResponse(data, format = 'openai') {
                 }
             }
 
-            // ✅ 用于累积提取的 <think> 内容
+            // 用于累积提取的 <think> 内容
             let extractedThinkingContent = '';
 
-            // ✅ 解析 content 数组（包含文本和图片）
+            // 解析 content 数组（包含文本和图片）
             if (Array.isArray(content)) {
                 for (const part of content) {
                     if (part.type === 'text') {
-                        // ✅ 先解析 <think> 标签
+                        // 先解析 <think> 标签
                         const { displayText: thinkParsedText, thinkingContent: thinkContent } = parseThinkTags(part.text);
                         if (thinkContent) {
                             extractedThinkingContent += thinkContent;
                             contentParts.push({ type: 'thinking', text: thinkContent });
                         }
 
-                        // ✅ 解析文本中的 markdown 图片格式
+                        // 解析文本中的 markdown 图片格式
                         const parsedParts = parseMarkdownImages(thinkParsedText);
                         for (const parsed of parsedParts) {
                             if (parsed.type === 'text') {
@@ -322,14 +378,14 @@ export function parseApiResponse(data, format = 'openai') {
                     }
                 }
             } else if (typeof content === 'string') {
-                // ✅ 先解析 <think> 标签
+                // 先解析 <think> 标签
                 const { displayText: thinkParsedText, thinkingContent: thinkContent } = parseThinkTags(content);
                 if (thinkContent) {
                     extractedThinkingContent += thinkContent;
                     contentParts.push({ type: 'thinking', text: thinkContent });
                 }
 
-                // ✅ 解析字符串中的 markdown 图片格式
+                // 解析字符串中的 markdown 图片格式
                 const parsedParts = parseMarkdownImages(thinkParsedText);
                 for (const part of parsedParts) {
                     if (part.type === 'text') {
@@ -341,7 +397,7 @@ export function parseApiResponse(data, format = 'openai') {
                 }
             }
 
-            // ✅ 处理原生思维链（优先级高于 <think> 标签）
+            // 处理原生思维链（优先级高于 <think> 标签）
             const finalThinkingContent = message.reasoning || extractedThinkingContent || null;
             if (message.reasoning) {
                 contentParts.unshift({ type: 'thinking', text: message.reasoning });
@@ -350,7 +406,7 @@ export function parseApiResponse(data, format = 'openai') {
             return {
                 content: Array.isArray(content) ? textContent : (extractedThinkingContent ? textContent : content),
                 thinkingContent: finalThinkingContent,
-                contentParts: contentParts.length > 0 ? contentParts : null, // ✅ 新增字段
+                contentParts: contentParts.length > 0 ? contentParts : null,
             };
         }
     }

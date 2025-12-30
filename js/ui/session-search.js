@@ -156,7 +156,7 @@ export function searchSessions(query) {
 
                 // 获取消息角色
                 let role = 'unknown';
-                if (session.apiFormat === 'openai') {
+                if (session.apiFormat === 'openai' || session.apiFormat === 'openai-responses') {
                     role = msg.role || 'unknown';
                 } else if (session.apiFormat === 'gemini') {
                     role = msg.role || 'unknown';
@@ -205,6 +205,7 @@ function extractMessageText(message, format) {
 
     switch (format) {
         case 'openai':
+        case 'openai-responses':  // Responses API 消息格式与 OpenAI 相同
             // OpenAI 格式：content 可以是字符串或数组
             if (typeof message.content === 'string') {
                 return message.content;

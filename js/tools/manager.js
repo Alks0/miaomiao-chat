@@ -250,6 +250,7 @@ export function getToolsForAPI(apiFormat) {
 
     switch (apiFormat) {
         case 'openai':
+        case 'openai-responses':  // Responses API 使用与 OpenAI 相同的工具格式
             return enabledTools.map(convertToOpenAIFormat);
         case 'gemini':
             return enabledTools.map(convertToGeminiFormat);

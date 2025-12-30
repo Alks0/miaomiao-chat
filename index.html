@@ -3,6 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <!-- ✅ Content Security Policy - 防止 XSS 攻击 -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        img-src 'self' data: blob: https: http:;
+        font-src 'self' data: https://fonts.gstatic.com;
+        connect-src 'self'
+            https://api.openai.com
+            https://api.anthropic.com
+            https://generativelanguage.googleapis.com
+            https://aiplatform.googleapis.com
+            https:
+            http:
+            wss:
+            ws:;
+        media-src 'self' data: blob:;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+    ">
+    <!--
+        注意事项：
+        1. frame-ancestors 指令在 meta 标签中无效，需要在服务器 HTTP 响应头中设置
+        2. 'unsafe-inline' 允许内联脚本和样式，但增加 XSS 风险（当前项目使用了大量内联事件处理器）
+        3. connect-src 包含 https: wss: ws: 允许所有 HTTPS/WebSocket 连接（用于用户自定义API端点）
+    -->
+
+    <!-- mathjs 使用本地 UMD 构建版本，兼容所有平台（Web/Electron/Android）-->
+    <script src="libs/mathjs/math.js"></script>
+
     <title>Web Chat</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="libs/marked-highlight/index.css">
@@ -254,6 +285,19 @@
                 <p class="settings-hint">关闭后将等待完整响应再显示</p>
             </div>
 
+            <!-- 图片压缩模式 -->
+            <div class="settings-group">
+                <label class="settings-label">图片压缩</label>
+                <div class="toggle-row">
+                    <label class="switch">
+                        <input type="checkbox" id="fast-image-compression">
+                        <span class="slider"></span>
+                    </label>
+                    <span>高速压缩模式</span>
+                </div>
+                <p class="settings-hint">默认智能压缩（根据API限制按需压缩）；开启后强制压缩到512px以提升速度</p>
+            </div>
+
             <!-- 思维链开关 -->
             <div class="settings-group" id="thinking-config">
                 <label class="settings-label">思维链</label>
@@ -322,6 +366,100 @@
                     <span>启用实时搜索</span>
                 </div>
                 <p class="settings-hint">允许 AI 搜索互联网获取最新信息</p>
+            </div>
+
+            <!-- ========== Code Execution 配置（可折叠） ========== -->
+            <div class="settings-group">
+                <details class="model-params-details">
+                    <summary class="model-params-summary">
+                        <span style="font-weight: 600; font-size: 13px;">📝 代码执行（Code Execution）</span>
+                    </summary>
+                    <div style="margin-top: 12px;">
+                        <div class="toggle-row">
+                            <label class="switch">
+                                <input type="checkbox" id="code-execution-enabled">
+                                <span class="slider"></span>
+                            </label>
+                            <span>启用代码执行</span>
+                        </div>
+                        <p class="settings-hint">允许 AI 在沙箱中运行 Python、JavaScript 代码进行计算、数据分析等</p>
+                    </div>
+                </details>
+            </div>
+
+            <!-- ========== Computer Use 配置（可折叠） ========== -->
+            <div class="settings-group" id="computer-use-settings-group" style="display: none;">
+                <details class="model-params-details">
+                    <summary class="model-params-summary">
+                        <span style="font-weight: 600; font-size: 13px;">💻 Computer Use（仅 Electron）</span>
+                    </summary>
+                    <div style="margin-top: 12px;">
+                        <div class="toggle-row">
+                            <label class="switch">
+                                <input type="checkbox" id="computer-use-enabled">
+                                <span class="slider"></span>
+                            </label>
+                            <span>启用 Computer Use</span>
+                        </div>
+                        <p class="settings-hint">⚠️ 允许 AI 执行命令和编辑文件<br>仅支持 Claude API + Electron 环境（Gemini/OpenAI 支持通过自定义工具）</p>
+
+                        <!-- 权限控制 -->
+                        <details class="model-params-details" style="margin-top: 12px;">
+                            <summary class="model-params-summary">权限设置</summary>
+                            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                                <div class="toggle-row">
+                                    <label class="switch">
+                                        <input type="checkbox" id="allow-bash" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span>允许执行 Bash 命令</span>
+                                </div>
+                                <div class="toggle-row">
+                                    <label class="switch">
+                                        <input type="checkbox" id="allow-text-editor" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span>允许编辑文件</span>
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- Bash 命令配置 -->
+                        <details class="model-params-details" style="margin-top: 12px;">
+                            <summary class="model-params-summary">Bash 命令设置</summary>
+                            <div style="margin-top: 8px;">
+                                <label class="settings-label" style="font-size: 11px; margin-bottom: 4px;">默认工作目录</label>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <input type="text" id="bash-working-dir"
+                                           value=""
+                                           placeholder="留空使用应用根目录"
+                                           style="flex: 1; padding: 6px; font-family: var(--font-mono); font-size: 11px; background: var(--md-surface); border: var(--border); color: var(--md-text); border-radius: 4px;">
+                                    <button class="quick-toggle-btn" id="browse-working-dir" title="浏览文件夹">📁</button>
+                                </div>
+                                <p class="settings-hint">Bash 命令将在此目录下执行（留空则使用应用根目录）</p>
+
+                                <label class="settings-label" style="font-size: 11px; margin-top: 12px; margin-bottom: 4px;">命令超时时间（秒）</label>
+                                <input type="number" id="bash-timeout" value="30" min="5" max="300"
+                                       style="width: 80px; padding: 6px; font-family: var(--font-mono); font-size: 11px; background: var(--md-surface); border: var(--border); color: var(--md-text); border-radius: 4px;">
+
+                                <div class="toggle-row" style="margin-top: 12px;">
+                                    <label class="switch">
+                                        <input type="checkbox" id="bash-require-confirmation">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span>命令执行前需要确认（安全选项）</span>
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- 安全提示 -->
+                        <div style="margin-top: 12px; padding: 10px; background: var(--md-warning-bg, rgba(255,193,7,0.1)); border-left: 3px solid var(--md-warning, #ffc107); border-radius: 4px;">
+                            <p style="margin: 0; font-size: 11px; color: var(--md-text);">
+                                <strong>安全提示：</strong>Computer Use 具有系统级权限，AI 可以执行 Shell 命令和修改文件。请仅在受控环境下使用，并注意监控 AI 的行为。
+                            </p>
+                        </div>
+                    </div>
+                </details>
             </div>
 
             <!-- XML 工具调用兜底 -->
@@ -828,6 +966,23 @@
                     </svg>
                     <span>工具</span>
                 </button>
+                <!-- 代码执行快捷按钮 -->
+                <button id="toggle-code-exec" class="quick-toggle-btn" title="代码执行">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    <span>代码</span>
+                </button>
+                <!-- Computer Use 快捷按钮（仅 Electron 环境显示） -->
+                <button id="toggle-computer-use" class="quick-toggle-btn" title="Computer Use" style="display: none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/>
+                        <line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                    <span>控制</span>
+                </button>
             </div>
         </footer>
     </div>
@@ -850,8 +1005,6 @@
     <script src="libs/katex/katex.min.js"></script>
     <!-- 加载 DOMPurify 用于 HTML 净化（XSS 防护）-->
     <script src="libs/dompurify/purify.min.js"></script>
-    <!-- mathjs 使用本地 UMD 构建版本，兼容所有平台（Web/Electron/Android）-->
-    <script src="libs/mathjs/math.js"></script>
 
     <!-- ========== 快捷消息模态框 ========== -->
     <div id="quick-messages-modal" class="modal" role="dialog" aria-labelledby="quick-messages-modal-title" aria-modal="true">
