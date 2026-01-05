@@ -1353,7 +1353,7 @@ function updateEndpointHint(apiFormat) {
 
     const hints = {
         'openai': '示例: https://api.openai.com/v1/chat/completions 或 http://localhost:8000/v1/chat/completions',
-        'openai-responses': '示例: https://api.openai.com/v1/chat/completions（自动使用 Responses API）',
+        'openai-responses': '示例: https://api.openai.com/v1/responses 或自定义代理地址/v1/responses',
         'gemini': '示例: https://generativelanguage.googleapis.com 或自定义代理地址',
         'claude': '示例: https://api.anthropic.com/v1/messages 或自定义代理地址'
     };
@@ -1374,13 +1374,23 @@ function autoCompleteEndpoint(endpoint, apiFormat) {
 
     switch (apiFormat) {
         case 'openai':
-        case 'openai-responses':
-            // OpenAI 格式自动补全
+            // OpenAI Chat Completions 格式自动补全
             if (!endpoint.includes('/chat/completions')) {
                 if (endpoint.includes('/v1')) {
                     return endpoint + '/chat/completions';
                 } else {
                     return endpoint + '/v1/chat/completions';
+                }
+            }
+            return endpoint;
+
+        case 'openai-responses':
+            // OpenAI Responses API 格式自动补全
+            if (!endpoint.includes('/responses')) {
+                if (endpoint.includes('/v1')) {
+                    return endpoint + '/responses';
+                } else {
+                    return endpoint + '/v1/responses';
                 }
             }
             return endpoint;

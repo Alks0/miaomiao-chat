@@ -341,7 +341,7 @@ export function renderFinalTextWithThinking(textContent, thinkingContent, ground
     // 清理残留的流式状态（防止状态未重置）
     cleanupStreamingState(state.currentAssistantMessage);
 
-    enhanceCodeBlocks();
+    enhanceCodeBlocks(state.currentAssistantMessage);
     scrollToBottom();
 }
 
@@ -451,7 +451,7 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
     // 清理残留的流式状态（防止状态未重置）
     cleanupStreamingState(state.currentAssistantMessage);
 
-    enhanceCodeBlocks();
+    enhanceCodeBlocks(state.currentAssistantMessage);
     scrollToBottom();
 }
 

@@ -44,6 +44,9 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
     // <think> 标签解析器（用于 DeepSeek 等模型）
     const thinkTagParser = new ThinkTagParser();
 
+    // Responses API 的 encrypted_content 签名（用于多轮对话保持思维链上下文）
+    let encryptedContent = null;
+
     try {
         while (true) {
             const { done, value } = await reader.read();
@@ -57,7 +60,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                 if (line.startsWith('data: ')) {
                     const data = line.slice(6).trim();
                     if (data === '[DONE]') {
-                        finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId);
+                        finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId, encryptedContent);
                         return;
                     }
 
@@ -100,12 +103,83 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                             return; // 退出流处理
                         }
 
-                        // Responses API 格式：部分代理只返回 output_text（没有 output[]），这里需要兜底处理并计入 token
-                        if (isResponsesFormat && parsed.output_text && (!parsed.output || !Array.isArray(parsed.output)) && !textContent) {
+                        // Responses API 格式：基于事件类型处理流式响应
+                        // 事件类型包括：response.output_text.delta, response.completed 等
+                        if (isResponsesFormat && parsed.type) {
+                            switch (parsed.type) {
+                                case 'response.output_text.delta':
+                                    // 文本增量事件
+                                    if (parsed.delta) {
+                                        recordFirstToken();
+                                        recordTokens(parsed.delta);
+                                        textContent += parsed.delta;
+                                        totalReceived += parsed.delta.length;
+
+                                        // 合并连续的 text parts
+                                        const lastTextPart = contentParts[contentParts.length - 1];
+                                        if (lastTextPart && lastTextPart.type === 'text') {
+                                            lastTextPart.text += parsed.delta;
+                                        } else {
+                                            contentParts.push({ type: 'text', text: parsed.delta });
+                                        }
+                                        updateStreamingMessage(textContent, thinkingContent);
+                                    }
+                                    break;
+
+                                case 'response.reasoning.delta':
+                                case 'response.reasoning_summary.delta':
+                                    // 推理/思考增量事件
+                                    if (parsed.delta) {
+                                        recordFirstToken();
+                                        recordTokens(parsed.delta);
+                                        thinkingContent += parsed.delta;
+                                        totalReceived += parsed.delta.length;
+
+                                        // 合并连续的 thinking parts
+                                        const lastThinkPart = contentParts[contentParts.length - 1];
+                                        if (lastThinkPart && lastThinkPart.type === 'thinking') {
+                                            lastThinkPart.text += parsed.delta;
+                                        } else {
+                                            contentParts.push({ type: 'thinking', text: parsed.delta });
+                                        }
+                                        updateStreamingMessage(textContent, thinkingContent);
+                                    }
+                                    break;
+
+                                case 'response.completed':
+                                case 'response.done':
+                                    // 响应完成事件 - 提取最终内容（如果之前没有收到增量）
+                                    if (parsed.response?.output_text && !textContent) {
+                                        textContent = parsed.response.output_text;
+                                        totalReceived += textContent.length;
+                                        recordFirstToken();
+                                        recordTokens(textContent);
+                                        contentParts.push({ type: 'text', text: textContent });
+                                        updateStreamingMessage(textContent, thinkingContent);
+                                    }
+                                    // 提取 encrypted_content 签名（用于多轮对话）
+                                    if (parsed.response?.output) {
+                                        for (const item of parsed.response.output) {
+                                            if (item.type === 'reasoning' && item.encrypted_content) {
+                                                encryptedContent = item.encrypted_content;
+                                                console.log('[Parser] 提取到 encrypted_content 签名');
+                                            }
+                                        }
+                                    }
+                                    break;
+
+                                // 其他事件类型（如 response.created, response.in_progress 等）暂时忽略
+                                default:
+                                    console.debug('[Parser] Responses API 事件:', parsed.type);
+                                    break;
+                            }
+                        }
+                        // Responses API 格式：兜底 - 部分代理只返回 output_text（没有 type 字段）
+                        else if (isResponsesFormat && parsed.output_text && (!parsed.output || !Array.isArray(parsed.output)) && !textContent) {
                             textContent = parsed.output_text;
                             totalReceived += textContent.length;
 
-                            // 统计：output_text 也要计入 tokens（否则工具调用后的正文会“停止计数”）
+                            // 统计：output_text 也要计入 tokens（否则工具调用后的正文会"停止计数"）
                             recordFirstToken();
                             recordTokens(textContent);
 
@@ -117,7 +191,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
 
                             updateStreamingMessage(textContent, thinkingContent);
                         }
-                        // Responses API 格式：解析 output[] 数组
+                        // Responses API 格式：兜底 - 解析 output[] 数组（非流式或某些代理）
                         else if (isResponsesFormat && parsed.output && Array.isArray(parsed.output)) {
                             for (const item of parsed.output) {
                                 if (item.type === 'reasoning' && item.content) {
@@ -381,7 +455,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 type: 'warning'
                             });
                             await reader.cancel();
-                            finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId);
+                            finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId, encryptedContent);
                             return;
                         }
                     } catch (_e) {
@@ -413,7 +487,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
         }
 
         // 流结束
-        finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId);
+        finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId, encryptedContent);
     } finally {
         // 关键释放 reader 锁，防止资源泄漏
         try {
@@ -431,8 +505,9 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
  * @param {string} thinkingContent - 思维链内容
  * @param {Array} contentParts - 内容部分数组
  * @param {string} sessionId - 会话ID
+ * @param {string} encryptedContent - Responses API 的 encrypted_content 签名
  */
-function finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId) {
+function finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId, encryptedContent = null) {
     // 流结束，清除工具调用pending标志（如果没有新的工具调用）
     // 这样handler的finally块才能正确清理loading状态
     if (state.isToolCallPending) {
@@ -466,6 +541,7 @@ function finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessio
         contentParts,
         streamStats: getCurrentStreamStatsData(),
         sessionId: sessionId, // 🔒 传递会话ID防止串消息
+        encryptedContent: encryptedContent,
     });
 
     // Bug 2 立即设置 dataset.messageIndex

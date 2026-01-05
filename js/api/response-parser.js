@@ -240,15 +240,23 @@ export function parseApiResponse(data, format = 'openai') {
 
             let textContent = '';
             let thinkingContent = '';
+            let encryptedContent = null;  // 🔐 加密的推理内容签名
             const contentParts = [];
 
             // 1. 优先从 output[] 数组解析
             if (data.output && Array.isArray(data.output)) {
                 for (const item of data.output) {
-                    if (item.type === 'reasoning' && item.content) {
+                    if (item.type === 'reasoning') {
                         // 推理/思维链内容
-                        thinkingContent += item.content;
-                        contentParts.push({ type: 'thinking', text: item.content });
+                        if (item.content) {
+                            thinkingContent += item.content;
+                            contentParts.push({ type: 'thinking', text: item.content });
+                        }
+                        // 提取 encrypted_content 签名（用于多轮对话）
+                        if (item.encrypted_content) {
+                            encryptedContent = item.encrypted_content;
+                            console.log('[Response Parser] 提取到 encrypted_content 签名');
+                        }
                     }
                     else if (item.type === 'message') {
                         // 消息内容
@@ -290,6 +298,7 @@ export function parseApiResponse(data, format = 'openai') {
                 content: textContent,
                 thinkingContent: thinkingContent || null,
                 contentParts: contentParts.length > 0 ? contentParts : null,
+                encryptedContent: encryptedContent,
             };
         }
 

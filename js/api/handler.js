@@ -369,6 +369,7 @@ async function handleNonStreamResponse(response, assistantMessageEl, sessionId) 
                 textContent: reply0.content || '',
                 thinkingContent: reply0.thinkingContent,
                 thoughtSignature: reply0.thoughtSignature,
+                encryptedContent: reply0.encryptedContent,  // 🔐 Responses API 签名
                 streamStats: getCurrentStreamStatsData(),
                 allReplies: allReplies,
                 selectedReplyIndex: 0,

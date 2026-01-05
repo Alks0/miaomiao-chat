@@ -23,9 +23,11 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     const provider = getCurrentProvider();
     const format = provider?.apiFormat || 'openai';
     const isResponsesFormat = format === 'openai-responses';
-    const apiEndpoint = isResponsesFormat && !endpoint.includes('/responses')
-        ? endpoint.replace('/chat/completions', '/responses')
-        : endpoint;
+    // 端点已在 UI 层正确补全，这里做兼容处理（旧配置可能仍是 /chat/completions）
+    let apiEndpoint = endpoint;
+    if (isResponsesFormat && !endpoint.includes('/responses')) {
+        apiEndpoint = endpoint.replace('/chat/completions', '/responses');
+    }
 
     // 构建消息数组（过滤掉错误消息，它们不应发送给 API）
     let messages = state.messages.filter(m => !m.isError);
@@ -75,6 +77,18 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     if (isResponsesFormat) {
         // Responses API 使用 input
         requestBody.input = messages;
+
+        // 请求返回加密的推理内容（用于多轮对话保持思维链上下文）
+        requestBody.include = ['reasoning.encrypted_content'];
+
+        // 从消息历史中查找并传递 encrypted_content 签名
+        // 类似 Gemini 的 thoughtSignature，需要传递给所有消息
+        const encryptedContent = findEncryptedContentFromMessages(state.messages);
+        if (encryptedContent) {
+            // 将签名添加到每个非 system 消息中（Responses API 格式）
+            requestBody.input = propagateEncryptedContent(messages, encryptedContent);
+            console.log('[OpenAI] 传递 encrypted_content 签名到请求');
+        }
     } else {
         // Chat Completions API 使用 messages
         requestBody.messages = messages;
@@ -324,4 +338,49 @@ export function buildToolResultMessages(toolCalls, toolResults) {
     ];
 
     return messages;
+}
+
+/**
+ * 从消息历史中查找 encrypted_content 签名
+ * 优先使用最新的签名（类似 Gemini 的 thoughtSignature）
+ * @param {Array} messages - 消息数组
+ * @returns {string|null} encrypted_content 签名
+ */
+function findEncryptedContentFromMessages(messages) {
+    if (!messages || messages.length === 0) return null;
+
+    // 从后向前查找，优先使用最新的签名
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.encryptedContent) {
+            return msg.encryptedContent;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * 将 encrypted_content 签名传播到所有消息
+ * Responses API 格式：在 assistant 消息中添加 reasoning 字段
+ * @param {Array} messages - 消息数组
+ * @param {string} encryptedContent - 加密的推理内容
+ * @returns {Array} 更新后的消息数组
+ */
+function propagateEncryptedContent(messages, encryptedContent) {
+    if (!encryptedContent) return messages;
+
+    return messages.map(msg => {
+        // 只在 assistant 消息中添加签名（模型的回复）
+        if (msg.role === 'assistant') {
+            return {
+                ...msg,
+                // Responses API 格式：reasoning 包含 encrypted_content
+                reasoning: {
+                    encrypted_content: encryptedContent
+                }
+            };
+        }
+        return msg;
+    });
 }

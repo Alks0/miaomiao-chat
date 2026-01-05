@@ -69,6 +69,7 @@ export function saveAssistantMessage(options) {
         sessionId = null,    // 🔒 请求发起时的会话ID
         isContinuation = false,  // 是否是工具调用的 continuation
         toolCalls = null,  // 工具调用信息（用于会话恢复时重建工具UI）
+        encryptedContent = null,  // OpenAI Responses API 的 encrypted_content 签名
     } = options;
 
     // 🔑 生成唯一消息ID
@@ -85,7 +86,7 @@ export function saveAssistantMessage(options) {
     const seenImageUrls = new Set();
     const deduplicatedContentParts = contentParts.filter(p => {
         if (p.type === 'image_url' && p.url) {
-            // 使用完整 URL 的 hash 作为去重依据（修复 P0 安全问题）
+            // 使用完整 URL 的 hash 作为去重依据
             const urlKey = simpleHash(p.url);
             if (seenImageUrls.has(urlKey)) {
                 console.log('[saveAssistantMessage] 检测到重复图片，已去重');
@@ -106,21 +107,24 @@ export function saveAssistantMessage(options) {
     const openaiMsg = buildOpenAIAssistantMessage({
         messageId, textContent, contentParts: finalContentParts, hasImages, thinkingContent, thinkingSignature,
         thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName,
-        toolCalls  // 传递工具调用信息
+        toolCalls,  // 传递工具调用信息
+        encryptedContent
     });
 
     // 2. 构建 Gemini 格式（使用去重后的contentParts）
     const geminiMsg = buildGeminiAssistantMessage({
         messageId, textContent, contentParts: finalContentParts, hasImages, thoughtSignature,
         streamStats, allReplies, selectedReplyIndex, geminiParts, modelName, providerName,
-        toolCalls  // 传递工具调用信息
+        toolCalls,
+        encryptedContent
     });
 
     // 3. 构建 Claude 格式（使用去重后的contentParts）
     const claudeMsg = buildClaudeAssistantMessage({
         messageId, textContent, contentParts: finalContentParts, hasImages, thinkingContent, thinkingSignature,
         streamStats, allReplies, selectedReplyIndex, modelName, providerName,
-        toolCalls  // 传递工具调用信息
+        toolCalls,
+        encryptedContent
     });
 
     // 🔒 检查会话是否已切换（防止消息串到其他会话）
@@ -271,7 +275,7 @@ export function saveAssistantMessage(options) {
             const seenUrls = new Set();
             mergedContentParts = mergedContentParts.filter(p => {
                 if (p.type === 'image_url' && p.url) {
-                    // 使用完整 URL 的 hash 作为去重依据（修复 P0 安全问题）
+                    // 使用完整 URL 的 hash 作为去重依据
                     const urlKey = simpleHash(p.url);
                     if (seenUrls.has(urlKey)) {
                         console.log('[saveAssistantMessage] Continuation合并：检测到重复图片，已去重');
@@ -622,7 +626,8 @@ function buildOpenAIAssistantMessage(opts) {
     const {
         messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
         thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName,
-        toolCalls  // 添加工具调用信息
+        toolCalls,
+        encryptedContent
     } = opts;
 
     const msg = { role: 'assistant' };
@@ -652,7 +657,8 @@ function buildOpenAIAssistantMessage(opts) {
     // 添加元数据
     if (thinkingContent) msg.thinkingContent = thinkingContent;
     if (thinkingSignature) msg.thinkingSignature = thinkingSignature;  // Claude 签名
-    if (thoughtSignature) msg.thoughtSignature = thoughtSignature;  // Gemini 签名（P0 修复）
+    if (thoughtSignature) msg.thoughtSignature = thoughtSignature;
+    if (encryptedContent) msg.encryptedContent = encryptedContent;
     if (streamStats) msg.streamStats = streamStats;
     if (allReplies && allReplies.length > 0) {
         msg.allReplies = allReplies;
@@ -679,7 +685,8 @@ function buildGeminiAssistantMessage(opts) {
     const {
         messageId, textContent, contentParts, hasImages, thoughtSignature,
         streamStats, geminiParts, modelName, providerName,
-        toolCalls  // 添加工具调用信息
+        toolCalls,
+        encryptedContent
     } = opts;
 
     // 如果提供了原始 geminiParts，优先使用
@@ -726,6 +733,7 @@ function buildGeminiAssistantMessage(opts) {
 
     // 添加元数据
     if (thoughtSignature) msg.thoughtSignature = thoughtSignature;
+    if (encryptedContent) msg.encryptedContent = encryptedContent;
     if (streamStats) msg.streamStats = streamStats;
 
     // 保存原始 contentParts（用于会话恢复时的完整渲染）
@@ -748,7 +756,8 @@ function buildClaudeAssistantMessage(opts) {
     const {
         messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
         streamStats, modelName, providerName,
-        toolCalls  // 添加工具调用信息
+        toolCalls,
+        encryptedContent
     } = opts;
 
     let content;
@@ -784,7 +793,8 @@ function buildClaudeAssistantMessage(opts) {
 
     // 添加元数据
     if (thinkingContent) msg.thinkingContent = thinkingContent;
-    if (thinkingSignature) msg.thinkingSignature = thinkingSignature;  // Claude 签名
+    if (thinkingSignature) msg.thinkingSignature = thinkingSignature;
+    if (encryptedContent) msg.encryptedContent = encryptedContent;
     if (streamStats) msg.streamStats = streamStats;
 
     // 保存原始 contentParts（用于会话恢复时的完整渲染）
@@ -813,6 +823,7 @@ export function copyMessageMetadata(source, target) {
         'groundingMetadata',  // 搜索引用（Gemini 专有）
         'streamStats',        // 流统计数据
         'thoughtSignature',   // 思维链签名（Gemini 专有）
+        'encryptedContent',   // Responses API 签名
         'isError',            // 错误标记
         'errorData',          // 错误数据
         'errorHtml',          // 错误 HTML

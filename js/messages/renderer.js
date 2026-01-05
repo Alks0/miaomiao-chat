@@ -546,7 +546,8 @@ export function enhanceCodeBlocks(container = null) {
 
         // 优化：使用缓存的选择器避免重复查询
         // 如果已经处理过，跳过
-        if (pre.classList.contains('code-block-enhanced')) return;
+        // 同时检查是否已经在另一个折叠代码块的内部，避免重复增强导致的嵌套
+        if (pre.classList.contains('code-block-enhanced') || pre.closest('.code-collapse-content')) return;
 
         // 获取代码内容
         const codeText = codeBlock.textContent;
