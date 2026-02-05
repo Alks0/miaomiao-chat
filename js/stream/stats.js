@@ -10,7 +10,7 @@ import { state } from '../core/state.js';
  * @param {string} text
  * @returns {number}
  */
-function estimateTokenCount(text) {
+export function estimateTokenCount(text) {
     if (!text) return 0;
     const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
     const otherText = text.replace(/[\u4e00-\u9fff]/g, ' ');

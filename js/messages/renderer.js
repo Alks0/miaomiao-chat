@@ -13,6 +13,7 @@ import { getCurrentModelCapabilities } from '../providers/manager.js';
 import { renderCapabilityBadgesText } from '../utils/capability-badges.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { categorizeFile, truncateFileName } from '../utils/file-helpers.js';
+import { lazyImageManager } from '../utils/lazy-image.js';
 
 /**
  * 添加消息到 DOM
@@ -92,15 +93,24 @@ export function createMessageElement(role, content, images = null, messageId = n
             const category = file.category || categorizeFile(file.type);
 
             if (category === 'image') {
-                // 图片：显示缩略图
+                // 图片：使用懒加载
                 const imgEl = document.createElement('img');
-                imgEl.src = file.compressed || file.data;
+                // 使用SVG占位图，减少初始内存占用
+                imgEl.src = 'data:image/svg+xml,%3Csvg width="400" height="300" xmlns="http://www.w3.org/2000/svg"%3E%3Crect width="100%25" height="100%25" fill="%23f5f5f5"/%3E%3C/svg%3E';
+                // 真实图片URL存储在 data-src
+                imgEl.dataset.src = file.compressed || file.data;
                 imgEl.alt = file.name;
                 imgEl.title = '点击查看大图';
+                imgEl.className = 'lazy-image';
                 imgEl.onclick = () => {
                     eventBus.emit('ui:open-image-viewer', { url: file.data });
                 };
                 attachmentsContainer.appendChild(imgEl);
+
+                // 在下一个空闲时间观察图片
+                requestIdleCallback(() => {
+                    lazyImageManager.observe(imgEl);
+                }, { timeout: 500 });
             } else if (category === 'pdf') {
                 // PDF：显示文件图标
                 const fileEl = document.createElement('div');

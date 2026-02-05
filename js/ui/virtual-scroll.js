@@ -8,14 +8,15 @@ import { state } from '../core/state.js';
 import { elements } from '../core/elements.js';
 import { createMessageElement, renderThinkingBlock, renderReplyWithSelector } from '../messages/renderer.js';
 import { renderStreamStatsFromData } from '../stream/stats.js';
+import { lazyImageManager, preloadImagesInRange } from '../utils/lazy-image.js';
 
 // 虚拟滚动配置
 const VIRTUAL_SCROLL_CONFIG = {
-    enabled: false, // 是否启用虚拟滚动
-    threshold: 100, // 消息数量阈值（超过此数量启用虚拟滚动）
+    enabled: true, // 默认启用虚拟滚动
+    threshold: 5, // 消息数量阈值（降低到5条，适合图片密集场景）
     itemHeight: 150, // 预估每条消息高度（px）
-    overscan: 5, // 上下额外渲染的消息数量（避免闪烁）
-    buffer: 10 // 缓冲区大小（预加载）
+    overscan: 8, // 上下额外渲染的消息数量（增加到8，减少闪烁）
+    buffer: 15 // 缓冲区大小（增加到15，改善滚动体验）
 };
 
 // 虚拟滚动状态
@@ -293,6 +294,15 @@ function renderVirtualMessages() {
     // 插入到正确位置（在 bottom spacer 之前）
     if (fragment.childNodes.length > 0) {
         elements.messagesArea.insertBefore(fragment, bottomSpacer);
+
+        // 观察新插入的懒加载图片
+        requestIdleCallback(() => {
+            const lazyImages = elements.messagesArea.querySelectorAll('.lazy-image:not(.observed)');
+            lazyImages.forEach(img => {
+                lazyImageManager.observe(img);
+                img.classList.add('observed');
+            });
+        }, { timeout: 500 });
     }
 }
 

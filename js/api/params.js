@@ -61,10 +61,14 @@ function buildResponsesAPIThinking() {
         }
     }
 
-    // 启用时：low/medium/high
-    const effort = state.thinkingStrength === 'custom'
-        ? 'high'
-        : state.thinkingStrength;
+    // 启用时：minimal/low/medium/high/xhigh
+    let effort = state.thinkingStrength;
+    if (effort === 'custom') {
+        effort = 'high';
+    } else if (effort !== 'minimal' && effort !== 'low' && effort !== 'medium' && effort !== 'high' && effort !== 'xhigh') {
+        // 其他格式误用了 OpenAI 特有的值，默认转换为 high
+        effort = 'high';
+    }
 
     return {
         reasoning: {
@@ -89,39 +93,54 @@ export function buildThinkingConfig(format, model = '') {
         claude: { low: 2048, medium: 8192, high: 16384 }
     };
 
-    const budget = state.thinkingStrength === 'custom'
+    // 处理 OpenAI 特有的 minimal 和 xhigh 值
+    let normalizedStrength = state.thinkingStrength;
+    if (format !== 'openai' && format !== 'openai-responses') {
+        if (normalizedStrength === 'minimal') normalizedStrength = 'low';
+        else if (normalizedStrength === 'xhigh') normalizedStrength = 'high';
+    }
+
+    const budget = normalizedStrength === 'custom'
         ? state.thinkingBudget
-        : (budgetMaps[format]?.[state.thinkingStrength] || 16384);
+        : (budgetMaps[format]?.[normalizedStrength] || 16384);
 
     switch (format) {
-        case 'openai':
+        case 'openai': {
             // Chat Completions API 格式
             if (!state.thinkingEnabled) return null;
-            const effort = state.thinkingStrength === 'custom' ? 'high' : state.thinkingStrength;
+            let effort = state.thinkingStrength;
+            if (effort === 'custom') {
+                effort = 'high';
+            } else if (effort !== 'minimal' && effort !== 'low' && effort !== 'medium' && effort !== 'high' && effort !== 'xhigh') {
+                // 其他格式误用了 OpenAI 特有的值，默认转换为 high
+                effort = 'high';
+            }
             return { reasoning_effort: effort };
+        }
 
         case 'openai-responses':
             // Responses API 格式（嵌套的 reasoning 对象）
             return buildResponsesAPIThinking();
 
-        case 'gemini':
-            // ✅ 修复：检查是否启用思考链
+        case 'gemini': {
+            // 检查是否启用思考链
             if (!state.thinkingEnabled) return null;
 
             // Gemini 需要检测版本
             const isGemini3 = model.includes('gemini-3') || model.includes('gemini3');
 
             if (isGemini3) {
-                const level = state.thinkingStrength === 'low' ? 'LOW' : 'HIGH';
+                const level = normalizedStrength === 'low' ? 'LOW' : 'HIGH';
                 return { thinkingConfig: { thinkingLevel: level, includeThoughts: true } };
             }
             // Gemini 2.5 或其他版本使用 thinkingBudget
             return { thinkingConfig: { thinkingBudget: budget, includeThoughts: true } };
+        }
 
         case 'claude':
-            // ✅ 修复：检查是否启用思考链
+            // 检查是否启用思考链
             if (!state.thinkingEnabled) return null;
-            return { thinking: { type: 'enabled', budget_tokens: budget } };
+            return { thinking: { budget_tokens: budget } };  // 移除 type: 'enabled'，使用最新格式
 
         default:
             return null;

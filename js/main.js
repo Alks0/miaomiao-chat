@@ -80,6 +80,7 @@ async function loadEruda() {
 
 // ========== Core Layer ==========
 import './core/events.js';
+import { eventBus } from './core/events.js';
 import { state } from './core/state.js';
 import { elements, initElements } from './core/elements.js';
 
@@ -166,6 +167,9 @@ import { initToolsQuickSelector } from './ui/tools-quick-selector.js';
 
 // ========== Update Layer ==========
 import { initUpdateModal } from './update/update-modal.js';
+
+// ========== Performance & Memory ==========
+import { memoryManager } from './utils/memory-manager.js';
 
 /**
  * 初始化应用
@@ -347,6 +351,15 @@ async function init() {
         console.log('🔧 Step 7.5/9: Initializing tools system...');
         initTools();
 
+        // 监听工具执行状态变化，保存结果到消息历史
+        eventBus.on('tool:status:changed', ({ toolId, status, result }) => {
+            if (status === 'completed' || status === 'failed') {
+                import('./messages/sync.js').then(({ updateToolCallResult }) => {
+                    updateToolCallResult(toolId, status, result);
+                });
+            }
+        });
+
         console.log('🖱️  Step 8/9: Initializing UI handlers...');
 
         // 基础UI
@@ -399,6 +412,16 @@ async function init() {
         initMCPSettings();
         initToolManager();
         initToolsQuickSelector();
+
+        // 初始化工具管理器 MCP 增强
+        import('./ui/tool-manager-mcp-enhancements.js').then(({ initToolManagerMCPEnhancements }) => {
+            initToolManagerMCPEnhancements();
+        });
+
+        // 初始化快速选择器 MCP 增强
+        import('./ui/tools-quick-selector-enhancements.js').then(({ initQuickSelectorEnhancements }) => {
+            initQuickSelectorEnhancements();
+        });
 
         // 高级功能
         initPrefillControls();
@@ -453,6 +476,12 @@ async function init() {
         console.log(`💬 Sessions: ${state.sessions.length}`);
         console.log(`🎨 Theme: ${document.documentElement.classList.contains('dark-theme') ? 'dark' : 'light'}`);
         console.log(`🔌 API Format: ${state.apiFormat}`);
+
+        // 7. 自动连接 MCP 服务器
+        console.log('🔗 Step 10/10: Auto-connecting MCP servers...');
+        import('./ui/mcp-auto-connect.js').then(({ initMCPAutoConnect }) => {
+            initMCPAutoConnect(1000); // 延迟 1 秒后开始连接，确保 UI 已完全加载
+        });
 
         // 添加页面关闭前保存配置
         window.addEventListener('beforeunload', () => {

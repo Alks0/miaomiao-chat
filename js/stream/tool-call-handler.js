@@ -10,57 +10,111 @@ import { getOrCreateMappedId } from '../api/format-converter.js';  // ID 转换
 import { state } from '../core/state.js';  // 访问应用状态
 
 /**
- * 检测并下载 Claude Code Execution 返回的文件
+ * 处理工具返回的多媒体内容
+ * 支持MCP标准格式和Claude Code Execution格式
  * @param {Object} result - 工具执行结果
  * @param {string} toolName - 工具名称
  * @returns {Promise<Object>} 增强后的结果
  */
 async function enrichToolResultWithFiles(result, toolName) {
-    // 只处理 Code Execution 相关工具
-    if (!toolName || !toolName.includes('code_execution')) {
-        return result;
-    }
+    // 1. 优先处理 MCP 标准 content 数组格式
+    if (result && result.content && Array.isArray(result.content)) {
+        const converted = {};
+        const images = [];
+        const texts = [];
+        let hasContent = false;
 
-    // 检测 Claude Code Execution 的 bash_code_execution_tool_result 格式
-    if (result && result.content && typeof result.content === 'object') {
-        const content = result.content;
+        console.log(`[ToolCallHandler] 检测到 MCP content 数组格式，开始转换`);
 
-        // 检测 bash_code_execution_result 格式
-        if (content.type === 'bash_code_execution_result' && Array.isArray(content.content)) {
-            const images = [];
+        for (const item of result.content) {
+            // 处理文本内容
+            if (item.type === 'text' && item.text) {
+                texts.push(item.text);
+                hasContent = true;
+                console.log(`[ToolCallHandler] 发现文本内容: ${item.text.substring(0, 50)}...`);
+            }
+            // 处理图片内容
+            else if (item.type === 'image' && item.data) {
+                const mimeType = item.mimeType || item.media_type || 'image/png';
+                images.push({
+                    type: 'image_url',
+                    url: `data:${mimeType};base64,${item.data}`
+                });
+                hasContent = true;
+                console.log(`[ToolCallHandler] 🖼️ 发现图片内容，MIME类型: ${mimeType}`);
+            }
+        }
 
-            for (const item of content.content) {
-                // 检测文件输出
-                if (item.type === 'file' && item.file_id) {
-                    console.log(`[ToolCallHandler] 🖼️ 检测到 Code Execution 文件输出:`, item);
-
-                    try {
-                        // 下载文件
-                        const fileData = await downloadClaudeFile(item.file_id);
-                        if (fileData) {
-                            images.push({
-                                type: 'image_url',
-                                url: `data:${item.file_type || 'image/png'};base64,${fileData}`,
-                                file_id: item.file_id
-                            });
-                            console.log(`[ToolCallHandler] 文件下载成功: ${item.file_id}`);
-                        }
-                    } catch (error) {
-                        console.error(`[ToolCallHandler] ❌ 下载文件失败: ${item.file_id}`, error);
-                    }
-                }
+        // 如果成功转换了内容，返回转换后的结果
+        if (hasContent) {
+            // 处理文本
+            if (texts.length > 0) {
+                converted.text = texts.join('\n');
             }
 
-            // 如果有图片，添加到结果中
-            if (images.length > 0) {
-                return {
-                    ...result,
-                    images: images  // 添加图片数组
-                };
+            // 处理图片
+            if (images.length === 1) {
+                // 单张图片使用 image 字段（向后兼容）
+                converted.image = images[0].url;
+            } else if (images.length > 1) {
+                // 多张图片使用 images 数组
+                converted.images = images;
+            }
+
+            console.log(`[ToolCallHandler] MCP 格式转换完成:`, {
+                hasText: !!converted.text,
+                hasImage: !!converted.image,
+                imagesCount: images.length
+            });
+
+            // 保留原始结果的其他字段，但用转换后的内容覆盖
+            return { ...result, ...converted };
+        }
+    }
+
+    // 2. 处理 Claude Code Execution 格式（保持原有逻辑）
+    if (toolName && toolName.includes('code_execution')) {
+        if (result && result.content && typeof result.content === 'object') {
+            const content = result.content;
+
+            // 检测 bash_code_execution_result 格式
+            if (content.type === 'bash_code_execution_result' && Array.isArray(content.content)) {
+                const images = [];
+
+                for (const item of content.content) {
+                    // 检测文件输出
+                    if (item.type === 'file' && item.file_id) {
+                        console.log(`[ToolCallHandler] 🖼️ 检测到 Code Execution 文件输出:`, item);
+
+                        try {
+                            // 下载文件
+                            const fileData = await downloadClaudeFile(item.file_id);
+                            if (fileData) {
+                                images.push({
+                                    type: 'image_url',
+                                    url: `data:${item.file_type || 'image/png'};base64,${fileData}`,
+                                    file_id: item.file_id
+                                });
+                                console.log(`[ToolCallHandler] 文件下载成功: ${item.file_id}`);
+                            }
+                        } catch (error) {
+                            console.error(`[ToolCallHandler] ❌ 下载文件失败: ${item.file_id}`, error);
+                        }
+                    }
+                }
+
+                // 如果有图片，添加到结果中
+                if (images.length > 0) {
+                    return {
+                        ...result,
+                        images: images  // 添加图片数组
+                    };
+                }
             }
         }
     }
 
+    // 3. 如果都不匹配，返回原始结果
     return result;
 }
 
@@ -236,7 +290,9 @@ export async function executeToolCalls(toolCalls) {
 
         try {
             // 执行工具
-            const result = await executeTool(name, args);
+            // 优先使用工具ID，如果没有则使用工具名称
+            const toolIdentifier = id || name;
+            const result = await executeTool(toolIdentifier, args);
 
             // 更新 UI 为成功状态
             try {

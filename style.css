@@ -32,6 +32,7 @@
 @import "styles/components/_reasoning-collapser.css";
 @import "styles/components/_search-results.css";
 @import "styles/components/_image-loader.css";
+@import "styles/components/_lazy-image.css";
 @import "styles/components/_response-selector.css";
 @import "styles/components/_notifications.css";
 @import "styles/components/_scroll-to-bottom.css";

@@ -1,0 +1,143 @@
+/**
+ * 图片懒加载样式
+ * 处理加载中、已加载、错误等状态
+ */
+
+/* 懒加载图片基础样式 */
+.lazy-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    background-color: var(--color-surface-secondary);
+    border-radius: var(--radius-lg);
+    transition: opacity 0.3s ease;
+    position: relative;
+    min-height: 100px; /* 最小高度，避免布局跳动 */
+}
+
+/* 加载中状态 */
+.lazy-image.loading {
+    opacity: 0.5;
+    filter: blur(2px);
+}
+
+/* 已加载状态 */
+.lazy-image.loaded {
+    opacity: 1;
+    filter: none;
+}
+
+/* 加载错误状态 */
+.lazy-image.error {
+    opacity: 1;
+    background-color: #fee;
+    border: 2px dashed var(--color-error);
+}
+
+/* 图片加载指示器容器 */
+.image-loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* 加载动画 */
+.image-loader .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* 图片容器相对定位 */
+.message-images {
+    position: relative;
+}
+
+/* 占位图样式 */
+.lazy-image:not(.loaded):not(.error) {
+    background-image: linear-gradient(
+        45deg,
+        #f0f0f0 25%,
+        #f8f8f8 25%,
+        #f8f8f8 50%,
+        #f0f0f0 50%,
+        #f0f0f0 75%,
+        #f8f8f8 75%,
+        #f8f8f8
+    );
+    background-size: 20px 20px;
+    animation: lazy-image-shimmer 1.5s linear infinite;
+}
+
+/* 占位图动画 */
+@keyframes lazy-image-shimmer {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 20px 20px;
+    }
+}
+
+/* 虚拟滚动下的图片优化 */
+.virtual-scroll-active .lazy-image {
+    /* 使用 contain 提高渲染性能 */
+    contain: layout style paint;
+    /* 启用硬件加速 */
+    will-change: transform;
+}
+
+/* 低内存模式（可选） */
+.low-memory-mode .lazy-image:not(.loaded) {
+    /* 更简单的占位符，减少内存使用 */
+    background: #f0f0f0;
+    animation: none;
+}
+
+/* 移动设备优化 */
+@media (max-width: 768px) {
+    .lazy-image {
+        /* 移动设备上减少最小高度 */
+        min-height: 60px;
+    }
+
+    .image-loader .spinner {
+        /* 更小的加载指示器 */
+        width: 24px;
+        height: 24px;
+    }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+    .lazy-image.error {
+        border-width: 3px;
+    }
+
+    .image-loader .spinner {
+        border-width: 4px;
+    }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+    .lazy-image {
+        transition: none;
+    }
+
+    .image-loader .spinner {
+        animation: none;
+        border-top-color: var(--color-primary);
+    }
+
+    .lazy-image:not(.loaded):not(.error) {
+        animation: none;
+        background: #f0f0f0;
+    }
+}

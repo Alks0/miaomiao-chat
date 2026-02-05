@@ -10,6 +10,7 @@
  */
 
 import { categorizeFile } from '../utils/file-helpers.js';
+import { state } from '../core/state.js';
 
 /**
  * 判断 MIME 类型的文件类别
@@ -49,14 +50,23 @@ export function toOpenAIMessage(role, content, attachments = null) {
                     // 图片使用 image_url 格式
                     parts.push({ type: 'image_url', image_url: { url: att } });
                 } else if (category === 'pdf') {
-                    // PDF 使用 file 格式（OpenAI 2025.3 新增）
-                    parts.push({
-                        type: 'file',
-                        file: {
-                            filename: 'document.pdf',
-                            file_data: `data:${mimeType};base64,${base64Data}`
-                        }
-                    });
+                    // PDF 处理策略
+                    if (state.pdfImageModeEnabled) {
+                        // 兼容模式：将 PDF 伪装成 image_url (适用于 Gemini 兼容接口)
+                        parts.push({ 
+                            type: 'image_url', 
+                            image_url: { url: att } 
+                        });
+                    } else {
+                        // 标准模式：使用 file 格式（OpenAI 2025.3 新增）
+                        parts.push({
+                            type: 'file',
+                            file: {
+                                filename: 'document.pdf',
+                                file_data: `data:${mimeType};base64,${base64Data}`
+                            }
+                        });
+                    }
                 } else if (category === 'text') {
                     // 文本文件：解码后作为文本内容插入
                     try {

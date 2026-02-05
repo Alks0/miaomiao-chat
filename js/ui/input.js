@@ -13,7 +13,8 @@ import { showNotification } from './notifications.js';
 import { generateMessageId } from '../utils/helpers.js';
 import { pushMessage } from '../core/state-mutations.js';
 import { truncateFileName } from '../utils/file-helpers.js';
-import { MAX_ATTACHMENTS, MAX_FILE_SIZE, MAX_MESSAGE_LENGTH, IMAGE_COMPRESSION_TIMEOUT } from '../utils/constants.js';
+import { MAX_ATTACHMENTS, MAX_FILE_SIZE, MAX_MESSAGE_LENGTH, IMAGE_COMPRESSION_TIMEOUT, AUTO_DOCUMENT_TOKEN_THRESHOLD } from '../utils/constants.js';
+import { estimateTokenCount } from '../stream/stats.js';
 
 // 支持的文件类型
 const SUPPORTED_TYPES = {
@@ -282,6 +283,7 @@ export function updateImagePreview() {
             const sizeStr = file.size ? `${(file.size / 1024).toFixed(2)} KB` : '';
             const isMarkdown = file.type === 'text/markdown' || file.name.endsWith('.md');
             const iconClass = isMarkdown ? 'md-icon' : 'txt-icon';
+            const isAutoConverted = file.isAutoConverted || false;
             previewItem.className = 'image-preview-item file-preview-item';
             previewItem.innerHTML = `
                 <div class="file-preview-icon ${iconClass}">
@@ -292,10 +294,11 @@ export function updateImagePreview() {
                         <line x1="16" y1="17" x2="8" y2="17"/>
                         <polyline points="10 9 9 9 8 9"/>
                     </svg>
+                    ${isAutoConverted ? '<span class="auto-convert-badge" title="超长文本已自动转换为文档">自动</span>' : ''}
                 </div>
                 <div class="file-preview-info">
                     <span class="file-name" title="${file.name}">${truncateFileName(file.name, 15)}</span>
-                    <span class="file-size">${sizeStr}</span>
+                    <span class="file-size">${sizeStr}${isAutoConverted ? ' (自动转换)' : ''}</span>
                 </div>
                 <button class="remove-image" data-index="${index}" title="移除">×</button>
             `;
@@ -591,7 +594,7 @@ export async function handleSend() {
     console.log('[input.js] handleSend 被调用, 状态机:', requestStateMachine.getState());
 
     let textContent = elements.userInput.value.trim();
-    const hasAttachments = state.uploadedImages.length > 0;
+    let hasAttachments = state.uploadedImages.length > 0;
     const isEditing = state.editingIndex !== null;
 
     if (!textContent && !hasAttachments) {
@@ -618,6 +621,48 @@ export async function handleSend() {
     // 验证消息长度
     if (!validateMessageLength(textContent)) {
         return;
+    }
+
+    // 检查 token 数量，超过阈值自动转换为文档
+    if (textContent) {
+        const tokenCount = estimateTokenCount(textContent);
+        console.log(`[input.js] 消息 token 数: ${tokenCount}`);
+
+        if (tokenCount > AUTO_DOCUMENT_TOKEN_THRESHOLD) {
+            console.log(`[input.js] Token 数超过 ${AUTO_DOCUMENT_TOKEN_THRESHOLD}，自动转换为文档附件`);
+
+            // 检查附件数量限制
+            if (state.uploadedImages.length >= MAX_ATTACHMENTS) {
+                showNotification(`文本过长（约 ${tokenCount} tokens），但已达到最大附件数量限制`, 'error');
+                return;
+            }
+
+            // 生成文档文件名
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const fileName = `auto-document-${timestamp}.txt`;
+
+            // 将文本转换为文档附件
+            state.uploadedImages.push({
+                name: fileName,
+                type: 'text/plain',
+                category: 'text',
+                data: textContent,  // 直接存储文本内容
+                size: new Blob([textContent]).size,
+                isAutoConverted: true  // 标记为自动转换
+            });
+
+            // 清空输入框文本，因为已转换为附件
+            textContent = '';
+            elements.userInput.value = '';
+            autoResizeTextarea();
+            hasAttachments = true;
+
+            // 更新附件预览
+            updateImagePreview();
+
+            // 显示通知
+            showNotification(`文本过长（约 ${tokenCount} tokens），已自动转换为文档附件`, 'info');
+        }
     }
 
     // 构建三种格式的用户消息
@@ -730,7 +775,7 @@ export async function handleSend() {
 }
 
 /**
- * 处理粘贴事件（支持粘贴图片）
+ * 处理粘贴事件（支持粘贴图片和检测超长文本）
  * @param {ClipboardEvent} e - 粘贴事件
  */
 async function handlePaste(e) {
@@ -741,7 +786,25 @@ async function handlePaste(e) {
     const items = Array.from(clipboardData.items);
     const imageItems = items.filter(item => item.type.startsWith('image/'));
 
-    if (imageItems.length === 0) return; // 没有图片，使用默认粘贴行为
+    if (imageItems.length === 0) {
+        // 没有图片，检查文本长度
+        const pastedText = clipboardData.getData('text/plain');
+        if (pastedText) {
+            // 使用 setTimeout 让默认粘贴行为先执行，然后检查总长度
+            setTimeout(() => {
+                const fullText = elements.userInput.value;
+                const tokenCount = estimateTokenCount(fullText);
+
+                if (tokenCount > AUTO_DOCUMENT_TOKEN_THRESHOLD) {
+                    showNotification(
+                        `粘贴的内容过长（约 ${tokenCount} tokens），发送时将自动转换为文档附件`,
+                        'info'
+                    );
+                }
+            }, 0);
+        }
+        return; // 使用默认粘贴行为
+    }
 
     // 阻止默认粘贴行为（避免粘贴图片 URL 或文件名）
     e.preventDefault();
@@ -816,13 +879,38 @@ export function initInputHandlers() {
 
     // 图片删除事件改为直接绑定（在 updateImagePreview() 中处理）
 
-    // 字数统计和typing效果
+    // 字数统计、token计算和typing效果
+    let tokenCountTimeout = null;
     elements.userInput?.addEventListener('input', (e) => {
-        const length = e.target.value.length;
+        const text = e.target.value;
+        const length = text.length;
 
-        // 更新字数统计（仅显示当前字数）
+        // 更新字数统计和token计算
         if (elements.charCounter) {
-            elements.charCounter.textContent = length > 0 ? `${length}` : '';
+            if (length > 0) {
+                // 立即显示字符数
+                elements.charCounter.textContent = `${length}`;
+
+                // 使用防抖计算token数，避免输入时卡顿
+                clearTimeout(tokenCountTimeout);
+                tokenCountTimeout = setTimeout(() => {
+                    const tokenCount = estimateTokenCount(text);
+                    elements.charCounter.textContent = `${length} 字符 / ${tokenCount} tokens`;
+
+                    // 如果接近或超过阈值，添加警告样式
+                    if (tokenCount > AUTO_DOCUMENT_TOKEN_THRESHOLD * 0.9) {
+                        elements.charCounter.style.color = 'var(--md-warning)';
+                        elements.charCounter.title = `接近自动转换阈值 (${AUTO_DOCUMENT_TOKEN_THRESHOLD} tokens)`;
+                    } else {
+                        elements.charCounter.style.color = '';
+                        elements.charCounter.title = '';
+                    }
+                }, 300); // 300ms防抖延迟
+            } else {
+                elements.charCounter.textContent = '';
+                elements.charCounter.style.color = '';
+                elements.charCounter.title = '';
+            }
         }
 
         // 添加/移除 typing 类

@@ -86,6 +86,11 @@ export const XML_MAX_TOOL_CONTENT_LENGTH = 10000;
 export const MAX_ATTACHMENTS = 10;
 
 /**
+ * 自动转换为文档的 token 阈值
+ */
+export const AUTO_DOCUMENT_TOKEN_THRESHOLD = 5000;
+
+/**
  * 单条消息最大图片数量
  */
 export const MAX_IMAGES_PER_MESSAGE = 10;

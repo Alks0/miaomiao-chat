@@ -139,9 +139,10 @@ export function registerBuiltinTool(toolId, toolDefinition, handler) {
  * @param {Object} toolDefinition - 工具定义（MCP 格式）
  * @returns {string} 工具 ID
  */
-export function registerMCPTool(serverId, toolName, toolDefinition) {
+export async function registerMCPTool(serverId, toolName, toolDefinition) {
     // MCP 工具 ID 格式: {serverId}__{toolName}
     const toolId = `${serverId}__${toolName}`;
+    console.log(`[Tools] 开始注册 MCP 工具: ${toolId}`);
 
     // 转换 MCP 工具定义为通用格式
     const normalizedTool = {
@@ -155,7 +156,27 @@ export function registerMCPTool(serverId, toolName, toolDefinition) {
 
     toolRegistry.set(toolId, normalizedTool);
     toolTypes.set(toolId, 'mcp');
-    toolEnabled.set(toolId, false);  // 默认禁用
+
+    // 优先使用内存中的状态（可能由 loadToolStates 预加载）
+    let enabled = false;
+    console.log(`[Tools] 检查工具状态 - 工具 ID: ${toolId}`);
+    console.log(`[Tools] 内存中的状态 Map 包含此工具: ${toolEnabled.has(toolId)}`);
+
+    if (toolEnabled.has(toolId)) {
+        // 内存中已有状态（由 loadToolStates 预加载）
+        enabled = toolEnabled.get(toolId);
+        console.log(`[Tools] 使用预加载的 MCP 工具状态: ${toolId} = ${enabled ? '启用' : '禁用'}`);
+    } else {
+        // 内存中没有，尝试从持久化存储恢复
+        const savedStates = await loadSavedToolStates();
+        const savedEnabled = savedStates && savedStates[toolId];
+        enabled = savedEnabled !== undefined ? savedEnabled : false;
+        toolEnabled.set(toolId, enabled);
+
+        if (savedEnabled !== undefined) {
+            console.log(`[Tools] 从存储恢复 MCP 工具状态: ${toolId} = ${enabled ? '启用' : '禁用'}`);
+        }
+    }
 
     // 添加到名称索引
     addToNameIndex(toolName, toolId);
@@ -495,7 +516,10 @@ export function removeTool(toolId) {
  * 清空所有 MCP 工具（断开连接时调用）
  * @param {string} serverId - MCP 服务器 ID
  */
-export function clearMCPTools(serverId) {
+export async function clearMCPTools(serverId) {
+    // 在清除之前先保存当前状态
+    await saveToolStates();
+
     const mcpTools = Array.from(toolRegistry.values()).filter(
         tool => tool.type === 'mcp' && tool.serverId === serverId
     );
@@ -509,10 +533,11 @@ export function clearMCPTools(serverId) {
         toolRegistry.delete(tool.id);
         toolHandlers.delete(tool.id);
         toolTypes.delete(tool.id);
-        toolEnabled.delete(tool.id);
+        // 保留 toolEnabled 中的状态，这样重连时可以恢复
+        // toolEnabled.delete(tool.id);
     });
 
-    console.log(`[Tools] 已清空 MCP 服务器 "${serverId}" 的 ${mcpTools.length} 个工具`);
+    console.log(`[Tools] 已清空 MCP 服务器 "${serverId}" 的 ${mcpTools.length} 个工具（状态已保存）`);
 }
 
 // ========== 统计信息 ==========
@@ -536,6 +561,35 @@ export function getToolStats() {
 }
 
 /**
+ * 清理过期的工具状态（工具已不存在但状态还保留）
+ */
+export async function cleanupExpiredToolStates() {
+    try {
+        const savedStates = await loadSavedToolStates();
+        if (!savedStates) return;
+
+        let cleanedCount = 0;
+        const activeToolIds = new Set(toolRegistry.keys());
+
+        // 检查每个保存的状态
+        for (const toolId of Object.keys(savedStates)) {
+            if (!activeToolIds.has(toolId)) {
+                delete savedStates[toolId];
+                toolEnabled.delete(toolId);
+                cleanedCount++;
+            }
+        }
+
+        if (cleanedCount > 0) {
+            await savePreference('toolsEnabled', JSON.stringify(savedStates));
+            console.log(`[Tools] 已清理 ${cleanedCount} 个过期工具状态`);
+        }
+    } catch (error) {
+        console.error('[Tools] ❌ 清理过期工具状态失败:', error);
+    }
+}
+
+/**
  * 调试：打印工具列表
  */
 export function debugTools() {
@@ -556,19 +610,64 @@ export function debugTools() {
  * 同步 MCP 服务器的工具到管理器
  * @param {string} serverId - MCP 服务器 ID
  */
-export function syncMCPTools(serverId) {
-    // 先清空该服务器的旧工具
-    clearMCPTools(serverId);
+export async function syncMCPTools(serverId) {
+    // 获取当前服务器的旧工具
+    const oldTools = Array.from(toolRegistry.values()).filter(
+        tool => tool.type === 'mcp' && tool.serverId === serverId
+    );
+
+    // 清理旧工具（不保存状态，因为会立即重新注册）
+    oldTools.forEach(tool => {
+        if (tool.name) {
+            removeFromNameIndex(tool.name, tool.id);
+        }
+        toolRegistry.delete(tool.id);
+        toolHandlers.delete(tool.id);
+        toolTypes.delete(tool.id);
+        // 保留 toolEnabled 状态
+    });
 
     // 从 MCP 客户端获取工具
     const mcpTools = mcpClient.getToolsByServer(serverId);
 
-    // 注册每个工具
-    mcpTools.forEach(tool => {
-        registerMCPTool(serverId, tool.name, tool.mcpDefinition);
-    });
+    // 注册每个工具（异步）
+    for (const tool of mcpTools) {
+        await registerMCPTool(serverId, tool.name, tool.mcpDefinition);
+    }
 
     console.log(`[Tools] 🔄 已同步 ${mcpTools.length} 个工具 (MCP 服务器: ${serverId})`);
+
+    // 同步完成后，尝试加载该服务器工具的保存状态
+    // 这处理了工具在 initTools 之后注册的情况
+    try {
+        const savedStates = await loadSavedToolStates();
+        if (savedStates) {
+            let restoredCount = 0;
+            for (const tool of mcpTools) {
+                const toolId = `${serverId}__${tool.name}`;
+                if (savedStates[toolId] !== undefined && toolEnabled.has(toolId)) {
+                    // 如果 registerMCPTool 没有恢复状态（比如在某些边缘情况下），这里再次确保
+                    const currentState = toolEnabled.get(toolId);
+                    const savedState = savedStates[toolId];
+                    if (currentState !== savedState) {
+                        toolEnabled.set(toolId, savedState);
+                        restoredCount++;
+                    }
+                }
+            }
+            if (restoredCount > 0) {
+                console.log(`[Tools] 额外恢复了 ${restoredCount} 个工具状态`);
+                // 触发状态变化事件，确保 UI 更新
+                eventBus.emit('tool:enabled:changed', {});
+            }
+        }
+    } catch (error) {
+        console.error('[Tools] 恢复 MCP 工具状态失败:', error);
+    }
+
+    // 无论是否恢复了额外状态，都触发事件确保 UI 更新
+    // 因为工具的初始状态可能在 registerMCPTool 中已经设置
+    eventBus.emit('tool:enabled:changed', {});
 }
 
 /**
@@ -590,18 +689,35 @@ export function getMCPToolHandler(toolId) {
 }
 
 // 监听 MCP 工具发现事件，自动注册工具
-eventBus.on('mcp:tools-discovered', ({ serverId, tools }) => {
+eventBus.on('mcp:tools-discovered', async ({ serverId, tools }) => {
     console.log(`[Tools] 📡 检测到 MCP 工具发现事件: ${serverId} (${tools.length} 个工具)`);
-    syncMCPTools(serverId);
+    await syncMCPTools(serverId);
 });
 
 // 监听 MCP 断开连接事件，清除工具
-eventBus.on('mcp:disconnected', ({ serverId }) => {
+eventBus.on('mcp:disconnected', async ({ serverId }) => {
     console.log(`[Tools] 🔌 检测到 MCP 断开连接: ${serverId}`);
-    clearMCPTools(serverId);
+    await clearMCPTools(serverId);
 });
 
 // ========== 工具状态持久化 ==========
+
+/**
+ * 获取保存的工具状态（内部使用）
+ * @returns {Promise<Object|null>} 工具状态对象或 null
+ */
+async function loadSavedToolStates() {
+    try {
+        const statesJson = await loadPreference('toolsEnabled');
+        if (!statesJson) {
+            return null;
+        }
+        return JSON.parse(statesJson);
+    } catch (error) {
+        console.error('[Tools] ❌ 读取保存的工具状态失败:', error);
+        return null;
+    }
+}
 
 /**
  * 保存工具启用状态到持久化存储
@@ -629,8 +745,9 @@ async function saveToolStates() {
 
 /**
  * 从持久化存储加载工具启用状态
+ * @param {boolean} includeUnregistered - 是否加载未注册工具的状态到内存
  */
-export async function loadToolStates() {
+export async function loadToolStates(includeUnregistered = false) {
     try {
         const statesJson = await loadPreference('toolsEnabled');
         if (!statesJson) {
@@ -639,7 +756,10 @@ export async function loadToolStates() {
         }
 
         const states = JSON.parse(statesJson);
+        console.log('[Tools] 加载的工具状态:', Object.keys(states).length, '个工具');
+        console.log('[Tools] 状态详情:', states);
         let restoredCount = 0;
+        let unregisteredCount = 0;
 
         // 恢复工具状态
         for (const [toolId, enabled] of Object.entries(states)) {
@@ -655,10 +775,18 @@ export async function loadToolStates() {
 
                 toolEnabled.set(toolId, enabled);
                 restoredCount++;
+            } else if (includeUnregistered) {
+                // 即使工具未注册，也将状态加载到内存
+                // 这样当工具稍后注册时（如 MCP 连接），状态已经在内存中
+                toolEnabled.set(toolId, enabled);
+                unregisteredCount++;
             }
         }
 
         console.log(`[Tools] 已恢复 ${restoredCount} 个工具的状态`);
+        if (unregisteredCount > 0) {
+            console.log(`[Tools] 预加载了 ${unregisteredCount} 个未注册工具的状态`);
+        }
     } catch (error) {
         console.error('[Tools] ❌ 加载工具状态失败:', error);
     }

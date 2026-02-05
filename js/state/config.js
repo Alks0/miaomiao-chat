@@ -92,6 +92,7 @@ function buildConfigObject() {
         selectedModel: state.selectedModel ?? elements?.modelSelect?.value ?? '',
         apiFormat: state?.apiFormat ?? 'openai',
         imageSize: state?.imageSize ?? '2K',  // 使用 ?? 保留空字符串
+        pdfImageModeEnabled: state?.pdfImageModeEnabled ?? false, // PDF 兼容模式
         replyCount: state?.replyCount ?? 1,
 
         // 功能开关
@@ -397,6 +398,9 @@ function applyConfigToState(config) {
             elements.imageSizeSelect.value = config.imageSize;
         }
     }
+    if (config.pdfImageModeEnabled !== undefined) {
+        state.pdfImageModeEnabled = config.pdfImageModeEnabled;
+    }
     if (config.replyCount !== undefined) {
         state.replyCount = config.replyCount;
         if (elements.replyCountSelect) {
@@ -684,6 +688,12 @@ export function syncUIWithState() {
     const streamEnabled = document.getElementById('stream-enabled');
     if (streamEnabled) {
         streamEnabled.checked = state.streamEnabled;
+    }
+
+    // PDF 兼容模式
+    const pdfImageModeSwitch = document.getElementById('pdf-image-mode-enabled');
+    if (pdfImageModeSwitch) {
+        pdfImageModeSwitch.checked = state.pdfImageModeEnabled || false;
     }
 
     // 思维链开关

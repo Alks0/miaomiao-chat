@@ -151,6 +151,18 @@ export function initSettings() {
         });
     }
 
+    // PDF 兼容模式开关
+    const pdfImageModeSwitch = document.getElementById('pdf-image-mode-enabled');
+    if (pdfImageModeSwitch) {
+        pdfImageModeSwitch.checked = state.pdfImageModeEnabled || false;
+        pdfImageModeSwitch.addEventListener('change', (e) => {
+            state.pdfImageModeEnabled = e.target.checked;
+            saveCurrentConfig();
+            console.log('[Settings] 📄 PDF 兼容模式已', e.target.checked ? '启用' : '禁用');
+        });
+    }
+
+
     // 初始化更新设置（仅 Electron/APK）
     initUpdateSettings();
 

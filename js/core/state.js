@@ -111,6 +111,7 @@ export const state = {
     uploadedImages: [],
     imageSize: '2K', // '2K' | '4K'
     fastImageCompression: false, // 高速压缩模式（512px 超级压缩）
+    pdfImageModeEnabled: false, // PDF 兼容模式（将 PDF 作为图片传输）
 
     // 消息编辑
     lastUserMessage: null,

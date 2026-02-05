@@ -13,6 +13,7 @@ import { initVirtualScroll } from '../ui/virtual-scroll.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { createToolCallUI, updateToolCallStatus } from '../ui/tool-display.js';  // 工具UI恢复
 import { categorizeFile } from '../utils/file-helpers.js';
+import { lazyImageManager } from '../utils/lazy-image.js';
 
 /**
  * 解析 Gemini 用户消息内容
@@ -144,7 +145,7 @@ export function renderSessionMessages() {
     }
 
     // 如果消息数量超过阈值，使用虚拟滚动
-    if (messages.length >= 100) {
+    if (messages.length >= 5) {  // 降低到5条，与VIRTUAL_SCROLL_CONFIG.threshold保持一致
         console.log(`消息数量 ${messages.length}，启用虚拟滚动模式`);
         initVirtualScroll(true); // 强制启用
         rebuildMessageIdMap(); // 重建索引映射
@@ -272,6 +273,15 @@ export function renderSessionMessages() {
     // 重建 messageIdMap（确保索引映射正确）
     rebuildMessageIdMap();
 
+    // 观察所有懒加载图片
+    requestIdleCallback(() => {
+        const lazyImages = elements.messagesArea.querySelectorAll('.lazy-image:not(.observed)');
+        lazyImages.forEach(img => {
+            lazyImageManager.observe(img);
+            img.classList.add('observed');
+        });
+    }, { timeout: 1000 });
+
     // 滚动到底部
     setTimeout(() => {
         elements.messagesArea.scrollTo({
@@ -337,10 +347,24 @@ async function restoreToolCallsUI(toolCalls, messageEl) {
                 // 工具UI已经在正确位置（appendChild 添加到了最后），不需要移动
             }
 
-            // 立即更新为completed状态
-            updateToolCallStatus(toolCall.id, 'completed', {
-                result: { restored: true }
-            });
+            // 恢复工具状态和结果
+            if (toolCall.status === 'completed' && toolCall.result) {
+                updateToolCallStatus(toolCall.id, 'completed', {
+                    result: toolCall.result
+                });
+            } else if (toolCall.status === 'failed' && toolCall.error) {
+                updateToolCallStatus(toolCall.id, 'failed', {
+                    error: toolCall.error.message || toolCall.error,
+                    errorCode: toolCall.error.code,
+                    toolName: toolCall.name,
+                    toolArgs: toolCall.arguments || toolCall.input
+                });
+            } else {
+                // 兼容旧数据：没有保存结果的工具调用
+                updateToolCallStatus(toolCall.id, 'completed', {
+                    result: { restored: true, message: '(工具结果未保存)' }
+                });
+            }
         }
 
         console.log('[Restore] 工具UI恢复完成');

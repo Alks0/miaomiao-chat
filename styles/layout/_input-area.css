@@ -574,3 +574,24 @@
     font-size: 16px;
 }
 
+/* 自动转换标记 */
+.file-preview-icon {
+    position: relative;
+}
+
+.auto-convert-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: var(--color-primary);
+    color: white;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 8px;
+    border: 2px solid var(--color-bg-primary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+

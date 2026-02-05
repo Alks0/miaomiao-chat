@@ -221,6 +221,35 @@ export function saveAssistantMessage(options) {
                 .filter(Boolean)
                 .join('\n\n---\n\n');
 
+            // 合并签名（不同格式使用不同策略）
+            let mergedThoughtSignature = prevOpenai.thoughtSignature;
+            let mergedThinkingSignature = prevOpenai.thinkingSignature;
+            let mergedEncryptedContent = prevOpenai.encryptedContent;
+
+            // Gemini: 使用最新的 thoughtSignature（API要求）
+            if (thoughtSignature) {
+                mergedThoughtSignature = thoughtSignature;
+                console.log('[Sync] 更新 thoughtSignature (Gemini)');
+            }
+
+            // Claude: 合并多个 thinkingSignature
+            if (thinkingSignature) {
+                if (prevOpenai.thinkingSignature) {
+                    // 如果之前已有签名，合并它们
+                    mergedThinkingSignature = [prevOpenai.thinkingSignature, thinkingSignature]
+                        .join('\n\n---\n\n');
+                    console.log('[Sync] 合并 thinkingSignature (Claude)');
+                } else {
+                    mergedThinkingSignature = thinkingSignature;
+                }
+            }
+
+            // OpenAI: 使用最新的 encryptedContent
+            if (encryptedContent) {
+                mergedEncryptedContent = encryptedContent;
+                console.log('[Sync] 更新 encryptedContent (OpenAI Responses)');
+            }
+
             // 合并 textContent（原有的 + 新的）
             const prevText = typeof prevOpenai.content === 'string'
                 ? prevOpenai.content
@@ -325,6 +354,17 @@ export function saveAssistantMessage(options) {
                 prevOpenai.thinkingContent = mergedThinking;
             }
 
+            // 5. 更新合并后的签名
+            if (mergedThoughtSignature !== undefined) {
+                prevOpenai.thoughtSignature = mergedThoughtSignature;
+            }
+            if (mergedThinkingSignature !== undefined) {
+                prevOpenai.thinkingSignature = mergedThinkingSignature;
+            }
+            if (mergedEncryptedContent !== undefined) {
+                prevOpenai.encryptedContent = mergedEncryptedContent;
+            }
+
             // 更新 Gemini 格式 - 从 contentParts 重建 parts
             // 使用 prevOpenai.contentParts（已经过滤和处理过）
             const finalContentParts = prevOpenai.contentParts || [];
@@ -388,6 +428,16 @@ export function saveAssistantMessage(options) {
                 }
                 if (mergedThinking) {
                     prevClaude.thinkingContent = mergedThinking;
+                }
+                // 更新合并后的签名
+                if (mergedThinkingSignature !== undefined) {
+                    prevClaude.thinkingSignature = mergedThinkingSignature;
+                }
+                if (mergedThoughtSignature !== undefined) {
+                    prevClaude.thoughtSignature = mergedThoughtSignature;
+                }
+                if (mergedEncryptedContent !== undefined) {
+                    prevClaude.encryptedContent = mergedEncryptedContent;
                 }
             }
 
@@ -660,9 +710,23 @@ function buildOpenAIAssistantMessage(opts) {
     if (thoughtSignature) msg.thoughtSignature = thoughtSignature;
     if (encryptedContent) msg.encryptedContent = encryptedContent;
     if (streamStats) msg.streamStats = streamStats;
+    // 始终初始化 allReplies，即使是第一次生成
     if (allReplies && allReplies.length > 0) {
         msg.allReplies = allReplies;
         msg.selectedReplyIndex = selectedReplyIndex;
+    } else {
+        // 第一次生成时，创建包含当前消息的 allReplies 数组
+        msg.allReplies = [{
+            content: textContent,
+            thinkingContent: thinkingContent,
+            thoughtSignature: thoughtSignature,
+            thinkingSignature: thinkingSignature,
+            encryptedContent: encryptedContent,
+            contentParts: contentParts,
+            isOriginal: true,  // 标记为原始版本
+            timestamp: Date.now()
+        }];
+        msg.selectedReplyIndex = 0;
     }
 
     // 保存原始 contentParts（用于会话恢复时的完整渲染）
@@ -686,7 +750,8 @@ function buildGeminiAssistantMessage(opts) {
         messageId, textContent, contentParts, hasImages, thoughtSignature,
         streamStats, geminiParts, modelName, providerName,
         toolCalls,
-        encryptedContent
+        encryptedContent,
+        thinkingSignature  // 添加 Claude 签名支持
     } = opts;
 
     // 如果提供了原始 geminiParts，优先使用
@@ -733,6 +798,7 @@ function buildGeminiAssistantMessage(opts) {
 
     // 添加元数据
     if (thoughtSignature) msg.thoughtSignature = thoughtSignature;
+    if (thinkingSignature) msg.thinkingSignature = thinkingSignature;  // 添加 Claude 签名支持
     if (encryptedContent) msg.encryptedContent = encryptedContent;
     if (streamStats) msg.streamStats = streamStats;
 
@@ -746,6 +812,12 @@ function buildGeminiAssistantMessage(opts) {
         msg.toolCalls = toolCalls;
     }
 
+    // 保存所有回复版本（支持多变体）- Gemini格式
+    if (opts.allReplies && opts.allReplies.length > 0) {
+        msg.allReplies = opts.allReplies;
+        msg.selectedReplyIndex = opts.selectedReplyIndex;
+    }
+
     return msg;
 }
 
@@ -757,7 +829,8 @@ function buildClaudeAssistantMessage(opts) {
         messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
         streamStats, modelName, providerName,
         toolCalls,
-        encryptedContent
+        encryptedContent,
+        thoughtSignature  // 添加 Gemini 签名支持
     } = opts;
 
     let content;
@@ -794,6 +867,7 @@ function buildClaudeAssistantMessage(opts) {
     // 添加元数据
     if (thinkingContent) msg.thinkingContent = thinkingContent;
     if (thinkingSignature) msg.thinkingSignature = thinkingSignature;
+    if (thoughtSignature) msg.thoughtSignature = thoughtSignature;  // 添加 Gemini 签名支持
     if (encryptedContent) msg.encryptedContent = encryptedContent;
     if (streamStats) msg.streamStats = streamStats;
 
@@ -805,6 +879,12 @@ function buildClaudeAssistantMessage(opts) {
     // 保存工具调用信息（用于会话恢复时重建工具UI）
     if (toolCalls && toolCalls.length > 0) {
         msg.toolCalls = toolCalls;
+    }
+
+    // 保存所有回复版本（支持多变体）- Claude格式
+    if (opts.allReplies && opts.allReplies.length > 0) {
+        msg.allReplies = opts.allReplies;
+        msg.selectedReplyIndex = opts.selectedReplyIndex;
     }
 
     return msg;
@@ -956,4 +1036,47 @@ export function extractImages(content) {
     if (!Array.isArray(content)) return null;
     const images = content.filter(p => p.type === 'image_url').map(p => p.image_url?.url).filter(Boolean);
     return images.length > 0 ? images : null;
+}
+
+/**
+ * 更新工具调用结果
+ * 当工具执行完成时，将结果保存到消息历史中
+ * @param {string} toolId - 工具调用ID
+ * @param {string} status - 状态（completed/failed）
+ * @param {Object} result - 执行结果或错误信息
+ */
+export function updateToolCallResult(toolId, status, result) {
+    console.log('[Sync] 更新工具调用结果:', toolId, status);
+
+    // 查找包含该工具调用的消息
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+        const msg = state.messages[i];
+        if (msg.toolCalls && Array.isArray(msg.toolCalls)) {
+            const toolCallIndex = msg.toolCalls.findIndex(tc => tc.id === toolId);
+            if (toolCallIndex !== -1) {
+                // 更新工具调用信息
+                msg.toolCalls[toolCallIndex] = {
+                    ...msg.toolCalls[toolCallIndex],
+                    status: status,
+                    result: status === 'completed' ? result : null,
+                    error: status === 'failed' ? result : null,
+                    completedAt: Date.now()
+                };
+
+                // 同步更新到其他格式
+                if (state.geminiContents[i]) {
+                    state.geminiContents[i].toolCalls = msg.toolCalls;
+                }
+                if (state.claudeContents[i]) {
+                    state.claudeContents[i].toolCalls = msg.toolCalls;
+                }
+
+                console.log('[Sync] 工具调用结果已保存到消息 #' + i);
+
+                // 保存到会话
+                saveCurrentSessionMessages();
+                break;
+            }
+        }
+    }
 }

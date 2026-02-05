@@ -39,6 +39,7 @@
     <link rel="stylesheet" href="libs/marked-highlight/index.css">
     <link rel="stylesheet" href="styles/components/_code-collapser.css">
     <link rel="stylesheet" href="styles/components/_code-editor-modal.css">
+    <link rel="stylesheet" href="styles/components/_tool-manager-enhancements.css">
 </head>
 <body>
     <!-- 会话侧边栏 -->
@@ -283,6 +284,16 @@
                     <span>流式输出</span>
                 </div>
                 <p class="settings-hint">关闭后将等待完整响应再显示</p>
+
+                <!-- PDF 兼容模式 -->
+                <div class="toggle-row" style="margin-top: 12px;">
+                    <label class="switch">
+                        <input type="checkbox" id="pdf-image-mode-enabled">
+                        <span class="slider"></span>
+                    </label>
+                    <span>PDF 兼容模式</span>
+                </div>
+                <p class="settings-hint">开启后将 PDF 作为图片传输（用于解决部分 OpenAI 兼容接口不支持文件对象的问题）</p>
             </div>
 
             <!-- 图片压缩模式 -->
@@ -309,9 +320,11 @@
                     <span>启用思考过程</span>
                 </div>
                 <div class="thinking-strength" id="thinking-strength-group" style="display: none;">
+                    <button class="strength-btn" data-strength="minimal" title="极简思考（OpenAI 专用）">极简</button>
                     <button class="strength-btn" data-strength="low" title="快速思考，约 1K tokens 预算">低</button>
                     <button class="strength-btn" data-strength="medium" title="平衡模式，约 8K tokens 预算">中</button>
                     <button class="strength-btn active" data-strength="high" title="深度思考，约 32K tokens 预算">高</button>
+                    <button class="strength-btn" data-strength="xhigh" title="极深思考（OpenAI 专用）">极高</button>
                     <button class="strength-btn" data-strength="custom" title="自定义 token 预算">自定义</button>
                 </div>
                 <div class="thinking-budget-input" id="thinking-budget-group" style="display: none;">

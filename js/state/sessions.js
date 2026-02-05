@@ -238,6 +238,9 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
     // 设置切换标志
     state.isSwitchingSession = true;
 
+    // 触发会话切换前事件（用于清理）
+    eventBus.emit('session:before-switch');
+
     try {
         // 检查是否被中断
         if (signal.aborted) {

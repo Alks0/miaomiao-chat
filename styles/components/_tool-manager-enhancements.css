@@ -1,0 +1,255 @@
+/**
+ * 工具管理器增强样式
+ * 修复滚动问题，添加 MCP 分组功能
+ */
+
+/* ========== 修复滚动问题 ========== */
+
+/* 让整个内容区域可以滚动 */
+.tool-manager-content {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* 确保 Tab 内容可以正确滚动 */
+.tab-content[data-tab="tools"] {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 调整主体高度计算 */
+.tool-manager-body {
+    flex: 1;
+    min-height: 0; /* 重要：允许 flexbox 正确计算高度 */
+    overflow: hidden;
+}
+
+/* 确保工具列表容器可以滚动 */
+#tools-list-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-bg-accent) var(--md-bg);
+}
+
+/* ========== MCP 分组增强 ========== */
+
+/* MCP 服务器分组样式 */
+.mcp-server-group {
+    margin-bottom: 1rem;
+}
+
+.mcp-server-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--md-surface);
+    border: var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+}
+
+.mcp-server-header:hover {
+    background: var(--color-bg-secondary);
+    transform: translateX(2px);
+}
+
+.mcp-server-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.mcp-server-name {
+    font-weight: 600;
+    color: var(--md-text);
+}
+
+.mcp-server-count {
+    font-size: 0.875rem;
+    color: var(--md-muted);
+}
+
+/* 批量操作按钮 */
+.mcp-batch-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.mcp-batch-btn {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    background: var(--md-bg);
+    color: var(--md-text);
+    border: var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+}
+
+.mcp-batch-btn:hover {
+    background: var(--md-blue);
+    color: var(--md-bg);
+    transform: translateY(-1px);
+}
+
+.mcp-batch-btn:active {
+    transform: translateY(0);
+}
+
+/* MCP 工具列表容器 */
+.mcp-tools-container {
+    padding-left: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+/* 折叠/展开动画 */
+.mcp-server-group.collapsed .mcp-tools-container {
+    display: none;
+}
+
+.mcp-server-header .collapse-icon {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.15s var(--ease);
+}
+
+.mcp-server-group.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+/* ========== 工具快速选择器增强 ========== */
+
+/* 快速选择器中的 MCP 分组 */
+.quick-selector-mcp-group {
+    margin: 0.5rem 0;
+}
+
+.quick-selector-mcp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--color-bg-secondary);
+    border-radius: 4px;
+    margin-bottom: 0.25rem;
+}
+
+.quick-selector-mcp-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--md-text);
+}
+
+.quick-selector-mcp-toggle {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    background: var(--md-bg);
+    border: var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--md-muted);
+    transition: all 0.15s var(--ease);
+}
+
+.quick-selector-mcp-toggle:hover {
+    background: var(--md-blue);
+    color: var(--md-bg);
+    border-color: var(--md-blue);
+}
+
+/* MCP 子工具缩进 */
+.quick-selector-mcp-tools {
+    padding-left: 1rem;
+}
+
+.quick-tool-item.mcp-sub-item {
+    padding-left: 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* 工具分组标题样式 */
+.quick-tool-group {
+    margin-bottom: 0.75rem;
+}
+
+.quick-tool-group-header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--md-muted);
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--color-bg-secondary);
+    margin-bottom: 0.25rem;
+}
+
+/* 工具徽章 */
+.tool-badge {
+    display: inline-block;
+    padding: 1px 4px;
+    font-size: 0.625rem;
+    background: var(--md-cyan);
+    color: var(--md-bg);
+    border-radius: 3px;
+    margin-left: 0.25rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+/* ========== 响应式优化 ========== */
+
+@media (max-width: 768px) {
+    /* 移动端确保内容可滚动 */
+    .tool-manager-content {
+        height: 90vh;
+        max-height: none;
+    }
+
+    .tool-manager-body {
+        flex-direction: column;
+    }
+
+    .tool-list-panel {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+
+    .mcp-batch-btn {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+    }
+}
+
+/* ========== 滚动条美化 ========== */
+
+.tool-manager-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.tool-manager-content::-webkit-scrollbar-track {
+    background: var(--md-bg);
+    border-radius: 0 12px 12px 0;
+}
+
+.tool-manager-content::-webkit-scrollbar-thumb {
+    background: var(--color-bg-accent);
+    border-radius: 5px;
+    border: 2px solid var(--md-bg);
+}
+
+.tool-manager-content::-webkit-scrollbar-thumb:hover {
+    background: var(--md-muted);
+}
+
+/* Firefox 滚动条 */
+.tool-manager-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-bg-accent) var(--md-bg);
+}

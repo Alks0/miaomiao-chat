@@ -28,9 +28,9 @@ export async function initTools() {
         console.warn('[Tools] 加载自定义工具失败:', error);
     }
 
-    // 加载工具启用状态
+    // 加载工具启用状态（包括未注册的工具，为稍后的 MCP 连接做准备）
     try {
-        await loadToolStates();
+        await loadToolStates(true);
     } catch (error) {
         console.warn('[Tools] 加载工具状态失败:', error);
     }
