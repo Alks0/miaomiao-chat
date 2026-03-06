@@ -239,6 +239,9 @@ async function init() {
             if (dbInstance) {
                 const { requestPersistentStorage } = await import('./state/storage.js');
                 await requestPersistentStorage();
+            } else {
+                console.warn('IndexedDB 初始化返回空实例，启用 localStorage 降级模式');
+                state.storageMode = 'localStorage';
             }
         } catch (error) {
             console.error('IndexedDB 初始化失败，启用 localStorage 降级模式:', error);
@@ -451,7 +454,8 @@ async function init() {
                 savedSidebarState = localStorage.getItem('sidebarOpen');
             }
 
-            if (savedSidebarState === 'true' && elements.sidebar && !elements.sidebar.classList.contains('open')) {
+            const shouldOpenSidebar = savedSidebarState === true || savedSidebarState === 'true';
+            if (shouldOpenSidebar && elements.sidebar && !elements.sidebar.classList.contains('open')) {
                 setTimeout(() => {
                     import('./ui/sidebar.js').then(({ toggleSidebar }) => {
                         toggleSidebar(true); // skipSave = true, 避免循环
@@ -462,7 +466,8 @@ async function init() {
             console.error('恢复侧边栏状态失败:', error);
             // 降级处理
             const savedSidebarState = localStorage.getItem('sidebarOpen');
-            if (savedSidebarState === 'true' && elements.sidebar && !elements.sidebar.classList.contains('open')) {
+            const shouldOpenSidebar = savedSidebarState === true || savedSidebarState === 'true';
+            if (shouldOpenSidebar && elements.sidebar && !elements.sidebar.classList.contains('open')) {
                 setTimeout(() => {
                     import('./ui/sidebar.js').then(({ toggleSidebar }) => {
                         toggleSidebar(true);

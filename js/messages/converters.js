@@ -49,6 +49,9 @@ export function toOpenAIMessage(role, content, attachments = null) {
                 if (category === 'image') {
                     // 图片使用 image_url 格式
                     parts.push({ type: 'image_url', image_url: { url: att } });
+                } else if (category === 'video') {
+                    // 视频使用 video_url 格式
+                    parts.push({ type: 'video_url', video_url: { url: att } });
                 } else if (category === 'pdf') {
                     // PDF 处理策略
                     if (state.pdfImageModeEnabled) {
@@ -120,8 +123,8 @@ export function toGeminiMessage(role, content, attachments = null) {
                 const base64Data = match[2];
                 const category = getFileCategory(mimeType);
 
-                if (category === 'image' || category === 'pdf') {
-                    // 图片和 PDF 都使用 inlineData 格式
+                if (category === 'image' || category === 'video' || category === 'pdf') {
+                    // 图片、视频和 PDF 都使用 inlineData 格式
                     parts.push({
                         inlineData: {
                             mimeType: mimeType,
@@ -182,6 +185,12 @@ export function toClaudeMessage(role, content, attachments = null) {
                             media_type: mimeType,
                             data: base64Data
                         }
+                    });
+                } else if (category === 'video') {
+                    // Claude 不支持视频，添加文本说明
+                    parts.push({
+                        type: 'text',
+                        text: '[视频内容已跳过 - Claude API 不支持视频输入]'
                     });
                 } else if (category === 'pdf') {
                     // PDF 使用 document 类型

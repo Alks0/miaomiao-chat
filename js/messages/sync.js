@@ -10,6 +10,7 @@ import { toOpenAIMessage, toGeminiMessage, toClaudeMessage } from './converters.
 import { generateMessageId } from '../utils/helpers.js';
 import { pushMessage, rebuildMessageIdMap } from '../core/state-mutations.js';
 import { getCurrentProvider, getModelDisplayName } from '../providers/manager.js';
+import { isVideoMimeType } from '../utils/media.js';
 
 /**
  * 简单的字符串 hash 函数（用于图片去重）
@@ -24,6 +25,27 @@ function simpleHash(str) {
         hash = hash & hash; // Convert to 32bit integer
     }
     return hash.toString(36);
+}
+
+/**
+ * 是否为媒体内容 part
+ * @param {Object} part - content part
+ * @returns {boolean}
+ */
+function isMediaPart(part) {
+    return !!(part && (part.type === 'image_url' || part.type === 'video_url') && part.url);
+}
+
+/**
+ * 从 Data URL 提取 MIME 与 Base64
+ * @param {string} url - Data URL
+ * @returns {{mimeType: string, data: string} | null}
+ */
+function extractDataUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    return { mimeType: match[1], data: match[2] };
 }
 
 /**
@@ -81,18 +103,18 @@ export function saveAssistantMessage(options) {
     const modelName = getModelDisplayName(modelId, provider); // 使用友好显示名称而不是模型 ID
     const providerName = provider?.name || 'Unknown';
 
-    // 图片去重：移除重复的图片URL（修复code execution重复图片问题）
-    // 在构建消息之前进行去重，确保所有格式的消息都不包含重复图片
-    const seenImageUrls = new Set();
+    // 媒体去重：移除重复的图片/视频 URL（修复工具返回重复媒体问题）
+    // 在构建消息之前进行去重，确保所有格式的消息都不包含重复媒体
+    const seenMediaUrls = new Set();
     const deduplicatedContentParts = contentParts.filter(p => {
-        if (p.type === 'image_url' && p.url) {
+        if (isMediaPart(p)) {
             // 使用完整 URL 的 hash 作为去重依据
             const urlKey = simpleHash(p.url);
-            if (seenImageUrls.has(urlKey)) {
-                console.log('[saveAssistantMessage] 检测到重复图片，已去重');
+            if (seenMediaUrls.has(urlKey)) {
+                console.log('[saveAssistantMessage] 检测到重复媒体，已去重');
                 return false; // 过滤掉重复图片
             }
-            seenImageUrls.add(urlKey);
+            seenMediaUrls.add(urlKey);
         }
         return true;
     });
@@ -100,12 +122,14 @@ export function saveAssistantMessage(options) {
     // 使用去重后的contentParts替换原始的
     const finalContentParts = deduplicatedContentParts;
 
-    // 检测是否有图片
-    const hasImages = finalContentParts.some(p => p.type === 'image_url' && p.complete);
+    // 检测是否有媒体（图片/视频）
+    const hasMedia = finalContentParts.some(
+        p => (p.type === 'image_url' || p.type === 'video_url') && p.complete
+    );
 
     // 1. 构建 OpenAI 格式（使用去重后的contentParts）
     const openaiMsg = buildOpenAIAssistantMessage({
-        messageId, textContent, contentParts: finalContentParts, hasImages, thinkingContent, thinkingSignature,
+        messageId, textContent, contentParts: finalContentParts, hasMedia, thinkingContent, thinkingSignature,
         thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName,
         toolCalls,  // 传递工具调用信息
         encryptedContent
@@ -113,7 +137,7 @@ export function saveAssistantMessage(options) {
 
     // 2. 构建 Gemini 格式（使用去重后的contentParts）
     const geminiMsg = buildGeminiAssistantMessage({
-        messageId, textContent, contentParts: finalContentParts, hasImages, thoughtSignature,
+        messageId, textContent, contentParts: finalContentParts, hasMedia, thoughtSignature,
         streamStats, allReplies, selectedReplyIndex, geminiParts, modelName, providerName,
         toolCalls,
         encryptedContent
@@ -121,7 +145,7 @@ export function saveAssistantMessage(options) {
 
     // 3. 构建 Claude 格式（使用去重后的contentParts）
     const claudeMsg = buildClaudeAssistantMessage({
-        messageId, textContent, contentParts: finalContentParts, hasImages, thinkingContent, thinkingSignature,
+        messageId, textContent, contentParts: finalContentParts, hasMedia, thinkingContent, thinkingSignature,
         streamStats, allReplies, selectedReplyIndex, modelName, providerName,
         toolCalls,
         encryptedContent
@@ -140,10 +164,17 @@ export function saveAssistantMessage(options) {
             targetSession.updatedAt = Date.now();
 
             // 保存到数据库
-            import('../state/storage.js').then(({ saveSessionToDB }) => {
-                saveSessionToDB(targetSession).catch(e => {
-                    console.error('保存后台会话失败:', e);
+            Promise.all([
+                import('../state/storage.js'),
+                import('../state/sessions.js')
+            ]).then(async ([{ saveSessionToDB }, { createPersistedSessionPayload }]) => {
+                const persistedPayload = await createPersistedSessionPayload(targetSession);
+                await saveSessionToDB({
+                    ...targetSession,
+                    ...persistedPayload
                 });
+            }).catch(e => {
+                console.error('保存后台会话失败:', e);
             });
 
             console.log(`消息已保存到后台会话: ${targetSession.name}`);
@@ -300,14 +331,14 @@ export function saveAssistantMessage(options) {
                 !(p.type === 'text' && p.text === '(调用工具)')
             );
 
-            // 合并后去重：移除重复的图片URL
+            // 合并后去重：移除重复的媒体 URL（图片/视频）
             const seenUrls = new Set();
             mergedContentParts = mergedContentParts.filter(p => {
-                if (p.type === 'image_url' && p.url) {
+                if (isMediaPart(p)) {
                     // 使用完整 URL 的 hash 作为去重依据
                     const urlKey = simpleHash(p.url);
                     if (seenUrls.has(urlKey)) {
-                        console.log('[saveAssistantMessage] Continuation合并：检测到重复图片，已去重');
+                        console.log('[saveAssistantMessage] Continuation合并：检测到重复媒体，已去重');
                         return false;
                     }
                     seenUrls.add(urlKey);
@@ -377,10 +408,10 @@ export function saveAssistantMessage(options) {
                             newParts.push({ text: p.text, thought: true });
                         } else if (p.type === 'text' && p.text && p.text !== '(调用工具)') {
                             newParts.push({ text: p.text });
-                        } else if (p.type === 'image_url' && p.complete) {
-                            const match = p.url?.match(/^data:([^;]+);base64,(.+)$/);
-                            if (match) {
-                                newParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                        } else if ((p.type === 'image_url' || p.type === 'video_url') && p.complete) {
+                            const dataUrl = extractDataUrl(p.url);
+                            if (dataUrl) {
+                                newParts.push({ inlineData: { mimeType: dataUrl.mimeType, data: dataUrl.data } });
                             }
                         }
                     });
@@ -405,12 +436,12 @@ export function saveAssistantMessage(options) {
                     finalContentParts.forEach(p => {
                         if (p.type === 'text' && p.text && p.text !== '(调用工具)') {
                             newContent.push({ type: 'text', text: p.text });
-                        } else if (p.type === 'image_url' && p.complete) {
-                            const match = p.url?.match(/^data:([^;]+);base64,(.+)$/);
-                            if (match) {
+                        } else if ((p.type === 'image_url' || p.type === 'video_url') && p.complete) {
+                            const dataUrl = extractDataUrl(p.url);
+                            if (dataUrl && !isVideoMimeType(dataUrl.mimeType)) {
                                 newContent.push({
                                     type: 'image',
-                                    source: { type: 'base64', media_type: match[1], data: match[2] }
+                                    source: { type: 'base64', media_type: dataUrl.mimeType, data: dataUrl.data }
                                 });
                             }
                         }
@@ -583,25 +614,27 @@ export function saveAssistantMessageToSession(session, options) {
     const modelName = getModelDisplayName(modelId, provider); // 使用友好显示名称而不是模型 ID
     const providerName = provider?.name || 'Unknown';
 
-    const hasImages = contentParts?.some(p => p.type === 'image_url' && p.complete);
+    const hasMedia = contentParts?.some(
+        p => (p.type === 'image_url' || p.type === 'video_url') && p.complete
+    );
 
     // 构建并添加到会话
     const openaiMsg = buildOpenAIAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        messageId, textContent, contentParts, hasMedia, thinkingContent, thinkingSignature,
         thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName,
         toolCalls  // 传递工具调用信息
     });
     session.messages.push(openaiMsg);
 
     const geminiMsg = buildGeminiAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thoughtSignature,
+        messageId, textContent, contentParts, hasMedia, thoughtSignature,
         streamStats, allReplies, selectedReplyIndex, geminiParts, modelName, providerName,
         toolCalls  // 传递工具调用信息
     });
     session.geminiContents.push(geminiMsg);
 
     const claudeMsg = buildClaudeAssistantMessage({
-        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        messageId, textContent, contentParts, hasMedia, thinkingContent, thinkingSignature,
         streamStats, allReplies, selectedReplyIndex, modelName, providerName,
         toolCalls  // 传递工具调用信息
     });
@@ -674,7 +707,7 @@ export function saveErrorMessage(errorData, httpStatus = null, renderHumanizedEr
  */
 function buildOpenAIAssistantMessage(opts) {
     const {
-        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        messageId, textContent, contentParts, hasMedia, thinkingContent, thinkingSignature,
         thoughtSignature, streamStats, allReplies, selectedReplyIndex, modelName, providerName,
         toolCalls,
         encryptedContent
@@ -690,7 +723,7 @@ function buildOpenAIAssistantMessage(opts) {
     if (providerName) msg.providerName = providerName;
 
     // 处理内容
-    if (hasImages) {
+    if (hasMedia) {
         msg.content = [];
         if (textContent) {
             msg.content.push({ type: 'text', text: textContent });
@@ -698,6 +731,11 @@ function buildOpenAIAssistantMessage(opts) {
         contentParts.forEach(p => {
             if (p.type === 'image_url' && p.complete) {
                 msg.content.push({ type: 'image_url', image_url: { url: p.url } });
+            } else if (p.type === 'video_url' && p.complete) {
+                msg.content.push({
+                    type: 'video_url',
+                    video_url: { url: p.url, mime_type: p.mimeType || p.mime_type || '' }
+                });
             }
         });
     } else {
@@ -747,7 +785,7 @@ function buildOpenAIAssistantMessage(opts) {
  */
 function buildGeminiAssistantMessage(opts) {
     const {
-        messageId, textContent, contentParts, hasImages, thoughtSignature,
+        messageId, textContent, contentParts, hasMedia, thoughtSignature,
         streamStats, geminiParts, modelName, providerName,
         toolCalls,
         encryptedContent,
@@ -770,11 +808,11 @@ function buildGeminiAssistantMessage(opts) {
                 } else if (p.type === 'text') {
                     // 普通文本部分
                     parts.push({ text: p.text });
-                } else if (p.type === 'image_url' && p.complete) {
-                    // 图片部分
-                    const match = p.url.match(/^data:([^;]+);base64,(.+)$/);
-                    if (match) {
-                        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                } else if ((p.type === 'image_url' || p.type === 'video_url') && p.complete) {
+                    // 媒体部分（仅 Data URL 可转为 inlineData）
+                    const dataUrl = extractDataUrl(p.url);
+                    if (dataUrl) {
+                        parts.push({ inlineData: { mimeType: dataUrl.mimeType, data: dataUrl.data } });
                     }
                 }
             });
@@ -826,7 +864,7 @@ function buildGeminiAssistantMessage(opts) {
  */
 function buildClaudeAssistantMessage(opts) {
     const {
-        messageId, textContent, contentParts, hasImages, thinkingContent, thinkingSignature,
+        messageId, textContent, contentParts, hasMedia, thinkingContent, thinkingSignature,
         streamStats, modelName, providerName,
         toolCalls,
         encryptedContent,
@@ -835,15 +873,15 @@ function buildClaudeAssistantMessage(opts) {
 
     let content;
 
-    if (hasImages) {
+    if (hasMedia) {
         content = [];
         contentParts?.forEach(p => {
             if (p.type === 'image_url' && p.complete) {
-                const match = p.url.match(/^data:([^;]+);base64,(.+)$/);
-                if (match) {
+                const dataUrl = extractDataUrl(p.url);
+                if (dataUrl) {
                     content.push({
                         type: 'image',
-                        source: { type: 'base64', media_type: match[1], data: match[2] }
+                        source: { type: 'base64', media_type: dataUrl.mimeType, data: dataUrl.data }
                     });
                 }
             }
@@ -1074,7 +1112,13 @@ export function updateToolCallResult(toolId, status, result) {
                 console.log('[Sync] 工具调用结果已保存到消息 #' + i);
 
                 // 保存到会话
-                saveCurrentSessionMessages();
+                import('../state/sessions.js').then(({ saveCurrentSessionMessages }) => {
+                    saveCurrentSessionMessages().catch(error => {
+                        console.error('[Sync] 保存工具调用结果失败:', error);
+                    });
+                }).catch(error => {
+                    console.error('[Sync] 加载会话保存模块失败:', error);
+                });
                 break;
             }
         }

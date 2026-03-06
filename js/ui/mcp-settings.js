@@ -574,7 +574,7 @@ function renderServerList() {
  * 创建服务器卡片
  */
 function createServerCard(server) {
-    const status = mcpClient.connections.has(server.id);
+    const status = mcpClient.isConnected(server.id);
     const tools = mcpClient.getToolsByServer(server.id);
     const toolCount = tools.length;
     const retryCount = server.retryCount || 0;
@@ -769,7 +769,7 @@ async function deleteServer(serverId) {
     }
 
     // 先断开连接（必须等待断开完成，避免资源泄漏）
-    if (mcpClient.connections.has(serverId)) {
+    if (mcpClient.hasConnection(serverId)) {
         try {
             await mcpClient.disconnect(serverId);
         } catch (error) {
@@ -1093,11 +1093,11 @@ async function showJsonPasteDialog() {
 //   }
 // }
 
-// 示例 JSON (streamableHttp):
+// 示例 JSON (streamable-http):
 // {
 //   "mcpServers": {
 //     "streamable-http-example": {
-//       "type": "streamableHttp",
+//       "type": "streamable-http",
 //       "url": "http://localhost:3001/mcp",
 //       "headers": {
 //         "Content-Type": "application/json",
@@ -1269,7 +1269,7 @@ async function processImportedJson(jsonText) {
         let configData;
         try {
             configData = JSON.parse(cleanJson);
-        } catch (parseError) {
+        } catch {
             throw new Error('JSON 格式错误，请检查内容是否正确');
         }
 
@@ -1298,7 +1298,7 @@ async function processImportedJson(jsonText) {
         if (action === 'replace') {
             // 断开所有连接（使用 connections Map 而不是 server.connected）
             for (const server of state.mcpServers || []) {
-                if (mcpClient.connections.has(server.id)) {
+                if (mcpClient.hasConnection(server.id)) {
                     try {
                         await mcpClient.disconnect(server.id);
                     } catch (error) {

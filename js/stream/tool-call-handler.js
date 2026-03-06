@@ -17,16 +17,69 @@ import { state } from '../core/state.js';  // 访问应用状态
  * @returns {Promise<Object>} 增强后的结果
  */
 async function enrichToolResultWithFiles(result, toolName) {
-    // 1. 优先处理 MCP 标准 content 数组格式
-    if (result && result.content && Array.isArray(result.content)) {
+    const unwrapResultPayload = (rawResult) => {
+        if (!rawResult || typeof rawResult !== 'object') return rawResult;
+        if (Array.isArray(rawResult.content)) return rawResult;
+        if (rawResult.result && typeof rawResult.result === 'object') return rawResult.result;
+        if (Array.isArray(rawResult.result)) return { content: rawResult.result };
+        return rawResult;
+    };
+
+    const attachConvertedContent = (rawResult, payload, converted) => {
+        if (!rawResult || typeof rawResult !== 'object') {
+            return { ...(payload || {}), ...(converted || {}) };
+        }
+
+        // MCP 客户端常见包裹结构: { success: true, result: {...} }
+        if (rawResult.result && typeof rawResult.result === 'object') {
+            return {
+                ...rawResult,
+                ...converted,
+                result: {
+                    ...rawResult.result,
+                    ...converted
+                }
+            };
+        }
+
+        return {
+            ...rawResult,
+            ...converted
+        };
+    };
+
+    const normalizedPayload = unwrapResultPayload(result);
+    const persistVideoUrlIfNeeded = async (videoUrl, mimeType = '') => {
+        if (!videoUrl || typeof videoUrl !== 'string') return videoUrl;
+        if (!videoUrl.startsWith('data:video/')) return videoUrl;
+        if (!(typeof window !== 'undefined' && window.electron?.ipcRenderer?.invoke)) return videoUrl;
+
+        try {
+            const storeResult = await window.electron.ipcRenderer.invoke('mcp:store-video', {
+                dataUrl: videoUrl,
+                mimeType
+            });
+            if (storeResult?.success && storeResult.fileUrl) {
+                return storeResult.fileUrl;
+            }
+        } catch (error) {
+            console.warn('[ToolCallHandler] 视频持久化失败，回退 Data URL:', error);
+        }
+
+        return videoUrl;
+    };
+
+    // 1. 优先处理 MCP 标准 content 数组格式（兼容包装结构）
+    if (normalizedPayload && Array.isArray(normalizedPayload.content)) {
         const converted = {};
         const images = [];
+        const videos = [];
         const texts = [];
         let hasContent = false;
 
         console.log(`[ToolCallHandler] 检测到 MCP content 数组格式，开始转换`);
 
-        for (const item of result.content) {
+        for (const item of normalizedPayload.content) {
             // 处理文本内容
             if (item.type === 'text' && item.text) {
                 texts.push(item.text);
@@ -42,6 +95,34 @@ async function enrichToolResultWithFiles(result, toolName) {
                 });
                 hasContent = true;
                 console.log(`[ToolCallHandler] 🖼️ 发现图片内容，MIME类型: ${mimeType}`);
+            } else if (item.type === 'image' && item.url) {
+                images.push({
+                    type: 'image_url',
+                    url: item.url
+                });
+                hasContent = true;
+            }
+            // 处理视频内容
+            else if (item.type === 'video' && item.data) {
+                const mimeType = item.mimeType || item.media_type || item.mime_type || 'video/mp4';
+                const rawVideoUrl = `data:${mimeType};base64,${item.data}`;
+                const persistedVideoUrl = await persistVideoUrlIfNeeded(rawVideoUrl, mimeType);
+                videos.push({
+                    type: 'video_url',
+                    url: persistedVideoUrl,
+                    mimeType
+                });
+                hasContent = true;
+                console.log(`[ToolCallHandler] 🎬 发现视频内容，MIME类型: ${mimeType}`);
+            } else if (item.type === 'video' && item.url) {
+                const mimeType = item.mimeType || item.media_type || item.mime_type || '';
+                const persistedVideoUrl = await persistVideoUrlIfNeeded(item.url, mimeType);
+                videos.push({
+                    type: 'video_url',
+                    url: persistedVideoUrl,
+                    mimeType
+                });
+                hasContent = true;
             }
         }
 
@@ -61,14 +142,23 @@ async function enrichToolResultWithFiles(result, toolName) {
                 converted.images = images;
             }
 
+            // 处理视频
+            if (videos.length === 1) {
+                converted.video = videos[0].url;
+                converted.videos = videos;
+            } else if (videos.length > 1) {
+                converted.videos = videos;
+            }
+
             console.log(`[ToolCallHandler] MCP 格式转换完成:`, {
                 hasText: !!converted.text,
                 hasImage: !!converted.image,
-                imagesCount: images.length
+                imagesCount: images.length,
+                videosCount: videos.length
             });
 
-            // 保留原始结果的其他字段，但用转换后的内容覆盖
-            return { ...result, ...converted };
+            // 保留原始结果的其他字段，并在 wrapper/result 两层都补充转换字段
+            return attachConvertedContent(result, normalizedPayload, converted);
         }
     }
 

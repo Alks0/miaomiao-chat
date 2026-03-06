@@ -227,6 +227,13 @@ export function updateToolCallStatus(toolId, status, data = {}) {
  * 渲染工具结果
  */
 function renderToolResult(container, result) {
+    const normalizedResult = (
+        result &&
+        typeof result === 'object' &&
+        result.success === true &&
+        result.result !== undefined
+    ) ? result.result : result;
+
     const header = document.createElement('div');
     header.className = 'result-header';
 
@@ -244,12 +251,12 @@ function renderToolResult(container, result) {
     contentEl.className = 'result-content';
 
     // 根据结果类型选择渲染方式
-    if (typeof result === 'string') {
-        contentEl.textContent = result;
-    } else if (Array.isArray(result)) {
-        renderArrayResult(contentEl, result);
-    } else if (typeof result === 'object') {
-        renderObjectResult(contentEl, result);
+    if (typeof normalizedResult === 'string') {
+        contentEl.textContent = normalizedResult;
+    } else if (Array.isArray(normalizedResult)) {
+        renderArrayResult(contentEl, normalizedResult);
+    } else if (typeof normalizedResult === 'object') {
+        renderObjectResult(contentEl, normalizedResult);
     }
 
     container.innerHTML = '';
@@ -323,6 +330,7 @@ function renderArrayResult(container, items) {
 function renderObjectResult(container, obj) {
     // 多模态支持：检测并渲染图片
     const hasImage = obj && typeof obj === 'object' && obj.image;
+    const hasVideo = obj && typeof obj === 'object' && (obj.video || (Array.isArray(obj.videos) && obj.videos.length > 0));
     const hasText = obj && typeof obj === 'object' && obj.text;
 
     // 渲染图片
@@ -365,6 +373,40 @@ function renderObjectResult(container, obj) {
         }
     }
 
+    // 渲染视频（支持 video / videos）
+    if (hasVideo) {
+        const videoCandidates = [];
+        if (typeof obj.video === 'string') {
+            videoCandidates.push(obj.video);
+        }
+        if (Array.isArray(obj.videos)) {
+            for (const videoItem of obj.videos) {
+                if (typeof videoItem === 'string') {
+                    videoCandidates.push(videoItem);
+                } else if (videoItem && typeof videoItem === 'object' && videoItem.url) {
+                    videoCandidates.push(videoItem.url);
+                }
+            }
+        }
+
+        const uniqueVideoUrls = Array.from(new Set(videoCandidates.filter(Boolean)));
+        for (const videoUrl of uniqueVideoUrls.slice(0, 2)) {
+            const videoContainer = document.createElement('div');
+            videoContainer.className = 'result-image-container';
+
+            const video = document.createElement('video');
+            video.className = hasText ? 'result-image' : 'result-image no-text';
+            video.src = videoUrl;
+            video.controls = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+
+            videoContainer.appendChild(video);
+            container.appendChild(videoContainer);
+        }
+    }
+
     // 渲染文本
     if (hasText) {
         const textEl = document.createElement('div');
@@ -376,6 +418,8 @@ function renderObjectResult(container, obj) {
     // 渲染其他字段（如果有）
     const otherFields = { ...obj };
     delete otherFields.image;
+    delete otherFields.video;
+    delete otherFields.videos;
     delete otherFields.text;
 
     if (Object.keys(otherFields).length > 0 || (!hasImage && !hasText)) {

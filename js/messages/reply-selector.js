@@ -9,6 +9,41 @@ import { saveCurrentSessionMessages } from '../state/sessions.js';
 import { safeMarkedParse } from '../utils/markdown.js';
 import { renderThinkingBlock, enhanceCodeBlocks, renderContentParts } from './renderer.js';
 import { renderHumanizedError } from '../utils/errors.js';
+import { getMediaExtension, isVideoMimeType, isVideoUrl } from '../utils/media.js';
+
+function renderDownloadIcon() {
+    return `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+    `;
+}
+
+function encodeInlineUrl(url) {
+    return encodeURIComponent(url || '');
+}
+
+function renderImageBlock(url) {
+    const encodedUrl = encodeInlineUrl(url);
+    const ext = getMediaExtension(url, '', 'png');
+    return `<div class="image-wrapper">
+        <img src="${url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer(decodeURIComponent('${encodedUrl}'))" style="cursor:pointer;">
+        <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage(decodeURIComponent('${encodedUrl}'), 'image-${Date.now()}.${ext}')" title="下载原图">
+            ${renderDownloadIcon()}
+        </button>
+    </div>`;
+}
+
+function renderVideoBlock(url, mimeType = '') {
+    const encodedUrl = encodeInlineUrl(url);
+    const ext = getMediaExtension(url, mimeType, 'mp4');
+    return `<div class="image-wrapper video-wrapper">
+        <video src="${url}" controls playsinline muted preload="metadata" title="AI 生成视频"></video>
+        <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadMedia(decodeURIComponent('${encodedUrl}'), 'video-${Date.now()}.${ext}')" title="下载视频">
+            ${renderDownloadIcon()}
+        </button>
+    </div>`;
+}
 
 /**
  * 选择回复（支持两种调用方式：直接索引或带消息索引）
@@ -139,17 +174,12 @@ export function selectReply(replyIndex, messageIndex = null) {
                     } else if (part.inlineData || part.inline_data) {
                         const inlineData = part.inlineData || part.inline_data;
                         const mimeType = inlineData.mimeType || inlineData.mime_type;
-                        const imgData = inlineData.data;
-                        const ext = mimeType.split('/')[1] || 'png';
-                        const dataUrl = `data:${mimeType};base64,${imgData}`;
-                        html += `<div class="image-wrapper">
-                            <img src="${dataUrl}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${dataUrl}')" style="cursor:pointer;">
-                            <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${dataUrl}', 'image-${Date.now()}.${ext}')" title="下载原图">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                                </svg>
-                            </button>
-                        </div>`;
+                        const dataUrl = `data:${mimeType};base64,${inlineData.data}`;
+                        if (isVideoMimeType(mimeType)) {
+                            html += renderVideoBlock(dataUrl, mimeType);
+                        } else {
+                            html += renderImageBlock(dataUrl);
+                        }
                     }
                 }
 
@@ -162,18 +192,16 @@ export function selectReply(replyIndex, messageIndex = null) {
                     for (const part of reply.content) {
                         if (part.type === 'text') {
                             html += safeMarkedParse(part.text);
+                        } else if (part.type === 'video_url') {
+                            const url = part.video_url?.url || part.url;
+                            html += renderVideoBlock(url, part.mime_type || part.mimeType || part.video_url?.mime_type || part.video_url?.mimeType);
                         } else if (part.type === 'image_url' && part.image_url?.url) {
                             const url = part.image_url.url;
-                            const match = url.match(/^data:image\/(\w+);/);
-                            const ext = match ? match[1] : 'png';
-                            html += `<div class="image-wrapper">
-                                <img src="${url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${url}')" style="cursor:pointer;">
-                                <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${url}', 'image-${Date.now()}.${ext}')" title="下载原图">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                                    </svg>
-                                </button>
-                            </div>`;
+                            if (isVideoUrl(url)) {
+                                html += renderVideoBlock(url);
+                            } else {
+                                html += renderImageBlock(url);
+                            }
                         }
                     }
                 } else {

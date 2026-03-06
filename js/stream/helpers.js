@@ -7,6 +7,7 @@ import { state, elements } from '../core/state.js';
 import { safeMarkedParse } from '../utils/markdown.js';
 import { escapeHtml } from '../utils/helpers.js';
 import { renderThinkingBlock, enhanceCodeBlocks, enhanceThinkingBlocks } from '../messages/renderer.js';
+import { getMediaExtension, isVideoUrl } from '../utils/media.js';
 
 // 性能优化：防抖渲染（避免每个 token 都触发重绘）
 const renderDebounceTimer = null;
@@ -346,6 +347,75 @@ export function renderFinalTextWithThinking(textContent, thinkingContent, ground
 }
 
 /**
+ * 渲染下载图标
+ * @returns {string}
+ */
+function renderDownloadIcon() {
+    return `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+    `;
+}
+
+/**
+ * URL 编码（用于内联 onclick）
+ * @param {string} url - URL
+ * @returns {string}
+ */
+function encodeInlineUrl(url) {
+    return encodeURIComponent(url || '');
+}
+
+/**
+ * 渲染图片卡片
+ * @param {string} url - 图片 URL
+ * @returns {string}
+ */
+function renderImageCard(url) {
+    const encodedUrl = encodeInlineUrl(url);
+    const ext = getMediaExtension(url, '', 'png');
+
+    return `<div class="image-wrapper">
+        <img src="${url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer(decodeURIComponent('${encodedUrl}'))" style="cursor:pointer;">
+        <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage(decodeURIComponent('${encodedUrl}'), 'image-${Date.now()}.${ext}')" title="下载原图">
+            ${renderDownloadIcon()}
+        </button>
+    </div>`;
+}
+
+/**
+ * 渲染视频卡片
+ * @param {string} url - 视频 URL
+ * @param {string} mimeType - MIME 类型（可选）
+ * @returns {string}
+ */
+function renderVideoCard(url, mimeType = '') {
+    const encodedUrl = encodeInlineUrl(url);
+    const ext = getMediaExtension(url, mimeType, 'mp4');
+
+    return `<div class="image-wrapper video-wrapper">
+        <video src="${url}" controls playsinline muted preload="metadata" title="AI 生成视频"></video>
+        <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadMedia(decodeURIComponent('${encodedUrl}'), 'video-${Date.now()}.${ext}')" title="下载视频">
+            ${renderDownloadIcon()}
+        </button>
+    </div>`;
+}
+
+/**
+ * 渲染媒体卡片
+ * @param {string} url - 媒体 URL
+ * @param {'image'|'video'} mediaType - 媒体类型
+ * @param {string} mimeType - MIME 类型（可选）
+ * @returns {string}
+ */
+function renderMediaCard(url, mediaType, mimeType = '') {
+    if (!url) return '';
+    if (mediaType === 'video') return renderVideoCard(url, mimeType);
+    return renderImageCard(url);
+}
+
+/**
  * 渲染包含图片的最终内容
  * @param {Array} contentParts - 内容部分数组
  * @param {string} thinkingContent - 思维链内容
@@ -371,17 +441,11 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
                 html += renderThinkingBlock(part.text, false);
             } else if (part.type === 'text') {
                 html += safeMarkedParse(part.text);
+            } else if (part.type === 'video_url' && part.complete) {
+                html += renderMediaCard(part.url, 'video', part.mimeType || part.mime_type);
             } else if (part.type === 'image_url' && part.complete) {
-                const match = part.url.match(/^data:image\/(\w+);/);
-                const ext = match ? match[1] : 'png';
-                html += `<div class="image-wrapper">
-                    <img src="${part.url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${part.url}')" style="cursor:pointer;">
-                    <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${part.url}', 'image-${Date.now()}.${ext}')" title="下载原图">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                        </svg>
-                    </button>
-                </div>`;
+                const mediaType = isVideoUrl(part.url, part.mimeType || part.mime_type) ? 'video' : 'image';
+                html += renderMediaCard(part.url, mediaType, part.mimeType || part.mime_type);
             }
         }
     } else {
@@ -404,17 +468,11 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
         for (const part of contentParts) {
             if (part.type === 'text') {
                 html += safeMarkedParse(part.text);
+            } else if (part.type === 'video_url' && part.complete) {
+                html += renderMediaCard(part.url, 'video', part.mimeType || part.mime_type);
             } else if (part.type === 'image_url' && part.complete) {
-                const match = part.url.match(/^data:image\/(\w+);/);
-                const ext = match ? match[1] : 'png';
-                html += `<div class="image-wrapper">
-                    <img src="${part.url}" alt="Generated image" title="点击查看大图" onclick="openImageViewer('${part.url}')" style="cursor:pointer;">
-                    <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadImage('${part.url}', 'image-${Date.now()}.${ext}')" title="下载原图">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                        </svg>
-                    </button>
-                </div>`;
+                const mediaType = isVideoUrl(part.url, part.mimeType || part.mime_type) ? 'video' : 'image';
+                html += renderMediaCard(part.url, mediaType, part.mimeType || part.mime_type);
             }
         }
     }
@@ -500,7 +558,7 @@ export function cleanupAllIncompleteImages(contentParts) {
  * @returns {number} 添加的字符数（用于长度限制检查）
  */
 export async function handleContentArray(deltaContentArray, contentParts) {
-    // 处理文本和完整图片，跳过分块图片
+    // 处理文本和完整媒体（图片/视频），跳过分块图片
     let addedLength = 0;
 
     for (const part of deltaContentArray) {
@@ -517,12 +575,33 @@ export async function handleContentArray(deltaContentArray, contentParts) {
         else if (part.type === 'image_url') {
             const imageUrl = part.image_url?.url;
             if (imageUrl && !part.image_url?.partial) {
-                // 只处理完整图片，分块图片暂时跳过
-                contentParts.push({ type: 'image_url', url: imageUrl, complete: true });
+                const mediaType = isVideoUrl(imageUrl, part.image_url?.mime_type || part.image_url?.mimeType) ? 'video_url' : 'image_url';
+                contentParts.push({
+                    type: mediaType,
+                    url: imageUrl,
+                    complete: true,
+                    mimeType: part.image_url?.mime_type || part.image_url?.mimeType || ''
+                });
 
                 // 计数 base64 数据长度（防止超长）
                 // 如果是 data URL，提取 base64 部分的长度
-                const base64Match = imageUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+                const base64Match = imageUrl.match(/^data:[^;]+;base64,(.+)$/);
+                if (base64Match) {
+                    addedLength += base64Match[1].length;
+                }
+            }
+        }
+        else if (part.type === 'video_url') {
+            const videoUrl = part.video_url?.url || part.url;
+            const isPartial = part.video_url?.partial || part.partial;
+            if (videoUrl && !isPartial) {
+                contentParts.push({
+                    type: 'video_url',
+                    url: videoUrl,
+                    complete: true,
+                    mimeType: part.video_url?.mime_type || part.video_url?.mimeType || part.mimeType || ''
+                });
+                const base64Match = videoUrl.match(/^data:[^;]+;base64,(.+)$/);
                 if (base64Match) {
                     addedLength += base64Match[1].length;
                 }

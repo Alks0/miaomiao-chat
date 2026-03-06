@@ -5,6 +5,7 @@
 
 import { eventBus } from '../core/events.js';
 import { downloadImage } from '../utils/images.js';
+import { downloadMedia } from '../utils/media.js';
 
 /**
  * 焦点陷阱 - 限制焦点在指定元素内
@@ -127,6 +128,7 @@ export function initImageViewer() {
     window.openImageViewer = openImageViewer;
     window.closeImageViewer = closeImageViewer;
     window.downloadImage = downloadImage;
+    window.downloadMedia = downloadMedia;
 
     console.log('Image viewer initialized');
 }

@@ -295,8 +295,19 @@ export async function executeTool(toolId, args, options = {}) {
     }
 
     // 获取工具定义
+    // getTool 已经支持通过名称查找和MCP工具ID格式转换
     const tool = getTool(toolId);
     if (!tool) {
+        // 如果是MCP工具格式（serverId/toolName），尝试转换为双下划线格式
+        if (toolId.includes('/')) {
+            const [serverId, toolName] = toolId.split('/');
+            const mcpToolId = `${serverId}__${toolName}`;
+            const mcpTool = getTool(mcpToolId);
+            if (mcpTool) {
+                console.log(`[Executor] 🔄 转换MCP工具ID: ${toolId} -> ${mcpToolId}`);
+                return await executeTool(mcpToolId, args, options);
+            }
+        }
         throw new Error(`工具不存在: ${toolId}`);
     }
 
@@ -497,9 +508,11 @@ async function executeWithTimeout(tool, args, timeout) {
  */
 async function executeMCPTool(tool, args, options = {}) {
     // 动态导入 MCP 客户端（避免循环依赖）
-    const { callMCPTool } = await import('./mcp/client.js');
+    const { mcpClient } = await import('./mcp/client.js');
 
-    return callMCPTool(tool.serverId, tool.name, args, options);
+    // 使用完整的工具ID（包含serverId）
+    const fullToolId = tool.id || `${tool.serverId}__${tool.name}`;
+    return mcpClient.callTool(fullToolId, args, options);
 }
 
 /**

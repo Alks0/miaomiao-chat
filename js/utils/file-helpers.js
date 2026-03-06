@@ -8,6 +8,7 @@
  */
 export const FileCategory = {
     IMAGE: 'image',
+    VIDEO: 'video',
     PDF: 'pdf',
     TEXT: 'text',
     UNKNOWN: 'unknown'
@@ -26,6 +27,17 @@ export const SUPPORTED_IMAGE_TYPES = [
 ];
 
 /**
+ * 支持的视频 MIME 类型
+ */
+export const SUPPORTED_VIDEO_TYPES = [
+    'video/mp4',
+    'video/webm',
+    'video/ogg',
+    'video/quicktime',
+    'video/x-matroska'
+];
+
+/**
  * 支持的文本 MIME 类型
  */
 export const SUPPORTED_TEXT_TYPES = [
@@ -39,12 +51,13 @@ export const SUPPORTED_TEXT_TYPES = [
 /**
  * 判断文件的 MIME 类型类别
  * @param {string} mimeType - MIME 类型
- * @returns {'image'|'pdf'|'text'|'unknown'} 文件类别
+ * @returns {'image'|'video'|'pdf'|'text'|'unknown'} 文件类别
  */
 export function categorizeFile(mimeType) {
     if (!mimeType) return FileCategory.UNKNOWN;
 
     if (mimeType.startsWith('image/')) return FileCategory.IMAGE;
+    if (mimeType.startsWith('video/')) return FileCategory.VIDEO;
     if (mimeType === 'application/pdf') return FileCategory.PDF;
     if (mimeType === 'text/plain' ||
         mimeType === 'text/markdown' ||
@@ -62,6 +75,15 @@ export function categorizeFile(mimeType) {
  */
 export function isImage(mimeType) {
     return mimeType && mimeType.startsWith('image/');
+}
+
+/**
+ * 检查是否为视频类型
+ * @param {string} mimeType - MIME 类型
+ * @returns {boolean}
+ */
+export function isVideo(mimeType) {
+    return mimeType && mimeType.startsWith('video/');
 }
 
 /**
@@ -198,6 +220,13 @@ export function guessMimeType(filename) {
         'webp': 'image/webp',
         'bmp': 'image/bmp',
         'svg': 'image/svg+xml',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'ogv': 'video/ogg',
+        'ogg': 'video/ogg',
+        'mov': 'video/quicktime',
+        'mkv': 'video/x-matroska',
+        'avi': 'video/x-msvideo',
 
         // 文档
         'pdf': 'application/pdf',

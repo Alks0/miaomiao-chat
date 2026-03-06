@@ -946,9 +946,13 @@ async function fetchModelsFromAPI(provider) {
             // 智能构造 /models 端点
             let modelsEndpoint;
             if (endpoint.includes('/chat/completions')) {
+                // OpenAI 格式：/v1/chat/completions → /v1/models
                 modelsEndpoint = endpoint.replace('/chat/completions', '/models');
+            } else if (endpoint.includes('/messages')) {
+                // Claude 格式：/v1/messages → /v1/models
+                modelsEndpoint = endpoint.replace('/messages', '/models');
             } else if (endpoint.includes('/v1')) {
-                // 如果包含 /v1 但不是 /chat/completions，添加 /models
+                // 如果包含 /v1 但不是特定路径，添加 /models
                 modelsEndpoint = endpoint.replace(/\/$/, '') + '/models';
             } else {
                 // 默认添加 /v1/models

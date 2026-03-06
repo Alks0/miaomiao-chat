@@ -1,9 +1,103 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const { pathToFileURL, fileURLToPath } = require('url');
 const { initUpdater, checkForUpdatesManually, setSilentUpdate, quitAndInstall } = require('./updater');
 const { mcpManager } = require('./mcp-manager');
 
 let mainWindow;
+const VIDEO_STORAGE_DIR_NAME = 'message-videos';
+const MAX_VIDEO_BASE64_LENGTH = 1024 * 1024 * 256; // 256MB base64 字符串上限
+let resolvedVideoStorageDir = null;
+
+const VIDEO_MIME_TO_EXT = {
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/ogg': 'ogv',
+    'video/quicktime': 'mov',
+    'video/x-matroska': 'mkv',
+    'video/x-msvideo': 'avi',
+    'video/mpeg': 'mpeg'
+};
+
+function getVideoMimeTypeByExtension(filePath) {
+    const ext = path.extname(filePath || '').replace('.', '').toLowerCase();
+    const extToMime = {
+        mp4: 'video/mp4',
+        webm: 'video/webm',
+        ogv: 'video/ogg',
+        ogg: 'video/ogg',
+        mov: 'video/quicktime',
+        mkv: 'video/x-matroska',
+        avi: 'video/x-msvideo',
+        mpeg: 'video/mpeg',
+        mpg: 'video/mpeg'
+    };
+    return extToMime[ext] || 'video/mp4';
+}
+
+function getVideoExtensionByMimeType(mimeType) {
+    if (!mimeType || typeof mimeType !== 'string') return 'mp4';
+    return VIDEO_MIME_TO_EXT[mimeType.toLowerCase()] || 'mp4';
+}
+
+function isPathInsideDirectory(filePath, directoryPath) {
+    if (!filePath || !directoryPath) return false;
+    const normalizedFilePath = path.resolve(filePath);
+    const normalizedDirectoryPath = path.resolve(directoryPath);
+    const compareDir = normalizedDirectoryPath.endsWith(path.sep) ? normalizedDirectoryPath : `${normalizedDirectoryPath}${path.sep}`;
+
+    if (process.platform === 'win32') {
+        return normalizedFilePath.toLowerCase().startsWith(compareDir.toLowerCase());
+    }
+    return normalizedFilePath.startsWith(compareDir);
+}
+
+function getVideoStorageCandidates() {
+    const installDir = app.isPackaged
+        ? path.join(path.dirname(app.getPath('exe')), VIDEO_STORAGE_DIR_NAME)
+        : path.join(app.getAppPath(), 'electron', VIDEO_STORAGE_DIR_NAME);
+
+    const fallbackDir = path.join(app.getPath('userData'), VIDEO_STORAGE_DIR_NAME);
+    return [installDir, fallbackDir];
+}
+
+async function ensureDirectoryWritable(directoryPath) {
+    await fs.promises.mkdir(directoryPath, { recursive: true });
+    const testFile = path.join(directoryPath, `.write-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    await fs.promises.writeFile(testFile, 'ok');
+    await fs.promises.unlink(testFile);
+}
+
+async function resolveVideoStorageDirectory() {
+    if (resolvedVideoStorageDir) return resolvedVideoStorageDir;
+
+    const candidates = getVideoStorageCandidates();
+
+    for (const directoryPath of candidates) {
+        try {
+            await ensureDirectoryWritable(directoryPath);
+            resolvedVideoStorageDir = directoryPath;
+            console.log(`[Main] 视频存储目录: ${directoryPath}`);
+            return resolvedVideoStorageDir;
+        } catch (error) {
+            console.warn(`[Main] 视频目录不可写，跳过: ${directoryPath}`, error.message);
+        }
+    }
+
+    throw new Error('无法创建可写的视频存储目录');
+}
+
+function parseVideoDataUrl(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== 'string') return null;
+    const match = dataUrl.match(/^data:(video\/[^;]+);base64,(.+)$/i);
+    if (!match) return null;
+    return {
+        mimeType: match[1].toLowerCase(),
+        base64: match[2]
+    };
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -30,7 +124,7 @@ function createWindow() {
                     "img-src 'self' data: blob: https: http:; " +
                     "font-src 'self' data: https://fonts.gstatic.com; " +
                     "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://aiplatform.googleapis.com https: http: wss: ws:; " +
-                    "media-src 'self' data: blob:; " +
+                    "media-src 'self' data: blob: https: http: file:; " +
                     "object-src 'none'; " +
                     "base-uri 'self'; " +
                     "form-action 'self'; " +
@@ -137,6 +231,47 @@ ipcMain.on('install-update', () => {
 
 // ========== MCP IPC 处理器 ==========
 
+function normalizeMcpTools(rawPayload) {
+    const asArray = (value) => {
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === 'object') {
+            const toolEntries = Object.entries(value).filter(([, tool]) =>
+                tool && typeof tool === 'object' && !Array.isArray(tool)
+            );
+            if (toolEntries.length === 0) return [];
+            return toolEntries.map(([name, tool]) => ({
+                name,
+                ...(tool || {})
+            }));
+        }
+        return [];
+    };
+
+    const candidateLists = [
+        rawPayload,
+        rawPayload?.tools,
+        rawPayload?.result,
+        rawPayload?.result?.tools,
+        rawPayload?.data,
+        rawPayload?.data?.tools
+    ];
+
+    for (const candidate of candidateLists) {
+        const tools = asArray(candidate);
+        if (tools.length > 0) {
+            return tools
+                .map(tool => ({
+                    ...tool,
+                    name: tool?.name || tool?.id || '',
+                    inputSchema: tool?.inputSchema || tool?.input_schema || tool?.parameters || { type: 'object', properties: {} }
+                }))
+                .filter(tool => typeof tool.name === 'string' && tool.name.trim().length > 0);
+        }
+    }
+
+    return [];
+}
+
 /**
  * IPC: 连接到 MCP 服务器
  */
@@ -172,7 +307,8 @@ ipcMain.handle('mcp:list-tools', async (event, { serverId }) => {
     try {
         console.log('[Main] MCP 列出工具:', serverId);
         const result = await mcpManager.sendRequest(serverId, 'tools/list');
-        return { success: true, tools: result.tools || [] };
+        const tools = normalizeMcpTools(result);
+        return { success: true, tools };
     } catch (error) {
         console.error('[Main] MCP 列出工具失败:', error);
         return { success: false, error: error.message, tools: [] };
@@ -210,6 +346,99 @@ ipcMain.handle('mcp:status', async (event, { serverId }) => {
         }
     } catch (error) {
         console.error('[Main] MCP 获取状态失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 将视频 Data URL/base64 持久化到本地目录
+ */
+ipcMain.handle('mcp:store-video', async (event, payload = {}) => {
+    try {
+        const { dataUrl = '', base64 = '', mimeType = '', extension = '' } = payload || {};
+
+        let parsed = null;
+        if (typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+            parsed = parseVideoDataUrl(dataUrl);
+            if (!parsed) {
+                return { success: false, error: '仅支持视频 Data URL 格式' };
+            }
+        }
+
+        const finalMimeType = (parsed?.mimeType || mimeType || '').toLowerCase();
+        if (!finalMimeType.startsWith('video/')) {
+            return { success: false, error: `不支持的 MIME 类型: ${finalMimeType || 'unknown'}` };
+        }
+
+        const rawBase64 = (parsed?.base64 || base64 || '').replace(/\s+/g, '');
+        if (!rawBase64) {
+            return { success: false, error: '视频数据为空' };
+        }
+
+        if (rawBase64.length > MAX_VIDEO_BASE64_LENGTH) {
+            return { success: false, error: '视频数据过大，拒绝写入' };
+        }
+
+        const directoryPath = await resolveVideoStorageDirectory();
+        const fileExtension = (extension || getVideoExtensionByMimeType(finalMimeType)).replace(/^\./, '');
+        const fileName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${fileExtension}`;
+        const filePath = path.join(directoryPath, fileName);
+
+        const buffer = Buffer.from(rawBase64, 'base64');
+        await fs.promises.writeFile(filePath, buffer);
+
+        return {
+            success: true,
+            filePath,
+            fileUrl: pathToFileURL(filePath).toString(),
+            fileName,
+            mimeType: finalMimeType,
+            byteLength: buffer.length,
+            storageDir: directoryPath
+        };
+    } catch (error) {
+        console.error('[Main] 保存视频失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * IPC: 读取本地媒体文件（仅允许 message-videos 目录）
+ */
+ipcMain.handle('mcp:read-media-file', async (event, payload = {}) => {
+    try {
+        const { fileUrl = '' } = payload || {};
+        if (!fileUrl || typeof fileUrl !== 'string') {
+            return { success: false, error: '缺少 fileUrl 参数' };
+        }
+
+        let filePath;
+        try {
+            filePath = fileUrl.startsWith('file://') ? fileURLToPath(fileUrl) : path.resolve(fileUrl);
+        } catch (error) {
+            return { success: false, error: `无效 fileUrl: ${error.message}` };
+        }
+
+        const preferredDirectory = await resolveVideoStorageDirectory();
+        const allowedDirectories = Array.from(new Set([preferredDirectory, ...getVideoStorageCandidates()]));
+
+        const isAllowed = allowedDirectories.some(directoryPath => isPathInsideDirectory(filePath, directoryPath));
+        if (!isAllowed) {
+            return { success: false, error: '拒绝访问非媒体目录文件' };
+        }
+
+        const fileBuffer = await fs.promises.readFile(filePath);
+        const mimeType = getVideoMimeTypeByExtension(filePath);
+
+        return {
+            success: true,
+            filePath,
+            fileName: path.basename(filePath),
+            mimeType,
+            base64: fileBuffer.toString('base64')
+        };
+    } catch (error) {
+        console.error('[Main] 读取媒体文件失败:', error);
         return { success: false, error: error.message };
     }
 });

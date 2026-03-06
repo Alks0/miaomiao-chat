@@ -93,12 +93,24 @@ function convertSingleServer(serverName, config) {
 
         internalServer.url = config.url;
 
-        // 确定传输类型
-        if (config.type === 'sse') {
+        // 确定传输类型（兼容 streamableHttp / http / websocket 命名）
+        let transportType = config.type;
+
+        // Compat aliases (imported configs may differ)
+        if (transportType === 'streamableHttp') transportType = 'streamable-http';
+        if (typeof transportType === 'string') transportType = transportType.toLowerCase();
+        if (transportType === 'https') transportType = 'http';
+        if (transportType === 'ws' || transportType === 'wss') transportType = 'websocket';
+
+        if (transportType === 'sse') {
             internalServer.transportType = 'sse';
-        } else if (config.type === 'streamable-http') {
+        } else if (transportType === 'streamable-http') {
             internalServer.transportType = 'streamable-http';
-        } else if (!config.type) {
+        } else if (transportType === 'websocket') {
+            internalServer.transportType = 'websocket';
+        } else if (transportType === 'http') {
+            internalServer.transportType = 'http';
+        } else if (!transportType) {
             // 自动检测：WebSocket 还是 HTTP
             if (internalServer.url.startsWith('ws://') || internalServer.url.startsWith('wss://')) {
                 internalServer.transportType = 'websocket';
@@ -275,9 +287,15 @@ export function validateStandardConfig(config) {
             errors.push(`远程服务器 "${serverName}" 缺少 url 字段`);
         }
 
-        // 传输类型验证
-        if (serverConfig.type && !['sse', 'streamable-http'].includes(serverConfig.type)) {
-            errors.push(`服务器 "${serverName}" 的传输类型 "${serverConfig.type}" 无效（支持: sse, streamable-http）`);
+        // 传输类型验证（兼容 streamableHttp / http / websocket 命名）
+        let transportType = serverConfig.type;
+        if (transportType === 'streamableHttp') transportType = 'streamable-http';
+        if (typeof transportType === 'string') transportType = transportType.toLowerCase();
+        if (transportType === 'https') transportType = 'http';
+        if (transportType === 'ws' || transportType === 'wss') transportType = 'websocket';
+
+        if (transportType && !['sse', 'streamable-http', 'http', 'websocket'].includes(transportType)) {
+            errors.push(`服务器 "${serverName}" 的传输类型 "${serverConfig.type}" 无效（支持: sse, streamable-http, http, websocket）`);
         }
     }
 

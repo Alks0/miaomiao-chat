@@ -14,7 +14,7 @@ class MCPManager extends EventEmitter {
         super();
         this.processes = new Map(); // serverId -> process info
         this.messageHandlers = new Map(); // serverId -> message handler
-        this.requestQueue = new Map(); // requestId -> {resolve, reject, timeout}
+        this.requestQueue = new Map(); // requestId -> { serverId, resolve, reject, timeout }
         this.requestIdCounter = 0;
 
         // ✅ 重启配置
@@ -27,6 +27,78 @@ class MCPManager extends EventEmitter {
 
         // ✅ 重启计数器
         this.restartCounts = new Map(); // serverId -> { count, lastRestart, config }
+    }
+
+    /**
+     * Ensure the MCP server completed the initialization handshake (initialize -> initialized).
+     * Per MCP spec, clients must initialize before calling tools/list, tools/call, etc.
+     * @param {string} serverId - Server ID
+     * @returns {Promise<void>}
+     */
+    async ensureInitialized(serverId) {
+        const processInfo = this.processes.get(serverId);
+        if (!processInfo) {
+            throw new Error(`Server not running: ${serverId}`);
+        }
+
+        if (processInfo.status !== 'running') {
+            throw new Error(`Server status not ready: ${processInfo.status}`);
+        }
+
+        if (processInfo.initialized) return;
+
+        if (processInfo.initializing) {
+            await processInfo.initializing;
+            return;
+        }
+
+        processInfo.initializing = (async () => {
+            await this.sendRequest(serverId, 'initialize', {
+                protocolVersion: '2024-11-05',
+                capabilities: {},
+                clientInfo: {
+                    name: 'webchat',
+                    version: '1.1.4'
+                }
+            });
+
+            this._sendNotification(serverId, 'initialized');
+            processInfo.initialized = true;
+        })();
+
+        try {
+            await processInfo.initializing;
+        } finally {
+            processInfo.initializing = null;
+        }
+    }
+
+    /**
+     * Send a JSON-RPC notification (no id, no response expected).
+     * @private
+     */
+    _sendNotification(serverId, method, params) {
+        const processInfo = this.processes.get(serverId);
+        if (!processInfo) {
+            throw new Error(`Server not running: ${serverId}`);
+        }
+
+        if (processInfo.status !== 'running') {
+            throw new Error(`Server status not ready: ${processInfo.status}`);
+        }
+
+        const notification = {
+            jsonrpc: '2.0',
+            method
+        };
+
+        if (params !== undefined) {
+            notification.params = params;
+        }
+
+        const requestStr = JSON.stringify(notification) + '\n';
+        processInfo.process.stdin.write(requestStr);
+        console.log(`[MCP Manager] [${serverId}] Sent notification:`, method);
     }
 
     /**
@@ -70,9 +142,11 @@ class MCPManager extends EventEmitter {
                 args,
                 env: processEnv,  // ✅ 保存环境变量
                 cwd,              // ✅ 保存工作目录
-                buffer: '', // 用于累积 stdout 数据
+                buffer: Buffer.alloc(0), // 用于累积 stdout 数据
                 startTime: Date.now(),
-                status: 'starting'
+                status: 'starting',
+                initialized: false,
+                initializing: null
             };
 
             this.processes.set(serverId, processInfo);
@@ -183,6 +257,11 @@ class MCPManager extends EventEmitter {
      * @returns {Promise<Object>} 响应结果
      */
     async sendRequest(serverId, method, params = {}) {
+        // Ensure initialization handshake before calling any non-initialize methods
+        if (method !== 'initialize') {
+            await this.ensureInitialized(serverId);
+        }
+
         const processInfo = this.processes.get(serverId);
         if (!processInfo) {
             throw new Error(`服务器未运行: ${serverId}`);
@@ -206,7 +285,7 @@ class MCPManager extends EventEmitter {
         // 创建 Promise
         return new Promise((resolve, reject) => {
             // ✅ 根据方法类型设置超时时间
-            const timeoutDuration = method === 'tools/call' ? 30000 : 10000; // 工具调用 30s，其他 10s
+            const timeoutDuration = method === 'tools/call' ? 180000 : 10000; // 工具调用 180s，其他 10s
 
             const timeout = setTimeout(() => {
                 this.requestQueue.delete(requestId);
@@ -214,7 +293,7 @@ class MCPManager extends EventEmitter {
             }, timeoutDuration);
 
             // 存储请求回调
-            this.requestQueue.set(requestId, { resolve, reject, timeout });
+            this.requestQueue.set(requestId, { serverId, resolve, reject, timeout });
 
             // 发送请求（通过 stdin）
             try {
@@ -237,21 +316,65 @@ class MCPManager extends EventEmitter {
         const processInfo = this.processes.get(serverId);
         if (!processInfo) return;
 
-        // 累积数据
-        processInfo.buffer += data.toString();
+        const incomingBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        processInfo.buffer = Buffer.concat([processInfo.buffer, incomingBuffer]);
 
-        // 尝试解析完整的 JSON 消息（以换行符分隔）
-        const lines = processInfo.buffer.split('\n');
-        processInfo.buffer = lines.pop() || ''; // 保留未完成的行
+        while (processInfo.buffer.length > 0) {
+            const headerText = processInfo.buffer.toString('utf8', 0, Math.min(processInfo.buffer.length, 128));
+            const hasContentLengthPrefix = /^content-length\s*:/i.test(headerText);
 
-        for (const line of lines) {
-            if (!line.trim()) continue;
+            // MCP stdio 标准帧格式：Content-Length: <n>\r\n\r\n<json>
+            if (hasContentLengthPrefix) {
+                const headerEndCRLF = processInfo.buffer.indexOf('\r\n\r\n');
+                const headerEndLF = processInfo.buffer.indexOf('\n\n');
+                const headerEnd = headerEndCRLF >= 0 ? headerEndCRLF : headerEndLF;
+                const separatorLength = headerEndCRLF >= 0 ? 4 : 2;
+
+                // 头部还不完整，继续等待
+                if (headerEnd < 0) break;
+
+                const headersRaw = processInfo.buffer.slice(0, headerEnd).toString('utf8');
+                const lengthMatch = headersRaw.match(/content-length\s*:\s*(\d+)/i);
+                if (!lengthMatch) {
+                    console.error(`[MCP Manager] [${serverId}] 缺少 Content-Length 头，丢弃数据块`);
+                    processInfo.buffer = processInfo.buffer.slice(headerEnd + separatorLength);
+                    continue;
+                }
+
+                const contentLength = parseInt(lengthMatch[1], 10);
+                const frameEnd = headerEnd + separatorLength + contentLength;
+                if (processInfo.buffer.length < frameEnd) {
+                    // 消息体未完整到达
+                    break;
+                }
+
+                const payloadBuffer = processInfo.buffer.slice(headerEnd + separatorLength, frameEnd);
+                processInfo.buffer = processInfo.buffer.slice(frameEnd);
+
+                try {
+                    const message = JSON.parse(payloadBuffer.toString('utf8'));
+                    this.handleMessage(serverId, message);
+                } catch (error) {
+                    console.error(`[MCP Manager] [${serverId}] Content-Length 帧 JSON 解析失败:`, error);
+                }
+                continue;
+            }
+
+            // 兼容 NDJSON（一行一个 JSON）
+            const newlineIndex = processInfo.buffer.indexOf('\n');
+            if (newlineIndex < 0) break;
+
+            const lineBuffer = processInfo.buffer.slice(0, newlineIndex);
+            processInfo.buffer = processInfo.buffer.slice(newlineIndex + 1);
+
+            const line = lineBuffer.toString('utf8').trim();
+            if (!line) continue;
 
             try {
                 const message = JSON.parse(line);
                 this.handleMessage(serverId, message);
-            } catch (error) {
-                console.error(`[MCP Manager] [${serverId}] JSON 解析失败:`, line);
+            } catch {
+                console.error(`[MCP Manager] [${serverId}] NDJSON 解析失败:`, line);
             }
         }
     }
@@ -267,6 +390,14 @@ class MCPManager extends EventEmitter {
         if (message.id) {
             const pending = this.requestQueue.get(message.id);
             if (pending) {
+                if (pending.serverId && pending.serverId !== serverId) {
+                    console.warn(`[MCP Manager] [${serverId}] Response serverId mismatch, ignoring`, {
+                        messageId: message.id,
+                        pendingServerId: pending.serverId
+                    });
+                    return;
+                }
+
                 clearTimeout(pending.timeout);
                 this.requestQueue.delete(message.id);
 
@@ -294,10 +425,11 @@ class MCPManager extends EventEmitter {
 
         // 清理未完成的请求
         for (const [requestId, pending] of this.requestQueue.entries()) {
+            if (pending.serverId !== serverId) continue;
             clearTimeout(pending.timeout);
             pending.reject(new Error('服务器进程已退出'));
+            this.requestQueue.delete(requestId);
         }
-        this.requestQueue.clear();
 
         console.log(`[MCP Manager] [${serverId}] 进程已退出: code=${code}, signal=${signal}`);
         this.emit('server-exited', { serverId, code, signal });

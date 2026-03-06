@@ -63,6 +63,52 @@ const toolEnabled = new Map();
  */
 const toolNameIndex = new Map();
 
+/**
+ * 归一化工具启用状态值
+ * 兼容历史数据中的字符串/数字类型
+ * @param {any} value - 原始状态值
+ * @returns {boolean}
+ */
+function normalizeToolEnabledValue(value) {
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+    }
+
+    return value === true || value === 1;
+}
+
+/**
+ * 解析并归一化持久化的工具状态
+ * @param {string|Object|null} rawStates - 原始状态（JSON 字符串或对象）
+ * @returns {Object|null}
+ */
+function parseSavedToolStates(rawStates) {
+    if (!rawStates) return null;
+
+    let parsed = rawStates;
+    if (typeof rawStates === 'string') {
+        try {
+            parsed = JSON.parse(rawStates);
+        } catch (error) {
+            console.error('[Tools] ❌ 解析工具状态 JSON 失败:', error);
+            return null;
+        }
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return null;
+    }
+
+    const normalized = {};
+    for (const [toolId, enabled] of Object.entries(parsed)) {
+        normalized[toolId] = normalizeToolEnabledValue(enabled);
+    }
+
+    return normalized;
+}
+
 // ========== 反向索引辅助函数 ==========
 
 /**
@@ -164,16 +210,19 @@ export async function registerMCPTool(serverId, toolName, toolDefinition) {
 
     if (toolEnabled.has(toolId)) {
         // 内存中已有状态（由 loadToolStates 预加载）
-        enabled = toolEnabled.get(toolId);
+        enabled = normalizeToolEnabledValue(toolEnabled.get(toolId));
+        toolEnabled.set(toolId, enabled);
         console.log(`[Tools] 使用预加载的 MCP 工具状态: ${toolId} = ${enabled ? '启用' : '禁用'}`);
     } else {
         // 内存中没有，尝试从持久化存储恢复
         const savedStates = await loadSavedToolStates();
-        const savedEnabled = savedStates && savedStates[toolId];
-        enabled = savedEnabled !== undefined ? savedEnabled : false;
+        const hasSavedState = savedStates
+            ? Object.prototype.hasOwnProperty.call(savedStates, toolId)
+            : false;
+        enabled = hasSavedState ? normalizeToolEnabledValue(savedStates[toolId]) : false;
         toolEnabled.set(toolId, enabled);
 
-        if (savedEnabled !== undefined) {
+        if (hasSavedState) {
             console.log(`[Tools] 从存储恢复 MCP 工具状态: ${toolId} = ${enabled ? '启用' : '禁用'}`);
         }
     }
@@ -450,12 +499,13 @@ export function setToolEnabled(toolId, enabled) {
         return;
     }
 
-    toolEnabled.set(toolId, enabled);
+    const normalizedEnabled = normalizeToolEnabledValue(enabled);
+    toolEnabled.set(toolId, normalizedEnabled);
 
-    console.log(`[Tools] 工具 "${toolId}" 已${enabled ? '启用' : '禁用'}`);
+    console.log(`[Tools] 工具 "${toolId}" 已${normalizedEnabled ? '启用' : '禁用'}`);
 
     // 发布事件
-    eventBus.emit('tool:enabled:changed', { toolId, enabled });
+    eventBus.emit('tool:enabled:changed', { toolId, enabled: normalizedEnabled });
     eventBus.emit('tools:updated', { toolId });
 
     // 保存状态
@@ -648,7 +698,7 @@ export async function syncMCPTools(serverId) {
                 if (savedStates[toolId] !== undefined && toolEnabled.has(toolId)) {
                     // 如果 registerMCPTool 没有恢复状态（比如在某些边缘情况下），这里再次确保
                     const currentState = toolEnabled.get(toolId);
-                    const savedState = savedStates[toolId];
+                    const savedState = normalizeToolEnabledValue(savedStates[toolId]);
                     if (currentState !== savedState) {
                         toolEnabled.set(toolId, savedState);
                         restoredCount++;
@@ -708,11 +758,8 @@ eventBus.on('mcp:disconnected', async ({ serverId }) => {
  */
 async function loadSavedToolStates() {
     try {
-        const statesJson = await loadPreference('toolsEnabled');
-        if (!statesJson) {
-            return null;
-        }
-        return JSON.parse(statesJson);
+        const statesRaw = await loadPreference('toolsEnabled');
+        return parseSavedToolStates(statesRaw);
     } catch (error) {
         console.error('[Tools] ❌ 读取保存的工具状态失败:', error);
         return null;
@@ -733,7 +780,7 @@ async function saveToolStates() {
                 return; // forEach 的 return 相当于 continue
             }
 
-            states[toolId] = enabled;
+            states[toolId] = normalizeToolEnabledValue(enabled);
         });
 
         await savePreference('toolsEnabled', JSON.stringify(states));
@@ -749,13 +796,13 @@ async function saveToolStates() {
  */
 export async function loadToolStates(includeUnregistered = false) {
     try {
-        const statesJson = await loadPreference('toolsEnabled');
-        if (!statesJson) {
+        const statesRaw = await loadPreference('toolsEnabled');
+        const states = parseSavedToolStates(statesRaw);
+        if (!states) {
             console.log('[Tools] 没有已保存的工具状态');
             return;
         }
 
-        const states = JSON.parse(statesJson);
         console.log('[Tools] 加载的工具状态:', Object.keys(states).length, '个工具');
         console.log('[Tools] 状态详情:', states);
         let restoredCount = 0;
@@ -763,6 +810,8 @@ export async function loadToolStates(includeUnregistered = false) {
 
         // 恢复工具状态
         for (const [toolId, enabled] of Object.entries(states)) {
+            const normalizedEnabled = normalizeToolEnabledValue(enabled);
+
             if (toolRegistry.has(toolId)) {
                 const tool = toolRegistry.get(toolId);
 
@@ -773,12 +822,12 @@ export async function loadToolStates(includeUnregistered = false) {
                     continue;
                 }
 
-                toolEnabled.set(toolId, enabled);
+                toolEnabled.set(toolId, normalizedEnabled);
                 restoredCount++;
             } else if (includeUnregistered) {
                 // 即使工具未注册，也将状态加载到内存
                 // 这样当工具稍后注册时（如 MCP 连接），状态已经在内存中
-                toolEnabled.set(toolId, enabled);
+                toolEnabled.set(toolId, normalizedEnabled);
                 unregisteredCount++;
             }
         }

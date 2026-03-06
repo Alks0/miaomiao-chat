@@ -553,7 +553,24 @@ export async function loadSavedConfigs() {
  * @returns {Promise<void>}
  */
 export async function savePreference(key, value) {
-    return saveToStore(STORES.PREFERENCES, key, value);
+    const fallbackValue = typeof value === 'string' ? value : JSON.stringify(value);
+
+    // IndexedDB 不可用时，降级到 localStorage
+    if (!db) {
+        if (!safeLocalStorageSet(key, fallbackValue)) {
+            throw new Error(`保存偏好设置失败（localStorage 不可用）: ${key}`);
+        }
+        return;
+    }
+
+    try {
+        await saveToStore(STORES.PREFERENCES, key, value);
+    } catch (error) {
+        console.warn(`[Storage] savePreference("${key}") 写入 IndexedDB 失败，降级到 localStorage:`, error);
+        if (!safeLocalStorageSet(key, fallbackValue)) {
+            throw error;
+        }
+    }
 }
 
 /**
@@ -562,7 +579,22 @@ export async function savePreference(key, value) {
  * @returns {Promise<any|null>} 偏好设置值
  */
 export async function loadPreference(key) {
-    return loadFromStore(STORES.PREFERENCES, key);
+    // IndexedDB 不可用时，直接从 localStorage 读取
+    if (!db) {
+        return safeLocalStorageGet(key);
+    }
+
+    try {
+        const value = await loadFromStore(STORES.PREFERENCES, key);
+        // 兼容历史数据：IndexedDB 没有时尝试 localStorage
+        if (value === null || value === undefined) {
+            return safeLocalStorageGet(key);
+        }
+        return value;
+    } catch (error) {
+        console.warn(`[Storage] loadPreference("${key}") 读取 IndexedDB 失败，降级到 localStorage:`, error);
+        return safeLocalStorageGet(key);
+    }
 }
 
 /**

@@ -15,6 +15,7 @@ import { XMLStreamAccumulator } from '../tools/xml-formatter.js';  // XML 工具
 import { state } from '../core/state.js';  // 访问 xmlToolCallingEnabled 配置
 import { ThinkTagParser } from './think-tag-parser.js';  // <think> 标签解析器
 import { requestStateMachine, RequestState } from '../core/request-state-machine.js';
+import { isVideoMimeType } from '../utils/media.js';
 
 // 响应长度限制（防止内存溢出）
 const MAX_TEXT_RESPONSE_LENGTH = 200000;     // 纯文本响应：200KB
@@ -203,8 +204,8 @@ export async function parseGeminiStream(reader, sessionId = null) {
                                 if (parsedPart.type === 'text') {
                                     // 过滤掉图片占位符（避免显示 [Image #1] 等）
                                     let textToAdd = parsedPart.text;
-                                    const hasImages = contentParts.some(p => p.type === 'image_url');
-                                    if (hasImages) {
+                                    const hasMediaParts = contentParts.some(p => p.type === 'image_url' || p.type === 'video_url');
+                                    if (hasMediaParts) {
                                         textToAdd = textToAdd.replace(/\[Image #\d+\]/g, '').trim();
                                     }
 
@@ -226,9 +227,10 @@ export async function parseGeminiStream(reader, sessionId = null) {
                                     totalReceived += parsedPart.url.length;
                                 }
                             }
-                        } else if (part.inlineData) {
+                        } else if (part.inlineData || part.inline_data) {
                             // 图片独立成块，自动分段
-                            const inlineData = part.inlineData;
+                            const inlineData = part.inlineData || part.inline_data;
+                            const mimeType = inlineData.mimeType || inlineData.mime_type || '';
 
                             // 检查数据格式：跳过文件名格式的图片
                             if (typeof inlineData.data === 'string' && inlineData.data.length < 200 && !inlineData.data.includes('/')) {
@@ -243,8 +245,9 @@ export async function parseGeminiStream(reader, sessionId = null) {
                                 contentParts.push({ type: 'text', text: warningText });
                             } else {
                                 // 正常的 base64 数据
-                                const dataUrl = `data:${inlineData.mimeType};base64,${inlineData.data}`;
-                                contentParts.push({ type: 'image_url', url: dataUrl, complete: true });
+                                const dataUrl = `data:${mimeType};base64,${inlineData.data}`;
+                                const mediaType = isVideoMimeType(mimeType) ? 'video_url' : 'image_url';
+                                contentParts.push({ type: mediaType, url: dataUrl, complete: true, mimeType });
                                 // 计数 base64 数据长度（防止超长）
                                 totalReceived += inlineData.data.length;
                             }
@@ -252,19 +255,19 @@ export async function parseGeminiStream(reader, sessionId = null) {
                     }
 
                     // 智能截断检查（区分文本和图片响应）
-                    const hasImages = contentParts.some(p => p.type === 'image_url');
-                    const imageDataSize = contentParts
-                        .filter(p => p.type === 'image_url')
+                    const hasMedia = contentParts.some(p => p.type === 'image_url' || p.type === 'video_url');
+                    const mediaDataSize = contentParts
+                        .filter(p => p.type === 'image_url' || p.type === 'video_url')
                         .reduce((sum, p) => sum + (p.url ? p.url.length : 0), 0);
-                    const textDataSize = totalReceived - imageDataSize;
+                    const textDataSize = totalReceived - mediaDataSize;
 
-                    const limit = hasImages ? MAX_IMAGE_RESPONSE_LENGTH : MAX_TEXT_RESPONSE_LENGTH;
+                    const limit = hasMedia ? MAX_IMAGE_RESPONSE_LENGTH : MAX_TEXT_RESPONSE_LENGTH;
                     const exceeded = totalReceived > limit;
 
                     if (exceeded) {
-                        if (hasImages && textDataSize <= MAX_TEXT_RESPONSE_LENGTH) {
+                        if (hasMedia && textDataSize <= MAX_TEXT_RESPONSE_LENGTH) {
                             // 图片生成完成，这是正常情况，不显示警告
-                            console.log(`图片生成完成（图片 ${(imageDataSize/1024/1024).toFixed(1)}MB + 文本 ${textDataSize.toLocaleString()} 字符）`);
+                            console.log(`媒体生成完成（媒体 ${(mediaDataSize/1024/1024).toFixed(1)}MB + 文本 ${textDataSize.toLocaleString()} 字符）`);
                         } else {
                             // 真正的超长响应
                             console.warn(`响应超长（${totalReceived.toLocaleString()} 字符），已强制截断`);

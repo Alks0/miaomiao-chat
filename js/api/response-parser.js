@@ -7,6 +7,7 @@ import { parseMarkdownImages } from '../utils/markdown-image-parser.js';
 import { extractXMLToolCalls } from '../tools/xml-formatter.js';
 import { state } from '../core/state.js';
 import { parseThinkTags } from '../stream/think-tag-parser.js';
+import { isVideoMimeType, isVideoUrl } from '../utils/media.js';
 
 /**
  * 解析 API 响应数据
@@ -124,7 +125,8 @@ export function parseApiResponse(data, format = 'openai') {
                     const inlineData = part.inlineData || part.inline_data;
                     const mimeType = inlineData.mimeType || inlineData.mime_type;
                     const dataUrl = `data:${mimeType};base64,${inlineData.data}`;
-                    contentParts.push({ type: 'image_url', url: dataUrl, complete: true });
+                    const mediaType = isVideoMimeType(mimeType) ? 'video_url' : 'image_url';
+                    contentParts.push({ type: mediaType, url: dataUrl, complete: true, mimeType });
                 }
             }
 
@@ -222,6 +224,16 @@ export function parseApiResponse(data, format = 'openai') {
                     } else if (source.type === 'url') {
                         contentParts.push({ type: 'image_url', url: source.url, complete: true });
                     }
+                } else if (block.type === 'video') {
+                    const source = block.source || {};
+                    if (source.type === 'base64' && source.data) {
+                        const mimeType = source.media_type || source.mimeType || 'video/mp4';
+                        const dataUrl = `data:${mimeType};base64,${source.data}`;
+                        contentParts.push({ type: 'video_url', url: dataUrl, complete: true, mimeType });
+                    } else if (source.type === 'url' && source.url) {
+                        const mimeType = source.media_type || source.mimeType || '';
+                        contentParts.push({ type: 'video_url', url: source.url, complete: true, mimeType });
+                    }
                 }
             });
 
@@ -275,7 +287,19 @@ export function parseApiResponse(data, format = 'openai') {
                                     textContent += part.text;
                                     contentParts.push({ type: 'text', text: part.text });
                                 } else if (part.type === 'image_url' && part.image_url?.url) {
-                                    contentParts.push({ type: 'image_url', url: part.image_url.url, complete: true });
+                                    const mediaUrl = part.image_url.url;
+                                    const mediaType = isVideoUrl(mediaUrl, part.image_url?.mime_type || part.image_url?.mimeType) ? 'video_url' : 'image_url';
+                                    contentParts.push({ type: mediaType, url: mediaUrl, complete: true, mimeType: part.image_url?.mime_type || part.image_url?.mimeType || '' });
+                                } else if (part.type === 'video_url') {
+                                    const mediaUrl = part.video_url?.url || part.url;
+                                    if (mediaUrl) {
+                                        contentParts.push({
+                                            type: 'video_url',
+                                            url: mediaUrl,
+                                            complete: true,
+                                            mimeType: part.mime_type || part.mimeType || part.video_url?.mime_type || part.video_url?.mimeType || ''
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -383,7 +407,24 @@ export function parseApiResponse(data, format = 'openai') {
                             }
                         }
                     } else if (part.type === 'image_url' && part.image_url?.url) {
-                        contentParts.push({ type: 'image_url', url: part.image_url.url, complete: true });
+                        const mediaUrl = part.image_url.url;
+                        const mediaType = isVideoUrl(mediaUrl, part.image_url?.mime_type || part.image_url?.mimeType) ? 'video_url' : 'image_url';
+                        contentParts.push({
+                            type: mediaType,
+                            url: mediaUrl,
+                            complete: true,
+                            mimeType: part.image_url?.mime_type || part.image_url?.mimeType || ''
+                        });
+                    } else if (part.type === 'video_url') {
+                        const mediaUrl = part.video_url?.url || part.url;
+                        if (mediaUrl) {
+                            contentParts.push({
+                                type: 'video_url',
+                                url: mediaUrl,
+                                complete: true,
+                                mimeType: part.mime_type || part.mimeType || part.video_url?.mime_type || part.video_url?.mimeType || ''
+                            });
+                        }
                     }
                 }
             } else if (typeof content === 'string') {
