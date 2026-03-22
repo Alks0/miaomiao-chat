@@ -241,7 +241,12 @@ export function updateSessionList() {
                         '确认删除'
                     );
                     if (confirmed) {
-                        deleteSession(sessionData.id);
+                        try {
+                            await deleteSession(sessionData.id);
+                        } catch (err) {
+                            console.error('删除会话失败:', err);
+                            eventBus.emit('ui:notification', { message: '删除会话失败', type: 'error' });
+                        }
                     }
                 });
             }
@@ -553,7 +558,12 @@ export function initSidebar() {
     window.deleteSession = async (sessionId) => {
         const confirmed = await showConfirmDialog('确定要删除此会话吗？', '确认删除');
         if (confirmed) {
-            deleteSession(sessionId);
+            try {
+                await deleteSession(sessionId);
+            } catch (err) {
+                console.error('删除会话失败:', err);
+                eventBus.emit('ui:notification', { message: '删除会话失败', type: 'error' });
+            }
         }
     };
     window.renameSession = async (sessionId) => {

@@ -53,7 +53,15 @@ export function showInputDialog(message, defaultValue = '', title = '输入') {
             confirmBtn.removeEventListener('click', handleConfirm);
             cancelBtn.removeEventListener('click', handleCancel);
             closeBtn.removeEventListener('click', handleCancel);
+            modal.removeEventListener('click', handleOverlayClick);
             input.removeEventListener('keydown', handleKeydown);
+        };
+
+        // 点击遮罩层关闭
+        const handleOverlayClick = (e) => {
+            if (e.target === modal || e.target.classList.contains('modal-overlay')) {
+                handleCancel();
+            }
         };
 
         // 键盘事件
@@ -71,6 +79,7 @@ export function showInputDialog(message, defaultValue = '', title = '输入') {
         confirmBtn.addEventListener('click', handleConfirm);
         cancelBtn.addEventListener('click', handleCancel);
         closeBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('click', handleOverlayClick);
         input.addEventListener('keydown', handleKeydown);
     });
 }
@@ -120,7 +129,15 @@ export function showConfirmDialog(message, title = '确认') {
             confirmBtn.removeEventListener('click', handleConfirm);
             cancelBtn.removeEventListener('click', handleCancel);
             closeBtn.removeEventListener('click', handleCancel);
+            modal.removeEventListener('click', handleOverlayClick);
             document.removeEventListener('keydown', handleKeydown);
+        };
+
+        // 点击遮罩层关闭（点击模态框内容区域外的部分）
+        const handleOverlayClick = (e) => {
+            if (e.target === modal || e.target.classList.contains('modal-overlay')) {
+                handleCancel();
+            }
         };
 
         // 键盘事件
@@ -138,6 +155,7 @@ export function showConfirmDialog(message, title = '确认') {
         confirmBtn.addEventListener('click', handleConfirm);
         cancelBtn.addEventListener('click', handleCancel);
         closeBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('click', handleOverlayClick);
         document.addEventListener('keydown', handleKeydown);
     });
 }

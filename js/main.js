@@ -212,9 +212,22 @@ async function init() {
 
         // 1. 配置 Marked.js（代码高亮）
         if (typeof marked !== 'undefined') {
+            // 自定义链接渲染器：外部链接在新标签页打开
+            const renderer = new marked.Renderer();
+            renderer.link = function({ href, title, text }) {
+                const titleAttr = title ? ` title="${title}"` : '';
+                // 判断是否为外部链接（http/https 开头）
+                if (href && /^https?:\/\//i.test(href)) {
+                    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+                }
+                // 内部链接或其他协议，正常渲染
+                return `<a href="${href}"${titleAttr}>${text}</a>`;
+            };
+
             marked.setOptions({
                 breaks: true,
                 gfm: true,
+                renderer: renderer,
                 highlight: function(code, lang) {
                     if (typeof hljs !== 'undefined' && hljs.getLanguage(lang)) {
                         return hljs.highlight(code, { language: lang }).value;

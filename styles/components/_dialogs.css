@@ -32,6 +32,7 @@
     background: rgba(40, 40, 43, 0.85);
     backdrop-filter: blur(4px);
     z-index: var(--z-base);
+    pointer-events: none;
 }
 
 /* 对话框内容 */

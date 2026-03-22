@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -140,6 +140,21 @@ function createWindow() {
     if (process.env.NODE_ENV === 'development') {
         mainWindow.webContents.openDevTools();
     }
+
+    // ✅ 安全：拦截外部链接，用系统默认浏览器打开
+    // 防止点击消息中的超链接导致应用窗口导航离开
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        shell.openExternal(url);
+        return { action: 'deny' };
+    });
+
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        // 只允许加载应用自身的页面，外部链接用浏览器打开
+        if (url !== mainWindow.webContents.getURL()) {
+            event.preventDefault();
+            shell.openExternal(url);
+        }
+    });
 
     mainWindow.on('closed', () => {
         mainWindow = null;
