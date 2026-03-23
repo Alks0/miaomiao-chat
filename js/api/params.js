@@ -141,7 +141,18 @@ export function buildThinkingConfig(format, model = '') {
         case 'claude':
             // 检查是否启用思考链
             if (!state.thinkingEnabled) return null;
-            return { thinking: { budget_tokens: budget } };  // 移除 type: 'enabled'，使用最新格式
+
+            // Claude 4.6 Adaptive Thinking 模式
+            if (state.claudeAdaptiveThinking) {
+                const effort = state.claudeEffortLevel || 'high';
+                return {
+                    thinking: { type: 'adaptive' },
+                    output_config: { effort }
+                };
+            }
+
+            // 传统 budget_tokens 模式
+            return { thinking: { budget_tokens: budget } };
 
         default:
             return null;

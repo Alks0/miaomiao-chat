@@ -672,22 +672,38 @@ export class MCPClient {
                         reason: event.reason || '连接断开'
                     });
 
-                    // 延迟 5 秒后自动重连
+                    // 自动重连，带退避和次数限制
+                    const MAX_RECONNECT_ATTEMPTS = 5;
+                    const reconnectAttempt = (connection.reconnectAttempts || 0) + 1;
+                    if (reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
+                        console.warn(`[MCP] ⚠️ WebSocket 重连次数已达上限 (${MAX_RECONNECT_ATTEMPTS})，停止重连: ${config.name}`);
+                        eventBus.emit('mcp:reconnect-failed', {
+                            serverId: id,
+                            serverName: config.name,
+                            error: `超过最大重连次数 (${MAX_RECONNECT_ATTEMPTS})`
+                        });
+                        return;
+                    }
+                    connection.reconnectAttempts = reconnectAttempt;
+
+                    const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
+
                     setTimeout(async () => {
                         const connection = this.connections.get(id);
                         if (!connection || connection.instanceId !== instanceId) return;
                         if (connection.connected) return;
 
-                        // 检查连接是否还存在 && 允许重连 && 服务器配置还存在
                         if (connection.shouldReconnect && this.connections.has(id)) {
                             const server = state.mcpServers.find(s => s.id === id);
 
                             if (server) {
-                                console.log(`[MCP] 🔄 尝试自动重连: ${config.name}`);
+                                console.log(`[MCP] 🔄 尝试自动重连: ${config.name} (${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
 
                                 const result = await this.connect(server);
                                 if (result.success) {
                                     console.log(`[MCP] 自动重连成功: ${config.name}`);
+                                    const conn = this.connections.get(id);
+                                    if (conn) conn.reconnectAttempts = 0;
                                 } else {
                                     console.error(`[MCP] ❌ 自动重连失败: ${config.name}`);
                                     eventBus.emit('mcp:reconnect-failed', {
@@ -702,7 +718,7 @@ export class MCPClient {
                         } else {
                             console.log(`[MCP] ⚠️ 连接已手动断开或删除，取消重连: ${id}`);
                         }
-                    }, 5000);
+                    }, delay);
                 }
             };
 
@@ -781,6 +797,13 @@ export class MCPClient {
                 }
 
                 console.log(`[MCP] 初始化成功:`, initData);
+
+                // 提取 Mcp-Session-Id（Streamable HTTP 规范）
+                const sessionId = initResponse.headers.get('mcp-session-id');
+                if (sessionId) {
+                    console.log(`[MCP] 获取到 Session ID: ${sessionId}`);
+                    requestHeaders['Mcp-Session-Id'] = sessionId;
+                }
 
                 // 2. 发送 initialized 通知（无需等待响应）
                 fetch(url, {
@@ -1003,7 +1026,23 @@ export class MCPClient {
                     this._clearToolsForServer(id);
                     eventBus.emit('mcp:disconnected', { serverId: id, reason: 'connection-lost' });
 
-                    console.warn(`[MCP] ⚠️ SSE 异常断开: ${config.name || id}`);
+                    const MAX_RECONNECT_ATTEMPTS = 5;
+                    const reconnectAttempt = (current.reconnectAttempts || 0) + 1;
+                    if (reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
+                        console.warn(`[MCP] ⚠️ SSE 重连次数已达上限 (${MAX_RECONNECT_ATTEMPTS})，停止重连: ${config.name || id}`);
+                        eventBus.emit('mcp:reconnect-failed', {
+                            serverId: id,
+                            serverName: config.name || id,
+                            error: `超过最大重连次数 (${MAX_RECONNECT_ATTEMPTS})`
+                        });
+                        return;
+                    }
+                    current.reconnectAttempts = reconnectAttempt;
+
+                    // 递增退避: 5s, 10s, 20s, 40s, 60s
+                    const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
+                    console.warn(`[MCP] ⚠️ SSE 异常断开: ${config.name || id}，${delay / 1000}s 后重连 (${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
+
                     eventBus.emit('mcp:connection-lost', {
                         serverId: id,
                         serverName: config.name || id,
@@ -1020,14 +1059,18 @@ export class MCPClient {
                         if (!server) return;
 
                         const result = await this.connect(server);
-                        if (!result.success) {
+                        if (result.success) {
+                            // 重连成功，重置计数
+                            const conn = this.connections.get(id);
+                            if (conn) conn.reconnectAttempts = 0;
+                        } else {
                             eventBus.emit('mcp:reconnect-failed', {
                                 serverId: id,
                                 serverName: config.name || id,
                                 error: result.error
                             });
                         }
-                    }, 5000);
+                    }, delay);
                 }
             }
         })();
@@ -1534,6 +1577,12 @@ export class MCPClient {
 
                 if (!response.ok) {
                     throw new Error(`HTTP 请求失败: ${response.status}`);
+                }
+
+                // 更新 Session ID（服务器可能在任何响应中返回）
+                const newSessionId = response.headers.get('mcp-session-id');
+                if (newSessionId && connection.headers) {
+                    connection.headers['Mcp-Session-Id'] = newSessionId;
                 }
 
                 // 根据 Content-Type 解析响应

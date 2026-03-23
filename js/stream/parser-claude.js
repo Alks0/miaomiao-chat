@@ -41,7 +41,7 @@ export async function parseClaudeStream(reader, sessionId = null) {
     // ⭐ 工具调用相关状态
     const toolCalls = new Map();  // Map<index, {id, name, input: string}>
     const xmlToolCallAccumulator = new XMLStreamAccumulator();  // XML 工具调用累积器
-    let hasNativeToolCalls = false;  // 标记是否检测到原生格式
+    let xmlParsingDisabled = false;  // XML 解析崩溃时禁用，回退到纯文本
     let stopReason = null;  // 停止原因
     const thinkTagParser = new ThinkTagParser();  // <think> 标签解析器
 
@@ -103,7 +103,6 @@ export async function parseClaudeStream(reader, sessionId = null) {
 
                                 // 检测原生工具调用 (Claude 格式，仅在非 XML 模式)
                                 if (currentBlockType === 'tool_use' && !state.xmlToolCallingEnabled) {
-                                    hasNativeToolCalls = true;  // 标记为原生格式
                                     const block = event.content_block;
                                     toolCalls.set(blockIndex, {
                                         id: block.id,
@@ -159,7 +158,7 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                             // 顶层错误保护 - XML 解析崩溃时不影响正常流式输出
                                             console.error('[Claude Parser] ❌ XML 累积器异常:', xmlError);
                                             // 禁用 XML 模式，回退到纯文本
-                                            hasNativeToolCalls = true;
+                                            xmlParsingDisabled = true;
                                         }
                                     }
 
@@ -254,7 +253,7 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                 // ⭐ 检查是否有工具调用
                                 let completedCalls = [];
 
-                                if (state.xmlToolCallingEnabled) {
+                                if (state.xmlToolCallingEnabled && !xmlParsingDisabled) {
                                     // XML 模式：使用 XML 工具调用
                                     const xmlCalls = xmlToolCallAccumulator.getCompletedCalls();
                                     if (xmlCalls.length > 0) {
@@ -268,16 +267,20 @@ export async function parseClaudeStream(reader, sessionId = null) {
 
                                         // 解析所有原生工具调用
                                         for (const [_index, call] of toolCalls) {
+                                            let args;
                                             try {
-                                                const args = JSON.parse(call.input);
-                                                completedCalls.push({
-                                                    id: call.id,
-                                                    name: call.name,
-                                                    arguments: args
-                                                });
+                                                args = (call.input != null && call.input !== '')
+                                                    ? JSON.parse(call.input)
+                                                    : {};
                                             } catch (_e) {
                                                 console.error('[Claude] 解析工具参数失败:', call.name, _e);
+                                                args = {};
                                             }
+                                            completedCalls.push({
+                                                id: call.id,
+                                                name: call.name,
+                                                arguments: args
+                                            });
                                         }
                                     }
                                 }

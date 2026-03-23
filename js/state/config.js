@@ -100,7 +100,9 @@ function buildConfigObject() {
         thinkingEnabled: state.thinkingEnabled,
         thinkingStrength: state.thinkingStrength,
         thinkingBudget: state.thinkingBudget,
-        thinkingNoneMode: state.thinkingNoneMode || false,  // ⭐ 新增
+        thinkingNoneMode: state.thinkingNoneMode || false,
+        claudeAdaptiveThinking: state.claudeAdaptiveThinking || false,
+        claudeEffortLevel: state.claudeEffortLevel || 'high',
         webSearchEnabled: state.webSearchEnabled,
         geminiApiKeyInHeader: state.geminiApiKeyInHeader,
 
@@ -413,7 +415,9 @@ function applyConfigToState(config) {
     state.thinkingEnabled = config.thinkingEnabled ?? false;
     state.thinkingStrength = config.thinkingStrength ?? 'high';
     state.thinkingBudget = config.thinkingBudget ?? 32768;
-    state.thinkingNoneMode = config.thinkingNoneMode ?? false;  // ⭐ 新增
+    state.thinkingNoneMode = config.thinkingNoneMode ?? false;
+    state.claudeAdaptiveThinking = config.claudeAdaptiveThinking ?? false;
+    state.claudeEffortLevel = config.claudeEffortLevel ?? 'high';
     state.webSearchEnabled = config.webSearchEnabled ?? false;
     state.geminiApiKeyInHeader = config.geminiApiKeyInHeader ?? false;
 

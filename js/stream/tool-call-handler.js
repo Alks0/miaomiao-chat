@@ -308,21 +308,26 @@ class ToolCallAccumulator {
         const completed = [];
 
         for (const [index, call] of this.calls.entries()) {
-            if (call.name && call.arguments != null) {
+            if (call.name) {
+                let args;
                 try {
-                    // 解析参数 JSON
-                    const args = JSON.parse(call.arguments);
-
-                    completed.push({
-                        id: call.id,
-                        type: call.type,
-                        name: call.name,
-                        arguments: args
-                    });
+                    // 空字符串或 null 时降级为空对象
+                    args = (call.arguments != null && call.arguments !== '')
+                        ? JSON.parse(call.arguments)
+                        : {};
                 } catch (error) {
                     console.error(`[ToolCallHandler] 工具调用 ${index} 参数解析失败:`, call.arguments);
                     console.error(error);
+                    // 解析失败降级为空对象，不跳过工具调用
+                    args = {};
                 }
+
+                completed.push({
+                    id: call.id,
+                    type: call.type,
+                    name: call.name,
+                    arguments: args
+                });
             }
         }
 
@@ -384,23 +389,22 @@ export async function executeToolCalls(toolCalls) {
 
         try {
             // 执行工具
-            // 优先使用工具ID，如果没有则使用工具名称
-            const toolIdentifier = id || name;
-            const result = await executeTool(toolIdentifier, args);
+            // 使用工具名称查找执行，id 仅用于跟踪和结果回传
+            const result = await executeTool(name, args);
 
-            // 更新 UI 为成功状态
+            console.log(`[ToolCallHandler] 工具执行成功: ${name}`, result);
+
+            // 检测并处理多媒体内容（图片、视频等）
+            const enrichedResult = await enrichToolResultWithFiles(result, name);
+
+            // 更新 UI 为成功状态（使用 enriched 结果以正确渲染图片）
             try {
                 console.log(`[ToolCallHandler] 准备更新工具UI状态为completed: ${id}`);
-                updateToolCallStatus(id, 'completed', { result });
+                updateToolCallStatus(id, 'completed', { result: enrichedResult });
                 console.log(`[ToolCallHandler] 工具UI状态更新完成`);
             } catch (uiError) {
                 console.error(`[ToolCallHandler] ❌ 更新工具UI失败:`, uiError);
             }
-
-            console.log(`[ToolCallHandler] 工具执行成功: ${name}`, result);
-
-            // 检测并处理 Code Execution 返回的 file_id
-            const enrichedResult = await enrichToolResultWithFiles(result, name);
 
             // 立即转换 ID 为当前格式,防止切换模型时不匹配
             const currentFormat = state.apiFormat || 'openai';

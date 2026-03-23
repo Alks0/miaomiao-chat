@@ -320,8 +320,9 @@ export function getToolsForAPI(apiFormat) {
 
     switch (apiFormat) {
         case 'openai':
-        case 'openai-responses':  // Responses API 使用与 OpenAI 相同的工具格式
             return enabledTools.map(convertToOpenAIFormat);
+        case 'openai-responses':
+            return enabledTools.map(convertToResponsesFormat);
         case 'gemini':
             return enabledTools.map(convertToGeminiFormat);
         case 'claude':
@@ -349,10 +350,20 @@ export function getTool(toolId) {
     if (toolNameIndex.has(toolId)) {
         const matchingIds = toolNameIndex.get(toolId);
 
-        // 多个同名工具时，优先返回 MCP 工具
+        // 多个同名工具时，优先返回已启用的 MCP 工具，按 ID 排序确保稳定选择
         if (matchingIds.size > 1) {
             console.warn(`[Tools] ⚠️ 发现 ${matchingIds.size} 个名为 "${toolId}" 的工具`);
-            for (const id of matchingIds) {
+            const sortedIds = [...matchingIds].sort();
+            // 优先找已启用的 MCP 工具
+            for (const id of sortedIds) {
+                const t = toolRegistry.get(id);
+                if (t && t.type === 'mcp' && t.enabled !== false) {
+                    console.log(`[Tools] 🔍 使用 MCP 工具: ${id}`);
+                    return t;
+                }
+            }
+            // 其次找任意 MCP 工具
+            for (const id of sortedIds) {
                 const t = toolRegistry.get(id);
                 if (t && t.type === 'mcp') {
                     console.log(`[Tools] 🔍 使用 MCP 工具: ${id}`);
@@ -402,6 +413,21 @@ function convertToOpenAIFormat(tool) {
 }
 
 /**
+ * 转换为 OpenAI Responses API 格式
+ * Responses API 工具定义不嵌套 function 对象
+ * @param {Object} tool - 通用工具定义
+ * @returns {Object} Responses API 格式
+ */
+function convertToResponsesFormat(tool) {
+    return {
+        type: 'function',
+        name: tool.name || tool.id,
+        description: tool.description,
+        parameters: tool.parameters || tool.inputSchema || tool.input_schema || { type: 'object', properties: {} }
+    };
+}
+
+/**
  * 转换为 Gemini 格式
  * @param {Object} tool - 通用工具定义
  * @returns {Object} Gemini 格式
@@ -427,6 +453,43 @@ function cleanSchemaForGemini(schema) {
         return schema;
     }
 
+    // 创建新对象（避免修改原对象）
+    const cleaned = Array.isArray(schema) ? [...schema] : { ...schema };
+
+    // 处理 anyOf/oneOf：提取第一个非 null 类型作为降级
+    for (const combiner of ['anyOf', 'oneOf']) {
+        if (Array.isArray(cleaned[combiner]) && cleaned[combiner].length > 0) {
+            const candidates = cleaned[combiner].filter(
+                s => s && s.type !== 'null'
+            );
+            if (candidates.length > 0) {
+                // 将第一个候选的属性合并到当前 schema
+                const first = candidates[0];
+                if (first.type && !cleaned.type) cleaned.type = first.type;
+                if (first.properties && !cleaned.properties) cleaned.properties = first.properties;
+                if (first.items && !cleaned.items) cleaned.items = first.items;
+                if (first.description && !cleaned.description) cleaned.description = first.description;
+            }
+            delete cleaned[combiner];
+        }
+    }
+
+    // 处理 allOf：合并所有子 schema
+    if (Array.isArray(cleaned.allOf) && cleaned.allOf.length > 0) {
+        for (const sub of cleaned.allOf) {
+            if (sub && typeof sub === 'object') {
+                if (sub.type && !cleaned.type) cleaned.type = sub.type;
+                if (sub.properties) {
+                    cleaned.properties = { ...(cleaned.properties || {}), ...sub.properties };
+                }
+                if (sub.required && Array.isArray(sub.required)) {
+                    cleaned.required = [...new Set([...(cleaned.required || []), ...sub.required])];
+                }
+            }
+        }
+        delete cleaned.allOf;
+    }
+
     // Gemini 不支持的字段列表
     const unsupportedFields = [
         '$schema',
@@ -438,16 +501,9 @@ function cleanSchemaForGemini(schema) {
         'definitions',
         'patternProperties',
         'dependencies',
-        'allOf',
-        'anyOf',
-        'oneOf',
         'not'
     ];
 
-    // 创建新对象（避免修改原对象）
-    const cleaned = Array.isArray(schema) ? [...schema] : { ...schema };
-
-    // 删除不支持的字段
     for (const field of unsupportedFields) {
         delete cleaned[field];
     }

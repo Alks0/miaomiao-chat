@@ -38,7 +38,7 @@ export async function parseGeminiStream(reader, sessionId = null) {
     let markdownBuffer = ''; // Markdown 图片缓冲区
     const toolCalls = []; // ⭐ 工具调用数组
     const xmlToolCallAccumulator = new XMLStreamAccumulator();  // XML 工具调用累积器
-    let hasNativeToolCalls = false;  // 标记是否检测到原生格式
+    let xmlParsingDisabled = false;  // XML 解析崩溃时禁用，回退到纯文本
     const thinkTagParser = new ThinkTagParser();  // <think> 标签解析器
 
     try {
@@ -124,10 +124,9 @@ export async function parseGeminiStream(reader, sessionId = null) {
 
                         // ⭐ 检测工具调用 (Gemini 格式，仅在非 XML 模式)
                         if (part.functionCall && !state.xmlToolCallingEnabled) {
-                            hasNativeToolCalls = true;  // 标记为原生格式
                             const fc = part.functionCall;
                             toolCalls.push({
-                                id: fc.id || null,  // 可选字段（非标准）
+                                id: fc.id || `gemini_tc_${Date.now()}_${toolCalls.length}`,
                                 name: fc.name,
                                 arguments: fc.args,  // 已经是对象，不需要 JSON.parse
                                 // 保存 thoughtSignature（如果存在）
@@ -177,7 +176,7 @@ export async function parseGeminiStream(reader, sessionId = null) {
                                     // 顶层错误保护 - XML 解析崩溃时不影响正常流式输出
                                     console.error('[Gemini Parser] ❌ XML 累积器异常:', xmlError);
                                     // 禁用 XML 模式，回退到纯文本
-                                    hasNativeToolCalls = true;
+                                    xmlParsingDisabled = true;
                                 }
                             }
 
@@ -337,7 +336,7 @@ export async function parseGeminiStream(reader, sessionId = null) {
         // ⭐ 流结束，检查是否有工具调用
         let finalToolCalls = [];
 
-        if (state.xmlToolCallingEnabled) {
+        if (state.xmlToolCallingEnabled && !xmlParsingDisabled) {
             // XML 模式：使用 XML 工具调用
             const xmlCalls = xmlToolCallAccumulator.getCompletedCalls();
             if (xmlCalls.length > 0) {

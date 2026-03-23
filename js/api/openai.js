@@ -137,7 +137,7 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
     // 添加工具系统中的工具
     try {
         const { getToolsForAPI } = await import('../tools/manager.js');
-        const systemTools = getToolsForAPI('openai');
+        const systemTools = getToolsForAPI(format);
         tools.push(...systemTools);
     } catch (error) {
         console.warn('[OpenAI] 工具系统未加载:', error);
@@ -159,7 +159,10 @@ export async function sendOpenAIRequest(endpoint, apiKey, model, signal = null) 
             // 原生模式：使用标准 tools 字段
             requestBody.tools = tools;
             requestBody.tool_choice = "auto";
-            requestBody.parallel_tool_calls = true;
+            if (!isResponsesFormat) {
+                // parallel_tool_calls 仅 Chat Completions 支持
+                requestBody.parallel_tool_calls = true;
+            }
             console.log('[OpenAI] 📊 原生 tools 模式，工具数量:', tools.length);
         }
     }
@@ -221,99 +224,39 @@ export function buildToolResultMessages(toolCalls, toolResults) {
     const provider = getCurrentProvider();
     const isResponsesFormat = provider?.apiFormat === 'openai-responses';
 
-    // Responses API 多模态支持
+    // Responses API 格式
     if (isResponsesFormat) {
-        // 转换工具结果为 Responses API 格式
-        const convertedResults = toolResults.map(result => {
-            let resultContent;
+        const messages = [];
+
+        // 1. 追加每个 function_call 对象（模型的工具调用请求）
+        for (const tc of toolCalls) {
+            messages.push({
+                type: 'function_call',
+                id: tc.id,
+                call_id: tc.id,
+                name: tc.name,
+                arguments: typeof tc.arguments === 'string' ? tc.arguments : JSON.stringify(tc.arguments)
+            });
+        }
+
+        // 2. 追加每个 function_call_output（工具执行结果）
+        for (const result of toolResults) {
+            let outputStr;
             try {
-                resultContent = JSON.parse(result.content);
+                // 尝试解析以检测多模态内容
+                const parsed = JSON.parse(result.content);
+                // 纯文本结果直接用字符串
+                outputStr = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
             } catch {
-                resultContent = result.content;
+                outputStr = result.content;
             }
 
-            // 检测多模态内容
-            const outputParts = [];
-
-            if (resultContent && typeof resultContent === 'object') {
-                // 处理文本字段
-                if (resultContent.text) {
-                    outputParts.push({
-                        type: 'input_text',
-                        text: resultContent.text
-                    });
-                }
-
-                // 处理图片字段
-                if (resultContent.image) {
-                    const imageData = resultContent.image;
-                    let imageUrl;
-
-                    // 处理 base64 格式: "data:image/png;base64,..."
-                    if (typeof imageData === 'string') {
-                        imageUrl = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
-                    }
-                    // 处理对象格式: { mimeType, data } 或 { inlineData: {...} }
-                    else if (typeof imageData === 'object') {
-                        const mimeType = imageData.mimeType || imageData.inlineData?.mimeType || 'image/png';
-                        const data = imageData.data || imageData.inlineData?.data;
-                        if (data) {
-                            imageUrl = `data:${mimeType};base64,${data}`;
-                        }
-                    }
-
-                    if (imageUrl) {
-                        outputParts.push({
-                            type: 'input_image',
-                            image_url: imageUrl
-                        });
-                    }
-                }
-
-                // 处理其他字段（非 image/text）
-                const otherFields = { ...resultContent };
-                delete otherFields.image;
-                delete otherFields.text;
-                if (Object.keys(otherFields).length > 0) {
-                    outputParts.push({
-                        type: 'input_text',
-                        text: JSON.stringify(otherFields)
-                    });
-                }
-            }
-
-            // 如果没有检测到多模态内容，使用纯文本
-            if (outputParts.length === 0) {
-                outputParts.push({
-                    type: 'input_text',
-                    text: typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent)
-                });
-            }
-
-            // 返回 Responses API 格式
-            return {
+            messages.push({
                 type: 'function_call_output',
-                function_call_id: result.tool_call_id,
-                output: outputParts
-            };
-        });
-
-        // Responses API: assistant message 格式不同
-        const messages = [
-            // 1. assistant 消息：包含 function_calls
-            {
-                role: 'assistant',
-                content: '',
-                function_calls: toolCalls.map(tc => ({
-                    id: tc.id,
-                    type: 'function',
-                    name: tc.name,
-                    arguments: JSON.stringify(tc.arguments)
-                }))
-            },
-            // 2. 添加转换后的工具结果
-            ...convertedResults
-        ];
+                call_id: result.tool_call_id,
+                output: outputStr
+            });
+        }
 
         return messages;
     }

@@ -40,6 +40,11 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
     const xmlToolCallAccumulator = new XMLStreamAccumulator();  // XML 工具调用累积器
     let hasToolCalls = false;
     let hasNativeToolCalls = false;  // 标记是否检测到原生格式
+    let xmlParsingDisabled = false;  // XML 解析崩溃时禁用
+
+    // Responses API 工具调用累积
+    const responsesToolCalls = new Map(); // output_index -> {id, name, arguments}
+    let hasResponsesToolCalls = false;
 
     // <think> 标签解析器（用于 DeepSeek 等模型）
     const thinkTagParser = new ThinkTagParser();
@@ -60,6 +65,55 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                 if (line.startsWith('data: ')) {
                     const data = line.slice(6).trim();
                     if (data === '[DONE]') {
+                        // Responses API: 检查是否有未处理的工具调用
+                        if (isResponsesFormat && hasResponsesToolCalls && responsesToolCalls.size > 0) {
+                            const completedCalls = [];
+                            for (const [_idx, tc] of responsesToolCalls) {
+                                let args;
+                                try {
+                                    args = (tc.arguments != null && tc.arguments !== '')
+                                        ? JSON.parse(tc.arguments)
+                                        : {};
+                                } catch (_e) {
+                                    args = {};
+                                }
+                                completedCalls.push({ id: tc.id, name: tc.name, arguments: args });
+                            }
+
+                            if (completedCalls.length > 0) {
+                                console.log('[OpenAI] Responses API [DONE] 处理工具调用:', completedCalls.length);
+
+                                if (contentParts.length > 0) {
+                                    renderFinalContentWithThinking(contentParts, thinkingContent);
+                                } else if (textContent || thinkingContent) {
+                                    renderFinalTextWithThinking(textContent, thinkingContent);
+                                }
+
+                                const messageIndex = saveAssistantMessage({
+                                    textContent: textContent || '(调用工具)',
+                                    thinkingContent,
+                                    contentParts,
+                                    toolCalls: completedCalls,
+                                    streamStats: getPartialStreamStatsData(),
+                                    sessionId
+                                });
+
+                                setCurrentMessageIndex(messageIndex);
+                                requestStateMachine.transition(RequestState.TOOL_CALLING);
+                                state.isToolCallPending = true;
+
+                                handleToolCallStream(completedCalls, {
+                                    endpoint: state.endpoint,
+                                    apiKey: state.apiKey,
+                                    model: state.model
+                                }).catch(error => {
+                                    console.error('[Parser] Responses API [DONE] 工具调用失败:', error);
+                                });
+
+                                return;
+                            }
+                        }
+
                         finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId, encryptedContent);
                         return;
                     }
@@ -146,8 +200,44 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                     }
                                     break;
 
+                                case 'response.output_item.added':
+                                    // 新输出项：检测 function_call 类型
+                                    if (parsed.item?.type === 'function_call') {
+                                        const idx = parsed.output_index ?? responsesToolCalls.size;
+                                        responsesToolCalls.set(idx, {
+                                            id: parsed.item.call_id || parsed.item.id || `resp_tc_${Date.now()}_${idx}`,
+                                            name: parsed.item.name || '',
+                                            arguments: ''
+                                        });
+                                        hasResponsesToolCalls = true;
+                                        console.log('[Parser] Responses API 检测到工具调用:', parsed.item.name);
+                                    }
+                                    break;
+
+                                case 'response.function_call_arguments.delta':
+                                    // 工具调用参数增量
+                                    if (parsed.delta) {
+                                        const idx = parsed.output_index ?? 0;
+                                        const tc = responsesToolCalls.get(idx);
+                                        if (tc) {
+                                            tc.arguments += parsed.delta;
+                                        }
+                                    }
+                                    break;
+
+                                case 'response.function_call_arguments.done':
+                                    // 工具调用参数完成
+                                    if (parsed.arguments) {
+                                        const idx = parsed.output_index ?? 0;
+                                        const tc = responsesToolCalls.get(idx);
+                                        if (tc) {
+                                            tc.arguments = parsed.arguments;
+                                        }
+                                    }
+                                    break;
+
                                 case 'response.completed':
-                                case 'response.done':
+                                case 'response.done': {
                                     // 响应完成事件 - 提取最终内容（如果之前没有收到增量）
                                     if (parsed.response?.output_text && !textContent) {
                                         textContent = parsed.response.output_text;
@@ -164,9 +254,79 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                                 encryptedContent = item.encrypted_content;
                                                 console.log('[Parser] 提取到 encrypted_content 签名');
                                             }
+                                            // 从 response.completed 事件中提取工具调用（兜底）
+                                            if (item.type === 'function_call' && !responsesToolCalls.size) {
+                                                const idx = responsesToolCalls.size;
+                                                responsesToolCalls.set(idx, {
+                                                    id: item.call_id || item.id || `resp_tc_${Date.now()}_${idx}`,
+                                                    name: item.name || '',
+                                                    arguments: item.arguments || ''
+                                                });
+                                                hasResponsesToolCalls = true;
+                                            }
+                                        }
+                                    }
+
+                                    // ⭐ 如果有 Responses API 工具调用，执行工具调用流程
+                                    if (hasResponsesToolCalls && responsesToolCalls.size > 0) {
+                                        const completedCalls = [];
+                                        for (const [_idx, tc] of responsesToolCalls) {
+                                            let args;
+                                            try {
+                                                args = (tc.arguments != null && tc.arguments !== '')
+                                                    ? JSON.parse(tc.arguments)
+                                                    : {};
+                                            } catch (_e) {
+                                                console.error('[Parser] Responses API 工具参数解析失败:', tc.name, _e);
+                                                args = {};
+                                            }
+                                            completedCalls.push({
+                                                id: tc.id,
+                                                name: tc.name,
+                                                arguments: args
+                                            });
+                                        }
+
+                                        if (completedCalls.length > 0) {
+                                            console.log('[OpenAI] Responses API 检测到工具调用:', {
+                                                toolCallsCount: completedCalls.length,
+                                                toolNames: completedCalls.map(t => t.name).join(', ')
+                                            });
+
+                                            // 渲染当前内容
+                                            if (contentParts.length > 0) {
+                                                renderFinalContentWithThinking(contentParts, thinkingContent);
+                                            } else if (textContent || thinkingContent) {
+                                                renderFinalTextWithThinking(textContent, thinkingContent);
+                                            }
+
+                                            // 保存消息
+                                            const messageIndex = saveAssistantMessage({
+                                                textContent: textContent || '(调用工具)',
+                                                thinkingContent,
+                                                contentParts,
+                                                toolCalls: completedCalls,
+                                                streamStats: getPartialStreamStatsData(),
+                                                sessionId
+                                            });
+
+                                            setCurrentMessageIndex(messageIndex);
+                                            requestStateMachine.transition(RequestState.TOOL_CALLING);
+                                            state.isToolCallPending = true;
+
+                                            handleToolCallStream(completedCalls, {
+                                                endpoint: state.endpoint,
+                                                apiKey: state.apiKey,
+                                                model: state.model
+                                            }).catch(error => {
+                                                console.error('[Parser] Responses API 工具调用流程失败:', error);
+                                            });
+
+                                            return;
                                         }
                                     }
                                     break;
+                                }
 
                                 // 其他事件类型（如 response.created, response.in_progress 等）暂时忽略
                                 default:
@@ -247,9 +407,17 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                         totalReceived += addedLength; // 计数图片长度
                                     }
                                 }
+                                // 兜底路径中的工具调用检测
+                                else if (item.type === 'function_call') {
+                                    const idx = responsesToolCalls.size;
+                                    responsesToolCalls.set(idx, {
+                                        id: item.call_id || item.id || `resp_tc_${Date.now()}_${idx}`,
+                                        name: item.name || '',
+                                        arguments: item.arguments || ''
+                                    });
+                                    hasResponsesToolCalls = true;
+                                }
                             }
-
-                            // 快捷访问（如果有）
                             if (parsed.output_text && !textContent) {
                                 textContent = parsed.output_text;
                                 totalReceived += textContent.length;
@@ -265,6 +433,60 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 }
 
                                 updateStreamingMessage(textContent, thinkingContent);
+                            }
+
+                            // ⭐ 兜底路径：如果检测到工具调用，执行工具调用流程
+                            if (hasResponsesToolCalls && responsesToolCalls.size > 0) {
+                                const completedCalls = [];
+                                for (const [_idx, tc] of responsesToolCalls) {
+                                    let args;
+                                    try {
+                                        args = (tc.arguments != null && tc.arguments !== '')
+                                            ? JSON.parse(tc.arguments)
+                                            : {};
+                                    } catch (_e) {
+                                        console.error('[Parser] Responses API 兜底工具参数解析失败:', tc.name, _e);
+                                        args = {};
+                                    }
+                                    completedCalls.push({
+                                        id: tc.id,
+                                        name: tc.name,
+                                        arguments: args
+                                    });
+                                }
+
+                                if (completedCalls.length > 0) {
+                                    console.log('[OpenAI] Responses API 兜底路径检测到工具调用:', completedCalls.length);
+
+                                    if (contentParts.length > 0) {
+                                        renderFinalContentWithThinking(contentParts, thinkingContent);
+                                    } else if (textContent || thinkingContent) {
+                                        renderFinalTextWithThinking(textContent, thinkingContent);
+                                    }
+
+                                    const messageIndex = saveAssistantMessage({
+                                        textContent: textContent || '(调用工具)',
+                                        thinkingContent,
+                                        contentParts,
+                                        toolCalls: completedCalls,
+                                        streamStats: getPartialStreamStatsData(),
+                                        sessionId
+                                    });
+
+                                    setCurrentMessageIndex(messageIndex);
+                                    requestStateMachine.transition(RequestState.TOOL_CALLING);
+                                    state.isToolCallPending = true;
+
+                                    handleToolCallStream(completedCalls, {
+                                        endpoint: state.endpoint,
+                                        apiKey: state.apiKey,
+                                        model: state.model
+                                    }).catch(error => {
+                                        console.error('[Parser] Responses API 兜底工具调用流程失败:', error);
+                                    });
+
+                                    return;
+                                }
                             }
                         }
                         // Chat Completions API 格式：解析 choices[] 数组
@@ -297,6 +519,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 } catch (xmlError) {
                                     console.error('[Parser] ❌ XML 累积器异常:', xmlError);
                                     xmlParseResult = null;
+                                    xmlParsingDisabled = true;
                                 }
                             }
 
@@ -306,7 +529,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
 
                                 // 获取完整的工具调用列表
                                 let toolCalls;
-                                if (state.xmlToolCallingEnabled) {
+                                if (state.xmlToolCallingEnabled && !xmlParsingDisabled) {
                                     // XML 模式：使用 XML 工具调用
                                     toolCalls = xmlToolCallAccumulator.getCompletedCalls();
                                     console.log('[Parser] 🔧 使用 XML 工具调用:', toolCalls.length);
@@ -389,7 +612,7 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
 
                                     // 使用前面保存的 XML 解析结果（避免重复调用 processDelta）
                                     let contentToProcess = delta.content;
-                                    if (state.xmlToolCallingEnabled && xmlParseResult) {
+                                    if (state.xmlToolCallingEnabled && !xmlParsingDisabled && xmlParseResult) {
                                         const { displayText } = xmlParseResult;
                                         // 使用去除 XML 标签后的文本
                                         contentToProcess = displayText.substring(textContent.length); // 只取新增部分

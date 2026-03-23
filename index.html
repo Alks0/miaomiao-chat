@@ -343,6 +343,21 @@
                     <span>关闭时发送 None（Responses API 模式）</span>
                 </div>
                 <p class="settings-hint">开启后，关闭思维链会发送 reasoning.effort=none 而非不传参数</p>
+
+                <!-- Claude 4.6 Adaptive Thinking -->
+                <div class="toggle-row" id="claude-adaptive-row" style="margin-top: 12px;">
+                    <label class="switch">
+                        <input type="checkbox" id="claude-adaptive-thinking">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Claude Adaptive Thinking</span>
+                </div>
+                <div class="thinking-strength" id="claude-effort-group" style="display: none;">
+                    <button class="strength-btn claude-effort-btn" data-effort="low" title="快速响应，可能跳过思考">低</button>
+                    <button class="strength-btn claude-effort-btn" data-effort="medium" title="平衡模式，适度思考">中</button>
+                    <button class="strength-btn claude-effort-btn active" data-effort="high" title="深度思考（默认）">高</button>
+                </div>
+                <p class="settings-hint" id="claude-adaptive-hint" style="display: none;">Claude 4.6 专用：使用 adaptive thinking 替代 budget_tokens，由模型动态决定思考深度</p>
             </div>
 
             <!-- ⭐ 新增：输出详细度控制 -->

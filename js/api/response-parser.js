@@ -29,10 +29,11 @@ export function parseApiResponse(data, format = 'openai') {
 
             // ⭐ 1. 优先检测原生工具调用
             const toolCalls = [];
-            for (const part of candidate.content.parts) {
+            for (let i = 0; i < candidate.content.parts.length; i++) {
+                const part = candidate.content.parts[i];
                 if (part.functionCall) {
                     toolCalls.push({
-                        id: part.functionCall.id || null,
+                        id: part.functionCall.id || `gemini_tc_${Date.now()}_${i}`,
                         name: part.functionCall.name,
                         arguments: part.functionCall.args
                     });
@@ -250,9 +251,71 @@ export function parseApiResponse(data, format = 'openai') {
             // 响应结构: { output: [...], output_text: "..." }
             if (data.error) return null;
 
+            // ⭐ 1. 优先检测工具调用（function_call 类型）
+            if (data.output && Array.isArray(data.output)) {
+                const toolCalls = [];
+                for (const item of data.output) {
+                    if (item.type === 'function_call') {
+                        let parsedArgs;
+                        if (typeof item.arguments === 'string') {
+                            try {
+                                parsedArgs = JSON.parse(item.arguments);
+                            } catch (_e) {
+                                console.warn('[response-parser] Responses API 工具参数解析失败:', _e);
+                                parsedArgs = {};
+                            }
+                        } else {
+                            parsedArgs = item.arguments || {};
+                        }
+                        toolCalls.push({
+                            id: item.call_id || item.id || `resp_tc_${Date.now()}_${toolCalls.length}`,
+                            name: item.name,
+                            arguments: parsedArgs
+                        });
+                    }
+                }
+
+                if (toolCalls.length > 0) {
+                    // 提取伴随的文本内容
+                    let textContent = '';
+                    for (const item of data.output) {
+                        if (item.type === 'message') {
+                            textContent += item.text || '';
+                            if (Array.isArray(item.content)) {
+                                for (const part of item.content) {
+                                    if ((part.type === 'output_text' || part.type === 'text') && part.text) {
+                                        textContent += part.text;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    console.log('[Response Parser] 检测到 Responses API 工具调用:', toolCalls.length);
+                    return {
+                        toolCalls: toolCalls,
+                        content: textContent || '',
+                        hasToolCalls: true
+                    };
+                }
+            }
+
+            // ⭐ 2. 检测 XML 工具调用
+            if (state.xmlToolCallingEnabled && data.output_text) {
+                const xmlToolCalls = extractXMLToolCalls(data.output_text);
+                if (xmlToolCalls.length > 0) {
+                    console.log('[Response Parser] 检测到 Responses API XML 工具调用:', xmlToolCalls.length);
+                    return {
+                        toolCalls: xmlToolCalls,
+                        content: data.output_text,
+                        hasToolCalls: true
+                    };
+                }
+            }
+
             let textContent = '';
             let thinkingContent = '';
-            let encryptedContent = null;  // 🔐 加密的推理内容签名
+            let encryptedContent = null;
             const contentParts = [];
 
             // 1. 优先从 output[] 数组解析

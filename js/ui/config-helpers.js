@@ -232,6 +232,7 @@ export function initThinkingControls() {
                 thinkingHint.style.display = e.target.checked ? 'block' : 'none';
             }
             updateBudgetInputVisibility();
+            updateClaudeAdaptiveVisibility();
             syncQuickToggles();
             saveCurrentConfig();
         });
@@ -252,6 +253,9 @@ export function initThinkingControls() {
     }
 
     strengthBtns.forEach(btn => {
+        // 跳过 Claude effort 按钮（由下方单独处理）
+        if (btn.classList.contains('claude-effort-btn')) return;
+
         if (btn.dataset.strength === state.thinkingStrength) {
             btn.classList.add('active');
         } else {
@@ -260,9 +264,57 @@ export function initThinkingControls() {
 
         btn.addEventListener('click', () => {
             state.thinkingStrength = btn.dataset.strength;
-            strengthBtns.forEach(b => b.classList.remove('active'));
+            strengthBtns.forEach(b => {
+                if (!b.classList.contains('claude-effort-btn')) {
+                    b.classList.remove('active');
+                }
+            });
             btn.classList.add('active');
             updateBudgetInputVisibility();
+            saveCurrentConfig();
+        });
+    });
+
+    // Claude 4.6 Adaptive Thinking 控件
+    const claudeAdaptiveCheckbox = document.getElementById('claude-adaptive-thinking');
+    const claudeAdaptiveRow = document.getElementById('claude-adaptive-row');
+    const claudeEffortGroup = document.getElementById('claude-effort-group');
+    const claudeAdaptiveHint = document.getElementById('claude-adaptive-hint');
+    const claudeEffortBtns = document.querySelectorAll('.claude-effort-btn');
+
+    function updateClaudeAdaptiveVisibility() {
+        // 思维链关闭时隐藏整个 adaptive 区域
+        if (claudeAdaptiveRow) {
+            claudeAdaptiveRow.style.display = state.thinkingEnabled ? 'flex' : 'none';
+        }
+        // effort 按钮和提示只在 adaptive 也开启时显示
+        const showEffort = state.thinkingEnabled && state.claudeAdaptiveThinking;
+        if (claudeEffortGroup) claudeEffortGroup.style.display = showEffort ? 'flex' : 'none';
+        if (claudeAdaptiveHint) claudeAdaptiveHint.style.display = showEffort ? 'block' : 'none';
+    }
+
+    if (claudeAdaptiveCheckbox) {
+        claudeAdaptiveCheckbox.checked = state.claudeAdaptiveThinking;
+        updateClaudeAdaptiveVisibility();
+
+        claudeAdaptiveCheckbox.addEventListener('change', (e) => {
+            state.claudeAdaptiveThinking = e.target.checked;
+            updateClaudeAdaptiveVisibility();
+            saveCurrentConfig();
+        });
+    }
+
+    claudeEffortBtns.forEach(btn => {
+        if (btn.dataset.effort === state.claudeEffortLevel) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+
+        btn.addEventListener('click', () => {
+            state.claudeEffortLevel = btn.dataset.effort;
+            claudeEffortBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
             saveCurrentConfig();
         });
     });
@@ -287,6 +339,8 @@ function handleConfigSelect() {
     if (config.thinkingEnabled !== undefined) state.thinkingEnabled = config.thinkingEnabled;
     if (config.thinkingStrength !== undefined) state.thinkingStrength = config.thinkingStrength;
     if (config.thinkingBudget !== undefined) state.thinkingBudget = config.thinkingBudget;
+    if (config.claudeAdaptiveThinking !== undefined) state.claudeAdaptiveThinking = config.claudeAdaptiveThinking;
+    if (config.claudeEffortLevel !== undefined) state.claudeEffortLevel = config.claudeEffortLevel;
     if (config.webSearchEnabled !== undefined) state.webSearchEnabled = config.webSearchEnabled;
 
     if (config.endpoints) state.endpoints = { ...config.endpoints };
@@ -347,6 +401,8 @@ async function handleSaveConfig() {
         thinkingEnabled: state.thinkingEnabled,
         thinkingStrength: state.thinkingStrength,
         thinkingBudget: state.thinkingBudget,
+        claudeAdaptiveThinking: state.claudeAdaptiveThinking,
+        claudeEffortLevel: state.claudeEffortLevel,
         webSearchEnabled: state.webSearchEnabled,
         endpoints: { ...state.endpoints },
         apiKeys: { ...state.apiKeys },

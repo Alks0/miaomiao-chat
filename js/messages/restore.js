@@ -11,7 +11,7 @@ import { generateMessageId } from '../utils/helpers.js';
 import { rebuildMessageIdMap } from '../core/state-mutations.js';
 import { initVirtualScroll } from '../ui/virtual-scroll.js';
 import { renderHumanizedError } from '../utils/errors.js';
-import { createToolCallUI, updateToolCallStatus } from '../ui/tool-display.js';  // 工具UI恢复
+import { restoreToolCallsGroup } from '../ui/tool-display.js';  // 工具UI恢复
 import { categorizeFile } from '../utils/file-helpers.js';
 import { lazyImageManager } from '../utils/lazy-image.js';
 
@@ -292,7 +292,7 @@ export function renderSessionMessages() {
 }
 
 /**
- * 恢复工具调用UI
+ * 恢复工具调用UI（紧凑按钮 + 媒体提取模式）
  * @param {Array} toolCalls - 工具调用数组
  * @param {HTMLElement} messageEl - 消息元素
  */
@@ -307,72 +307,18 @@ async function restoreToolCallsUI(toolCalls, messageEl) {
         return;
     }
 
-    // 导入工具UI函数
-    const { createToolCallUI, updateToolCallStatus } = await import('../ui/tool-display.js');
-
-    // 临时设置 state.currentAssistantMessage 用于 createToolCallUI
-    const prevAssistantMessage = state.currentAssistantMessage;
-    state.currentAssistantMessage = contentDiv;
-
     try {
-        // 记录插入位置：第一个非工具UI的元素
-        // 这样可以确保所有工具UI都按顺序插入到内容的最前面
-        let insertBeforeElement = null;
+        // 兼容旧数据：给没有 status 的工具调用补充默认状态
+        const normalized = toolCalls.map(tc => ({
+            ...tc,
+            status: tc.status || 'completed',
+            result: tc.result || (tc.status !== 'failed' ? { restored: true, message: '(工具结果未保存)' } : null)
+        }));
 
-        // 找到第一个不是工具UI的子元素
-        for (const child of contentDiv.children) {
-            if (!child.classList.contains('tool-call-container')) {
-                insertBeforeElement = child;
-                break;
-            }
-        }
-
-        // 按顺序恢复所有工具调用
-        for (const toolCall of toolCalls) {
-            // 创建工具UI元素
-            const toolContainer = await createToolCallUI({
-                id: toolCall.id,
-                name: toolCall.name,
-                args: toolCall.arguments || toolCall.input || {}
-            });
-
-            // 关键将工具UI移动到正确位置
-            // createToolCallUI 使用 appendChild 添加到最后，我们需要移动它
-            if (toolContainer && contentDiv.contains(toolContainer)) {
-                // 如果找到了非工具UI元素，插入到它之前；否则保持在当前位置
-                if (insertBeforeElement) {
-                    contentDiv.insertBefore(toolContainer, insertBeforeElement);
-                }
-                // 如果 insertBeforeElement 为 null，说明内容全是工具UI或为空，
-                // 工具UI已经在正确位置（appendChild 添加到了最后），不需要移动
-            }
-
-            // 恢复工具状态和结果
-            if (toolCall.status === 'completed' && toolCall.result) {
-                updateToolCallStatus(toolCall.id, 'completed', {
-                    result: toolCall.result
-                });
-            } else if (toolCall.status === 'failed' && toolCall.error) {
-                updateToolCallStatus(toolCall.id, 'failed', {
-                    error: toolCall.error.message || toolCall.error,
-                    errorCode: toolCall.error.code,
-                    toolName: toolCall.name,
-                    toolArgs: toolCall.arguments || toolCall.input
-                });
-            } else {
-                // 兼容旧数据：没有保存结果的工具调用
-                updateToolCallStatus(toolCall.id, 'completed', {
-                    result: { restored: true, message: '(工具结果未保存)' }
-                });
-            }
-        }
-
+        await restoreToolCallsGroup(normalized, contentDiv);
         console.log('[Restore] 工具UI恢复完成');
     } catch (error) {
         console.error('[Restore] 恢复工具UI失败:', error);
-    } finally {
-        // 恢复 state.currentAssistantMessage
-        state.currentAssistantMessage = prevAssistantMessage;
     }
 }
 

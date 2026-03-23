@@ -69,7 +69,7 @@ function doRender(textContent, thinkingContent) {
     if (!state.currentAssistantMessage) return;
 
     // 检测是否是 continuation 模式（有工具调用 UI 或持久标记）
-    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-call-container');
+    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-calls-group');
     const hasContinuationLoading = state.currentAssistantMessage.querySelector('.continuation-loading');
     const isContinuation = state.currentAssistantMessage.dataset.isContinuation === 'true';
 
@@ -269,7 +269,7 @@ export function renderFinalTextWithThinking(textContent, thinkingContent, ground
     if (!state.currentAssistantMessage) return;
 
     // 检测是否是 continuation 模式（有工具调用 UI 或持久标记）
-    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-call-container');
+    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-calls-group');
     const hasContinuationLoading = state.currentAssistantMessage.querySelector('.continuation-loading');
     const isContinuation = state.currentAssistantMessage.dataset.isContinuation === 'true';
 
@@ -425,7 +425,7 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
     if (!state.currentAssistantMessage) return;
 
     // 检测是否是 continuation 模式（有工具调用 UI 或持久标记）
-    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-call-container');
+    const hasToolCallUI = state.currentAssistantMessage.querySelector('.tool-calls-group');
     const hasContinuationLoading = state.currentAssistantMessage.querySelector('.continuation-loading');
     const isContinuation = state.currentAssistantMessage.dataset.isContinuation === 'true';
 

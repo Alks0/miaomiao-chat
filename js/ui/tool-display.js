@@ -1,602 +1,754 @@
 /**
- * 工具调用 UI 模块
- * 显示工具调用状态、参数和结果
+ * 工具调用 UI 模块 — 紧凑按钮 + 媒体提取 + 详情弹窗
  *
- * 订阅事件:
- * - tool:execute:start
- * - tool:execute:success
- * - tool:execute:error
+ * DOM 结构（插入到 assistant .message-content 顶部）:
+ *   div.tool-calls-group
+ *     ├── button.tool-calls-summary-btn   （紧凑按钮）
+ *     └── div.tool-media-area             （提取的图片/视频）
  */
 
 import { eventBus } from '../core/events.js';
 import { getIcon } from '../utils/icons.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
 
-// 工具图标映射（图标名称）
-const TOOL_ICONS = {
-    'calculator': 'calculator',
-    'web_search': 'search',
-    'read_file': 'fileText',
-    'write_file': 'edit',
-    'run_code': 'settings',
-    'get_weather': 'globe'
+// 工具名称映射
+const TOOL_DISPLAY_NAMES = {
+    'calculator': '计算器',
+    'web_search': '网络搜索',
+    'read_file': '读取文件',
+    'write_file': '写入文件',
+    'run_code': '执行代码',
+    'get_weather': '天气查询'
 };
 
+// 每个 group DOM 元素 → 详情数据
+const toolCallsDataMap = new WeakMap();
+
 // 计时器管理
-const durationTimers = new Map();
+const groupTimers = new Map();
 
 /**
- * 创建工具调用 UI
- * @param {Object} toolCall - 工具调用对象
- * @returns {HTMLElement} 工具调用 DOM 元素
+ * 获取或创建 .tool-calls-group
+ * 一个 assistant 消息中只有一个 group
  */
-export async function createToolCallUI(toolCall) {
-    // 检查是否已存在相同 tool-id 的 UI（防止重复创建）
-    const existing = document.querySelector(`[data-tool-id="${CSS.escape(toolCall.id)}"]`);
-    if (existing) {
-        console.warn(`[ToolDisplay] 工具 UI 已存在，跳过创建: ${toolCall.id}`);
-        return existing;
-    }
+function getOrCreateGroup(targetContainer) {
+    let group = targetContainer.querySelector('.tool-calls-group');
+    if (group) return group;
 
-    const container = document.createElement('div');
-    container.className = 'tool-call-container';
-    container.setAttribute('data-tool-id', toolCall.id);
-    container.setAttribute('data-status', 'executing');
+    group = document.createElement('div');
+    group.className = 'tool-calls-group';
 
-    // Header
-    const header = document.createElement('div');
-    header.className = 'tool-call-header';
+    // 紧凑按钮
+    const btn = document.createElement('button');
+    btn.className = 'tool-calls-summary-btn';
+    btn.setAttribute('data-status', 'executing');
+    btn.innerHTML = `
+        ${getIcon('tool', { size: 14 })}
+        <span class="summary-text">1 个工具调用</span>
+        <span class="summary-status">执行中...</span>
+        <svg class="summary-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    `;
+    btn.onclick = () => openToolDetailModal(group);
 
-    const icon = document.createElement('div');
-    icon.className = 'tool-icon';
-    icon.innerHTML = getToolIcon(toolCall.name);
+    // 媒体区域（按钮下方）
+    const mediaArea = document.createElement('div');
+    mediaArea.className = 'tool-media-area';
 
-    const info = document.createElement('div');
-    info.className = 'tool-info';
+    group.append(btn, mediaArea);
 
-    const name = document.createElement('span');
-    name.className = 'tool-name';
-    name.textContent = getToolDisplayName(toolCall.name);
+    // 插入到 message-content 的最前面（文本上方）
+    targetContainer.prepend(group);
 
-    const status = document.createElement('span');
-    status.className = 'tool-status';
-    status.textContent = '准备执行...';
+    // 初始化数据存储
+    toolCallsDataMap.set(group, {
+        tools: [],          // { id, name, args, status, result, error, startTime, duration }
+        completedCount: 0,
+        failedCount: 0,
+        totalCount: 0
+    });
 
-    info.append(name, status);
+    // 启动 group 计时
+    startGroupTimer(group);
 
-    const timestamp = document.createElement('div');
-    timestamp.className = 'tool-timestamp';
-    timestamp.textContent = formatTime(new Date());
+    return group;
+}
 
-    header.append(icon, info, timestamp);
-
-    // 参数折叠面板
-    const params = document.createElement('details');
-    params.className = 'tool-params';
-
-    const summary = document.createElement('summary');
-    summary.textContent = `查看参数 (${Object.keys(toolCall.args).length} 项)`;
-
-    const pre = document.createElement('pre');
-    pre.className = 'params-content';
-    const code = document.createElement('code');
-    code.textContent = formatJSON(toolCall.args);
-    pre.appendChild(code);
-
-    params.append(summary, pre);
-
-    // 执行状态
-    const executionStatus = document.createElement('div');
-    executionStatus.className = 'tool-execution-status';
-
-    const spinner = document.createElement('div');
-    spinner.className = 'status-spinner';
-
-    const statusText = document.createElement('span');
-    statusText.className = 'status-text';
-    statusText.textContent = '执行中...';
-
-    const duration = document.createElement('span');
-    duration.className = 'status-duration';
-    duration.textContent = '0.0s';
-
-    executionStatus.append(spinner, statusText, duration);
-
-    // 结果和错误容器
-    const resultEl = document.createElement('div');
-    resultEl.className = 'tool-result';
-    resultEl.style.display = 'none';
-
-    const errorEl = document.createElement('div');
-    errorEl.className = 'tool-error';
-    errorEl.style.display = 'none';
-
-    container.append(header, params, executionStatus, resultEl, errorEl);
-
-    // 插入到当前的 assistant 消息内部（而不是chat容器）
-    const { state } = await import('../core/state.js');
-    const targetElement = state.currentAssistantMessage || document.querySelector('.message.assistant:last-child .message-content');
-
-    if (targetElement) {
-        targetElement.appendChild(container);
-        console.log('[ToolDisplay] 工具UI已插入到消息内部');
-
-        // 滚动到底部
-        const chatArea = document.getElementById('chat');
-        if (chatArea) {
-            chatArea.scrollTop = chatArea.scrollHeight;
+/**
+ * 创建工具调用 UI（紧凑模式）
+ * 第一个工具创建 group + 按钮，后续只更新计数
+ */
+export async function createToolCallUI(toolCall, targetContainer = null) {
+    // 防止重复
+    const existingGroup = document.querySelector('.tool-calls-group');
+    if (existingGroup) {
+        const data = toolCallsDataMap.get(existingGroup);
+        if (data && data.tools.some(t => t.id === toolCall.id)) {
+            console.warn(`[ToolDisplay] 工具已存在，跳过: ${toolCall.id}`);
+            return existingGroup;
         }
-    } else {
-        console.warn('[ToolDisplay] 未找到assistant消息元素，工具UI无法显示');
     }
 
-    // 启动计时器
-    startDurationTimer(container, toolCall.id);
+    const { state } = await import('../core/state.js');
+    const target = targetContainer || state.currentAssistantMessage || document.querySelector('.message.assistant:last-child .message-content');
 
-    // 发出事件通知
+    if (!target) {
+        console.warn('[ToolDisplay] 未找到 assistant 消息元素');
+        return null;
+    }
+
+    const group = getOrCreateGroup(target);
+    const data = toolCallsDataMap.get(group);
+
+    // 记录工具信息
+    data.tools.push({
+        id: toolCall.id,
+        name: toolCall.name,
+        args: toolCall.args || {},
+        status: 'executing',
+        result: null,
+        error: null,
+        startTime: Date.now(),
+        duration: null
+    });
+    data.totalCount = data.tools.length;
+
+    // 更新按钮文本
+    updateSummaryButton(group, data);
+
+    // 滚动到底部
+    const chatArea = document.getElementById('chat');
+    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+
     eventBus.emit('tool:ui:created', { toolId: toolCall.id, toolName: toolCall.name });
 
-    return container;
+    return group;
 }
 
 /**
  * 更新工具执行状态
- * @param {string} toolId - 工具调用 ID
- * @param {string} status - 状态 ('executing' | 'completed' | 'failed')
- * @param {Object} data - 额外数据（结果或错误）
  */
 export function updateToolCallStatus(toolId, status, data = {}) {
-    console.log(`[ToolDisplay] updateToolCallStatus 调用: toolId=${toolId}, status=${status}`);
-    const container = document.querySelector(`[data-tool-id="${toolId}"]`);
-    if (!container) {
-        console.warn(`[ToolDisplay] 未找到工具UI容器: ${toolId}`);
+    // 找到包含该工具的 group
+    let group = null;
+    let toolInfo = null;
+
+    for (const g of document.querySelectorAll('.tool-calls-group')) {
+        const gData = toolCallsDataMap.get(g);
+        if (!gData) continue;
+        const found = gData.tools.find(t => t.id === toolId);
+        if (found) {
+            group = g;
+            toolInfo = found;
+            break;
+        }
+    }
+
+    if (!group || !toolInfo) {
+        console.warn(`[ToolDisplay] 未找到工具: ${toolId}`);
         return;
     }
 
-    console.log(`[ToolDisplay] 找到工具容器，更新状态为: ${status}`);
-    container.setAttribute('data-status', status);
-
-    const statusEl = container.querySelector('.tool-status');
-    const executionStatus = container.querySelector('.tool-execution-status');
-    const resultEl = container.querySelector('.tool-result');
-    const errorEl = container.querySelector('.tool-error');
-
-    if (status === 'executing') {
-        statusEl.textContent = data.message || '执行中...';
-        const statusTextEl = container.querySelector('.status-text');
-        if (statusTextEl) {
-            statusTextEl.textContent = data.message || '执行中...';
-        }
-
-        eventBus.emit('tool:status:changed', { toolId, status: 'executing', message: data.message });
-    }
+    const gData = toolCallsDataMap.get(group);
 
     if (status === 'completed') {
-        console.log('[ToolDisplay] 设置工具为completed状态');
-        statusEl.innerHTML = `${getIcon('checkCircle', { size: 14 })} 执行成功`;
-        executionStatus.style.display = 'none';
-        console.log('[ToolDisplay] 已隐藏executionStatus（spinner）');
-        resultEl.style.display = 'block';
+        toolInfo.status = 'completed';
+        toolInfo.result = data.result;
+        toolInfo.duration = ((Date.now() - toolInfo.startTime) / 1000).toFixed(1);
+        gData.completedCount++;
 
-        // 渲染结果
-        renderToolResult(resultEl, data.result);
-
-        // 停止计时器
-        stopDurationTimer(toolId);
-
-        // 添加撤销按钮
-        addUndoButton(container);
-
-        // 添加成功动画
-        container.classList.add('success-flash');
-        setTimeout(() => container.classList.remove('success-flash'), 500);
+        // 提取媒体到 media area
+        extractMediaToGroup(group, data.result, toolInfo.name);
 
         eventBus.emit('tool:status:changed', { toolId, status: 'completed', result: data.result });
     }
 
     if (status === 'failed') {
-        statusEl.innerHTML = `${getIcon('xCircle', { size: 14 })} 执行失败`;
-        executionStatus.style.display = 'none';
-        errorEl.style.display = 'flex';
-
-        // 渲染错误
-        const errorIcon = document.createElement('span');
-        errorIcon.className = 'error-icon';
-        errorIcon.innerHTML = getIcon('alertCircle', { size: 16 });
-
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'error-message';
-        errorMessage.textContent = data.error || '工具执行失败';
-
-        // 添加重试按钮
-        const retryButton = document.createElement('button');
-        retryButton.className = 'retry-button';
-        retryButton.textContent = '重试';
-        retryButton.onclick = () => retryToolCall(toolId, data.toolName, data.toolArgs);
-
-        errorEl.innerHTML = '';
-        errorEl.append(errorIcon, errorMessage, retryButton);
-
-        stopDurationTimer(toolId);
+        toolInfo.status = 'failed';
+        toolInfo.error = data.error || '执行失败';
+        toolInfo.duration = ((Date.now() - toolInfo.startTime) / 1000).toFixed(1);
+        gData.failedCount++;
 
         eventBus.emit('tool:status:changed', { toolId, status: 'failed', error: data.error });
     }
-}
 
-/**
- * 渲染工具结果
- */
-function renderToolResult(container, result) {
-    const normalizedResult = (
-        result &&
-        typeof result === 'object' &&
-        result.success === true &&
-        result.result !== undefined
-    ) ? result.result : result;
-
-    const header = document.createElement('div');
-    header.className = 'result-header';
-
-    const icon = document.createElement('span');
-    icon.className = 'result-icon';
-    icon.innerHTML = getIcon('barChart', { size: 16 });
-
-    const label = document.createElement('span');
-    label.className = 'result-label';
-    label.textContent = '执行结果';
-
-    header.append(icon, label);
-
-    const contentEl = document.createElement('div');
-    contentEl.className = 'result-content';
-
-    // 根据结果类型选择渲染方式
-    if (typeof normalizedResult === 'string') {
-        contentEl.textContent = normalizedResult;
-    } else if (Array.isArray(normalizedResult)) {
-        renderArrayResult(contentEl, normalizedResult);
-    } else if (typeof normalizedResult === 'object') {
-        renderObjectResult(contentEl, normalizedResult);
+    if (status === 'executing') {
+        toolInfo.status = 'executing';
+        eventBus.emit('tool:status:changed', { toolId, status: 'executing', message: data.message });
     }
 
-    container.innerHTML = '';
-    container.append(header, contentEl);
+    // 更新按钮状态
+    updateSummaryButton(group, gData);
+
+    // 全部完成时停止计时
+    const allDone = gData.completedCount + gData.failedCount >= gData.totalCount;
+    if (allDone) {
+        stopGroupTimer(group);
+    }
 }
 
-/**
- * 渲染数组结果（如搜索结果列表）
- */
-function renderArrayResult(container, items) {
-    if (items.length === 0) {
-        const empty = document.createElement('p');
-        empty.className = 'empty-result';
-        empty.textContent = '无结果';
-        container.appendChild(empty);
-        return;
-    }
+// ==================== 按钮更新 ====================
 
-    const list = document.createElement('ul');
-    list.className = 'result-list';
+function updateSummaryButton(group, data) {
+    const btn = group.querySelector('.tool-calls-summary-btn');
+    if (!btn) return;
 
-    items.slice(0, 10).forEach((item, index) => {
-        const li = document.createElement('li');
-        li.className = 'result-item';
+    const textEl = btn.querySelector('.summary-text');
+    const statusEl = btn.querySelector('.summary-status');
 
-        if (typeof item === 'object' && item.title && item.url) {
-            const number = document.createElement('div');
-            number.className = 'result-item-number';
-            number.textContent = String(index + 1);
+    const total = data.totalCount;
+    const done = data.completedCount + data.failedCount;
+    const allDone = done >= total;
 
-            const content = document.createElement('div');
-            content.className = 'result-item-content';
+    // 文本
+    textEl.textContent = `${total} 个工具调用`;
 
-            const link = document.createElement('a');
-            link.href = item.url;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.className = 'result-item-title';
-            link.textContent = item.title;
-
-            content.appendChild(link);
-
-            if (item.snippet) {
-                const snippet = document.createElement('p');
-                snippet.className = 'result-item-snippet';
-                snippet.textContent = item.snippet;
-                content.appendChild(snippet);
-            }
-
-            li.append(number, content);
+    // 状态
+    if (allDone) {
+        if (data.failedCount > 0) {
+            statusEl.textContent = `${data.failedCount} 个失败`;
+            btn.setAttribute('data-status', 'failed');
         } else {
-            li.textContent = JSON.stringify(item);
+            statusEl.textContent = '全部完成';
+            btn.setAttribute('data-status', 'completed');
         }
-
-        list.appendChild(li);
-    });
-
-    if (items.length > 10) {
-        const more = document.createElement('li');
-        more.className = 'result-more';
-        more.textContent = `... 还有 ${items.length - 10} 项结果`;
-        list.appendChild(more);
+    } else {
+        statusEl.textContent = `执行中 ${done}/${total}`;
+        btn.setAttribute('data-status', 'executing');
     }
+}
 
-    container.appendChild(list);
+// ==================== 媒体提取 ====================
+
+/**
+ * 从工具结果中提取图片/视频，插入到 media area
+ */
+function extractMediaToGroup(group, result, _toolName) {
+    if (!result || typeof result !== 'object') return;
+
+    const mediaArea = group.querySelector('.tool-media-area');
+    if (!mediaArea) return;
+
+    // 解包嵌套 result
+    const obj = (result.success === true && result.result !== undefined) ? result.result : result;
+
+    const mediaItems = collectMedia(obj);
+
+    for (const item of mediaItems) {
+        if (item.type === 'image') {
+            const wrapper = createImageWrapper(item.url);
+            mediaArea.appendChild(wrapper);
+        } else if (item.type === 'video') {
+            const wrapper = createVideoWrapper(item.url);
+            mediaArea.appendChild(wrapper);
+        }
+    }
 }
 
 /**
- * 渲染对象结果
+ * 从结果对象中收集所有媒体 URL
  */
-function renderObjectResult(container, obj) {
-    // 多模态支持：检测并渲染图片
-    const hasImage = obj && typeof obj === 'object' && obj.image;
-    const hasVideo = obj && typeof obj === 'object' && (obj.video || (Array.isArray(obj.videos) && obj.videos.length > 0));
-    const hasText = obj && typeof obj === 'object' && obj.text;
+function collectMedia(obj) {
+    if (!obj || typeof obj !== 'object') return [];
 
-    // 渲染图片
-    if (hasImage) {
-        const imageData = obj.image;
-        let imageUrl;
+    const items = [];
 
-        // 处理 base64 格式: "data:image/png;base64,..."
-        if (typeof imageData === 'string') {
-            imageUrl = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
-        }
-        // 处理对象格式
-        else if (typeof imageData === 'object') {
-            // Gemini 格式: { inlineData: { mimeType, data } }
-            if (imageData.inlineData) {
-                imageUrl = `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`;
-            }
-            // Claude 格式: { source: { media_type, data } }
-            else if (imageData.source) {
-                imageUrl = `data:${imageData.source.media_type || imageData.source.mimeType};base64,${imageData.source.data}`;
-            }
-            // 简化格式: { mimeType, data } 或 { media_type, data }
-            else if (imageData.data) {
-                const mimeType = imageData.mimeType || imageData.media_type || 'image/png';
-                imageUrl = `data:${mimeType};base64,${imageData.data}`;
-            }
-        }
-
-        if (imageUrl) {
-            const imgContainer = document.createElement('div');
-            imgContainer.className = 'result-image-container';
-
-            const img = document.createElement('img');
-            img.className = hasText ? 'result-image' : 'result-image no-text';
-            img.src = imageUrl;
-            img.alt = '工具返回的图片';
-
-            imgContainer.appendChild(img);
-            container.appendChild(imgContainer);
-        }
+    // 单张图片
+    if (obj.image) {
+        const url = resolveImageUrl(obj.image);
+        if (url) items.push({ type: 'image', url });
     }
 
-    // 渲染视频（支持 video / videos）
-    if (hasVideo) {
-        const videoCandidates = [];
-        if (typeof obj.video === 'string') {
-            videoCandidates.push(obj.video);
-        }
-        if (Array.isArray(obj.videos)) {
-            for (const videoItem of obj.videos) {
-                if (typeof videoItem === 'string') {
-                    videoCandidates.push(videoItem);
-                } else if (videoItem && typeof videoItem === 'object' && videoItem.url) {
-                    videoCandidates.push(videoItem.url);
+    // 多张图片 (images 数组)
+    if (Array.isArray(obj.images)) {
+        for (const img of obj.images) {
+            let url;
+            if (typeof img === 'string') {
+                url = img;
+            } else if (img && typeof img === 'object') {
+                url = img.url || img.image_url?.url;
+                if (!url && img.data) {
+                    const mime = img.mimeType || img.media_type || 'image/png';
+                    url = `data:${mime};base64,${img.data}`;
                 }
             }
-        }
-
-        const uniqueVideoUrls = Array.from(new Set(videoCandidates.filter(Boolean)));
-        for (const videoUrl of uniqueVideoUrls.slice(0, 2)) {
-            const videoContainer = document.createElement('div');
-            videoContainer.className = 'result-image-container';
-
-            const video = document.createElement('video');
-            video.className = hasText ? 'result-image' : 'result-image no-text';
-            video.src = videoUrl;
-            video.controls = true;
-            video.muted = true;
-            video.playsInline = true;
-            video.preload = 'metadata';
-
-            videoContainer.appendChild(video);
-            container.appendChild(videoContainer);
+            if (url) items.push({ type: 'image', url });
         }
     }
 
-    // 渲染文本
-    if (hasText) {
-        const textEl = document.createElement('div');
-        textEl.className = 'result-text';
-        textEl.textContent = obj.text;
-        container.appendChild(textEl);
+    // 视频
+    if (typeof obj.video === 'string') {
+        items.push({ type: 'video', url: obj.video });
     }
-
-    // 渲染其他字段（如果有）
-    const otherFields = { ...obj };
-    delete otherFields.image;
-    delete otherFields.video;
-    delete otherFields.videos;
-    delete otherFields.text;
-
-    if (Object.keys(otherFields).length > 0 || (!hasImage && !hasText)) {
-        const pre = document.createElement('pre');
-        pre.className = 'result-json';
-        // 如果有 image/text，只显示其他字段；否则显示完整对象
-        const displayObj = (hasImage || hasText) ? otherFields : obj;
-        pre.textContent = JSON.stringify(displayObj, null, 2);
-        container.appendChild(pre);
-    }
-}
-
-// ========== 计时器管理 ==========
-
-function startDurationTimer(container, toolId) {
-    const startTime = Date.now();
-    const durationEl = container.querySelector('.status-duration');
-
-    const timer = setInterval(() => {
-        const elapsed = (Date.now() - startTime) / 1000;
-        if (durationEl) {
-            durationEl.textContent = `${elapsed.toFixed(1)}s`;
+    if (Array.isArray(obj.videos)) {
+        const seen = new Set();
+        for (const v of obj.videos) {
+            const url = typeof v === 'string' ? v : v?.url;
+            if (url && !seen.has(url)) {
+                seen.add(url);
+                items.push({ type: 'video', url });
+            }
         }
-    }, 500);
-
-    durationTimers.set(toolId, timer);
-}
-
-function stopDurationTimer(toolId) {
-    const timer = durationTimers.get(toolId);
-    if (timer) {
-        clearInterval(timer);
-        durationTimers.delete(toolId);
     }
+
+    return items;
 }
 
-// ========== 辅助函数 ==========
-
-function getToolIcon(toolName) {
-    const iconName = TOOL_ICONS[toolName] || 'tool';
-    return getIcon(iconName, { size: 16 });
+/**
+ * 解析各种格式的图片数据为 URL
+ */
+function resolveImageUrl(imageData) {
+    if (typeof imageData === 'string') {
+        return imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+    }
+    if (typeof imageData === 'object') {
+        if (imageData.inlineData) {
+            return `data:${imageData.inlineData.mimeType};base64,${imageData.inlineData.data}`;
+        }
+        if (imageData.source) {
+            return `data:${imageData.source.media_type || imageData.source.mimeType || 'image/png'};base64,${imageData.source.data}`;
+        }
+        if (imageData.data) {
+            const mime = imageData.mimeType || imageData.media_type || 'image/png';
+            return `data:${mime};base64,${imageData.data}`;
+        }
+    }
+    return null;
 }
 
-function getToolDisplayName(toolName) {
-    const names = {
-        'calculator': '计算器',
-        'web_search': '网络搜索',
-        'read_file': '读取文件',
-        'write_file': '写入文件',
-        'run_code': '执行代码',
-        'get_weather': '天气查询'
+/**
+ * 创建图片 wrapper（可点击查看大图 + 下载）
+ */
+function createImageWrapper(url) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-wrapper';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '工具返回的图片';
+    img.title = '点击查看大图';
+    img.style.cursor = 'pointer';
+    img.onclick = () => eventBus.emit('ui:open-image-viewer', { url });
+
+    const downloadBtn = document.createElement('button');
+    downloadBtn.type = 'button';
+    downloadBtn.className = 'download-image-btn';
+    downloadBtn.title = '下载原图';
+    downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation();
+        downloadMedia(url, `tool-image-${Date.now()}.png`);
     };
-    return names[toolName] || toolName;
-}
 
-function formatTime(date) {
-    return date.toLocaleTimeString('zh-CN', { hour12: false });
-}
-
-function formatJSON(obj) {
-    return JSON.stringify(obj, null, 2);
+    wrapper.append(img, downloadBtn);
+    return wrapper;
 }
 
 /**
- * 重试工具调用
+ * 创建视频 wrapper
  */
-async function retryToolCall(toolId, toolName, toolArgs) {
-    console.log('[ToolDisplay] 重试工具调用:', toolName);
+function createVideoWrapper(url) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-wrapper video-wrapper';
 
-    // 重置 UI 状态
-    updateToolCallStatus(toolId, 'executing', { message: '重试中...' });
+    const video = document.createElement('video');
+    video.src = url;
+    video.controls = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
 
-    try {
-        const { executeTool } = await import('../tools/executor.js');
-        const result = await executeTool(toolName, toolArgs);
-
-        updateToolCallStatus(toolId, 'completed', { result });
-    } catch (error) {
-        updateToolCallStatus(toolId, 'failed', {
-            error: error.message,
-            toolName,
-            toolArgs
-        });
-    }
+    wrapper.appendChild(video);
+    return wrapper;
 }
 
 /**
- * 添加撤销按钮到工具调用卡片
- * @param {HTMLElement} container - 工具调用容器元素
+ * 下载媒体文件
  */
-function addUndoButton(container) {
-    // 检查是否已存在撤销按钮
-    if (container.querySelector('.tool-undo-button')) {
-        return;
+function downloadMedia(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+// ==================== 详情弹窗 ====================
+
+function openToolDetailModal(group) {
+    const data = toolCallsDataMap.get(group);
+    if (!data) return;
+
+    // 移除已有弹窗
+    document.querySelector('.tool-detail-modal')?.remove();
+
+    // 最外层：fixed 全屏遮罩 + 居中
+    const modal = document.createElement('div');
+    modal.className = 'tool-detail-modal';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tool-detail-overlay';
+    overlay.onclick = () => modal.remove();
+
+    // 内容面板：自建，不用 .modal-content（避免其 overflow:hidden）
+    const panel = document.createElement('div');
+    panel.className = 'tool-detail-panel';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'tool-detail-panel-header';
+    const title = document.createElement('h3');
+    title.textContent = '工具调用详情';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tool-detail-close-btn';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = () => modal.remove();
+    header.append(title, closeBtn);
+
+    // Body — 滚动区域，固定高度
+    const body = document.createElement('div');
+    body.className = 'tool-detail-panel-body';
+
+    for (const tool of data.tools) {
+        body.appendChild(createToolDetailItem(tool));
     }
 
-    // 创建撤销按钮容器
-    const undoContainer = document.createElement('div');
-    undoContainer.className = 'tool-undo-container';
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = 'tool-detail-panel-footer';
 
-    const undoButton = document.createElement('button');
-    undoButton.className = 'tool-undo-button';
-    undoButton.innerHTML = `
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'tool-undo-button';
+    undoBtn.innerHTML = `
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 7v6h6"></path>
             <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
         </svg>
-        <span>撤销工具调用</span>
+        <span>撤销所有工具调用</span>
     `;
-    undoButton.title = '撤销此工具调用，恢复到调用前的状态';
-
-    undoButton.onclick = async () => {
-        const confirmed = await confirmUndo();
+    undoBtn.onclick = async () => {
+        const confirmed = await showConfirmDialog(
+            '确定要撤销所有工具调用吗？\n\n这将恢复到工具调用前的消息状态。\n此操作不可逆！',
+            '确认撤销'
+        );
         if (!confirmed) return;
 
         try {
-            undoButton.disabled = true;
-            undoButton.textContent = '撤销中...';
-
+            undoBtn.disabled = true;
             const { undo, canUndoNow } = await import('../tools/undo.js');
-
             if (!canUndoNow()) {
-                eventBus.emit('ui:notification', {
-                    message: '没有可撤销的操作',
-                    type: 'warning'
-                });
+                eventBus.emit('ui:notification', { message: '没有可撤销的操作', type: 'warning' });
                 return;
             }
-
             const result = undo();
-
-            if (result && result.success) {
+            if (result?.success) {
                 eventBus.emit('ui:notification', {
                     message: `已撤销，恢复到 ${result.snapshot.messageCount} 条消息`,
                     type: 'success'
                 });
-
-                // 移除工具调用 UI
-                container.remove();
+                group.remove();
+                modal.remove();
             } else {
-                eventBus.emit('ui:notification', {
-                    message: '撤销失败',
-                    type: 'error'
-                });
+                eventBus.emit('ui:notification', { message: '撤销失败', type: 'error' });
             }
-        } catch (error) {
-            console.error('[ToolDisplay] 撤销失败:', error);
-            eventBus.emit('ui:notification', {
-                message: `撤销失败: ${error.message}`,
-                type: 'error'
-            });
+        } catch (err) {
+            eventBus.emit('ui:notification', { message: `撤销失败: ${err.message}`, type: 'error' });
         } finally {
-            undoButton.disabled = false;
-            undoButton.innerHTML = `
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 7v6h6"></path>
-                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
-                </svg>
-                <span>撤销工具调用</span>
-            `;
+            undoBtn.disabled = false;
         }
     };
 
-    undoContainer.appendChild(undoButton);
-    container.appendChild(undoContainer);
+    footer.appendChild(undoBtn);
+
+    panel.append(header, body, footer);
+    modal.append(overlay, panel);
+    document.body.appendChild(modal);
+
+    // ESC 关闭
+    const onKeydown = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', onKeydown);
+        }
+    };
+    document.addEventListener('keydown', onKeydown);
 }
 
 /**
- * 确认撤销操作
- * @returns {Promise<boolean>}
+ * 创建单个工具的详情面板
  */
-async function confirmUndo() {
-    return await showConfirmDialog(
-        '确定要撤销此工具调用吗？\n\n' +
-        '这将恢复到工具调用前的消息状态，' +
-        '并移除工具调用产生的所有消息。\n\n' +
-        '此操作不可逆！',
-        '确认撤销'
-    );
+function createToolDetailItem(tool) {
+    const item = document.createElement('div');
+    item.className = 'tool-detail-item';
+    item.setAttribute('data-status', tool.status);
+
+    // 头部
+    const header = document.createElement('div');
+    header.className = 'tool-detail-header';
+
+    const statusIcon = document.createElement('span');
+    statusIcon.className = 'tool-detail-status-icon';
+    if (tool.status === 'completed') {
+        statusIcon.innerHTML = getIcon('checkCircle', { size: 16 });
+    } else if (tool.status === 'failed') {
+        statusIcon.innerHTML = getIcon('xCircle', { size: 16 });
+    } else {
+        statusIcon.innerHTML = getIcon('loader', { size: 16 });
+    }
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'tool-detail-name';
+    nameEl.textContent = TOOL_DISPLAY_NAMES[tool.name] || tool.name;
+
+    const durationEl = document.createElement('span');
+    durationEl.className = 'tool-detail-duration';
+    durationEl.textContent = tool.duration ? `${tool.duration}s` : '';
+
+    header.append(statusIcon, nameEl, durationEl);
+
+    // 折叠面板
+    const details = document.createElement('details');
+    details.className = 'tool-detail-body';
+
+    const summary = document.createElement('summary');
+    summary.textContent = '查看详情';
+
+    // 参数
+    const argsSection = document.createElement('div');
+    argsSection.className = 'tool-detail-section';
+    argsSection.innerHTML = `<div class="tool-detail-section-label">参数</div>`;
+    const argsPre = document.createElement('pre');
+    argsPre.className = 'tool-detail-json';
+    argsPre.textContent = JSON.stringify(tool.args, null, 2);
+    argsSection.appendChild(argsPre);
+
+    details.append(summary, argsSection);
+
+    // 结果/错误
+    if (tool.status === 'completed' && tool.result != null) {
+        const resultSection = document.createElement('div');
+        resultSection.className = 'tool-detail-section';
+        resultSection.innerHTML = `<div class="tool-detail-section-label">结果</div>`;
+        const resultContent = document.createElement('div');
+        resultContent.className = 'tool-detail-result-content';
+        renderDetailResult(resultContent, tool.result);
+        resultSection.appendChild(resultContent);
+        details.appendChild(resultSection);
+    }
+
+    if (tool.status === 'failed' && tool.error) {
+        const errorSection = document.createElement('div');
+        errorSection.className = 'tool-detail-section tool-detail-error';
+        errorSection.innerHTML = `<div class="tool-detail-section-label">错误</div>`;
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'tool-detail-error-msg';
+        errorMsg.textContent = tool.error;
+        errorSection.appendChild(errorMsg);
+        details.appendChild(errorSection);
+    }
+
+    item.append(header, details);
+    return item;
+}
+
+/**
+ * 在弹窗中渲染工具结果
+ */
+function renderDetailResult(container, result) {
+    const normalized = (result?.success === true && result.result !== undefined) ? result.result : result;
+
+    if (typeof normalized === 'string') {
+        container.textContent = normalized;
+        return;
+    }
+
+    if (Array.isArray(normalized)) {
+        // 简化：搜索结果列表
+        if (normalized.length === 0) {
+            container.textContent = '(无结果)';
+            return;
+        }
+        for (const item of normalized.slice(0, 10)) {
+            if (typeof item === 'object' && item.title && item.url) {
+                const link = document.createElement('a');
+                link.href = item.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.className = 'tool-detail-link';
+                link.textContent = item.title;
+                container.appendChild(link);
+                if (item.snippet) {
+                    const snippet = document.createElement('p');
+                    snippet.className = 'tool-detail-snippet';
+                    snippet.textContent = item.snippet;
+                    container.appendChild(snippet);
+                }
+            } else {
+                const pre = document.createElement('pre');
+                pre.className = 'tool-detail-json';
+                pre.textContent = JSON.stringify(item, null, 2);
+                container.appendChild(pre);
+            }
+        }
+        if (normalized.length > 10) {
+            const more = document.createElement('div');
+            more.className = 'tool-detail-more';
+            more.textContent = `... 还有 ${normalized.length - 10} 项`;
+            container.appendChild(more);
+        }
+        return;
+    }
+
+    if (typeof normalized === 'object') {
+        // 图片在弹窗中也展示缩略图
+        const media = collectMedia(normalized);
+        for (const m of media) {
+            if (m.type === 'image') {
+                const img = document.createElement('img');
+                img.src = m.url;
+                img.className = 'tool-detail-image';
+                img.onclick = () => eventBus.emit('ui:open-image-viewer', { url: m.url });
+                container.appendChild(img);
+            }
+        }
+
+        // 文本
+        if (normalized.text) {
+            const textEl = document.createElement('div');
+            textEl.className = 'tool-detail-text';
+            textEl.textContent = normalized.text;
+            container.appendChild(textEl);
+        }
+
+        // 其他字段
+        const other = { ...normalized };
+        delete other.image; delete other.images; delete other.video; delete other.videos; delete other.text;
+        if (Object.keys(other).length > 0) {
+            const pre = document.createElement('pre');
+            pre.className = 'tool-detail-json';
+            pre.textContent = JSON.stringify(other, null, 2);
+            container.appendChild(pre);
+        }
+    }
+}
+
+// ==================== Group 计时器 ====================
+
+function startGroupTimer(group) {
+    const startTime = Date.now();
+    const btn = group.querySelector('.tool-calls-summary-btn');
+    const statusEl = btn?.querySelector('.summary-status');
+
+    const timer = setInterval(() => {
+        const data = toolCallsDataMap.get(group);
+        if (!data) return;
+        const done = data.completedCount + data.failedCount;
+        if (done >= data.totalCount) return;
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        if (statusEl) {
+            statusEl.textContent = `执行中 ${done}/${data.totalCount} · ${elapsed}s`;
+        }
+    }, 500);
+
+    // 用 group 的内存地址作为 key
+    groupTimers.set(group, timer);
+}
+
+function stopGroupTimer(group) {
+    const timer = groupTimers.get(group);
+    if (timer) {
+        clearInterval(timer);
+        groupTimers.delete(group);
+    }
+}
+
+// ==================== 恢复用 API ====================
+
+/**
+ * 恢复工具调用 UI（从持久化数据重建）
+ * @param {Array} toolCalls - 保存的工具调用数据
+ * @param {HTMLElement} contentDiv - 消息的 .message-content 元素
+ */
+export async function restoreToolCallsGroup(toolCalls, contentDiv) {
+    if (!toolCalls || toolCalls.length === 0 || !contentDiv) return;
+
+    const group = document.createElement('div');
+    group.className = 'tool-calls-group';
+
+    // 按钮
+    const btn = document.createElement('button');
+    btn.className = 'tool-calls-summary-btn';
+    btn.onclick = () => openToolDetailModal(group);
+
+    // 媒体区
+    const mediaArea = document.createElement('div');
+    mediaArea.className = 'tool-media-area';
+
+    group.append(btn, mediaArea);
+
+    // 构建数据
+    const data = {
+        tools: [],
+        completedCount: 0,
+        failedCount: 0,
+        totalCount: toolCalls.length
+    };
+
+    for (const tc of toolCalls) {
+        const toolInfo = {
+            id: tc.id,
+            name: tc.name,
+            args: tc.arguments || tc.input || {},
+            status: tc.status || 'completed',
+            result: tc.result || null,
+            error: tc.error ? (tc.error.message || tc.error) : null,
+            startTime: 0,
+            duration: tc.duration || null
+        };
+
+        if (toolInfo.status === 'completed') data.completedCount++;
+        if (toolInfo.status === 'failed') data.failedCount++;
+
+        data.tools.push(toolInfo);
+
+        // 提取已完成的媒体
+        if (toolInfo.status === 'completed' && toolInfo.result) {
+            const normalized = (toolInfo.result?.success === true && toolInfo.result.result !== undefined)
+                ? toolInfo.result.result : toolInfo.result;
+            const mediaItems = collectMedia(normalized);
+            for (const item of mediaItems) {
+                if (item.type === 'image') {
+                    mediaArea.appendChild(createImageWrapper(item.url));
+                } else if (item.type === 'video') {
+                    mediaArea.appendChild(createVideoWrapper(item.url));
+                }
+            }
+        }
+    }
+
+    toolCallsDataMap.set(group, data);
+
+    // 设置按钮状态
+    const allDone = data.completedCount + data.failedCount >= data.totalCount;
+    let statusText = '全部完成';
+    let statusAttr = 'completed';
+    if (!allDone) {
+        statusText = `执行中 ${data.completedCount + data.failedCount}/${data.totalCount}`;
+        statusAttr = 'executing';
+    } else if (data.failedCount > 0) {
+        statusText = `${data.failedCount} 个失败`;
+        statusAttr = 'failed';
+    }
+
+    btn.setAttribute('data-status', statusAttr);
+    btn.innerHTML = `
+        ${getIcon('tool', { size: 14 })}
+        <span class="summary-text">${data.totalCount} 个工具调用</span>
+        <span class="summary-status">${statusText}</span>
+        <svg class="summary-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    `;
+
+    // 插入到 message-content 最前面
+    contentDiv.prepend(group);
 }

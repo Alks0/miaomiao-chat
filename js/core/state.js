@@ -172,7 +172,9 @@ export const state = {
     thinkingEnabled: false,
     thinkingStrength: 'high', // 'low' | 'medium' | 'high' | 'custom'
     thinkingBudget: 32768,
-    thinkingNoneMode: false,  // ⭐ 新增：关闭时是否发送 none（Responses API 模式）
+    thinkingNoneMode: false,  // 关闭时是否发送 none（Responses API 模式）
+    claudeAdaptiveThinking: false, // Claude 4.6 adaptive thinking 模式
+    claudeEffortLevel: 'high', // Claude adaptive effort: 'low' | 'medium' | 'high'
     webSearchEnabled: false,
     geminiApiKeyInHeader: false,
     prefillEnabled: true,
