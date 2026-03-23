@@ -131,6 +131,16 @@ export function deleteProvider(id) {
     const index = state.providers.findIndex(p => p.id === id);
     if (index === -1) return false;
 
+    // 如果删除的是当前活跃提供商，先切换到其他提供商
+    if (state.currentProviderId === id) {
+        const remaining = state.providers.filter(p => p.id !== id && p.enabled);
+        const fallback = remaining[0] || state.providers.find(p => p.id !== id);
+        state.currentProviderId = fallback?.id || null;
+        if (fallback) {
+            syncProviderState(fallback);
+        }
+    }
+
     state.providers.splice(index, 1);
     saveCurrentConfig();
     eventBus.emit('providers:deleted', { id });
@@ -187,6 +197,13 @@ export function addApiKey(providerId, key, name = '') {
 
     ensureApiKeysArray(provider);
 
+    // 检查重复密钥
+    const isDuplicate = provider.apiKeys.some(k => k.key === key);
+    if (isDuplicate) {
+        console.warn(`[addApiKey] 密钥已存在于提供商 ${provider.name}`);
+        return null;
+    }
+
     const keyId = generateKeyId();
     const keyName = name || `密钥 ${provider.apiKeys.length + 1}`;
 
@@ -228,6 +245,17 @@ export function removeApiKey(providerId, keyId) {
     if (index === -1) return false;
 
     provider.apiKeys.splice(index, 1);
+
+    // 调整轮询索引
+    if (provider.keyRotation) {
+        const enabledKeys = provider.apiKeys.filter(k => k.enabled);
+        if (index < provider.keyRotation.currentIndex) {
+            provider.keyRotation.currentIndex--;
+        }
+        if (enabledKeys.length > 0 && provider.keyRotation.currentIndex >= enabledKeys.length) {
+            provider.keyRotation.currentIndex = 0;
+        }
+    }
 
     // 如果删除的是当前密钥，切换到第一个可用密钥
     if (provider.currentKeyId === keyId) {
@@ -486,7 +514,7 @@ export function getCurrentProvider() {
     if (state.currentProviderId) {
         const provider = state.providers.find(p => p.id === state.currentProviderId);
         if (provider && provider.enabled) {
-            console.log(`[getCurrentProvider] 使用 currentProviderId: ${provider.name} (${provider.id})`);
+            console.debug(`[getCurrentProvider] 使用 currentProviderId: ${provider.name} (${provider.id})`);
             // 同步全局状态
             syncProviderState(provider);
             return provider;
@@ -527,7 +555,7 @@ export function getCurrentProvider() {
             const formatMatched = matchingProviders.find(p => p.apiFormat === state.apiFormat);
             const provider = formatMatched || matchingProviders[0];
 
-            console.log(`[getCurrentProvider] 根据模型查找: ${provider.name} (${selectedModel}, apiFormat: ${provider.apiFormat})`);
+            console.debug(`[getCurrentProvider] 根据模型查找: ${provider.name} (${selectedModel}, apiFormat: ${provider.apiFormat})`);
             if (matchingProviders.length > 1) {
                 console.warn(`[getCurrentProvider] 多个提供商包含模型 ${selectedModel}, 使用: ${provider.name} (apiFormat: ${provider.apiFormat})`);
             }
@@ -540,7 +568,7 @@ export function getCurrentProvider() {
     // 4. 如果没有找到，返回第一个启用的提供商
     const firstEnabled = state.providers.find(p => p.enabled);
     if (firstEnabled) {
-        console.log(`[getCurrentProvider] 使用第一个启用的提供商: ${firstEnabled.name}`);
+        console.debug(`[getCurrentProvider] 使用第一个启用的提供商: ${firstEnabled.name}`);
         // 同步全局状态
         syncProviderState(firstEnabled);
         return firstEnabled;
@@ -651,6 +679,7 @@ export function getCurrentModelCapabilities() {
 function getDefaultEndpoint(apiFormat) {
     const defaults = {
         openai: 'https://api.openai.com',
+        'openai-responses': 'https://api.openai.com/v1/responses',
         gemini: 'https://generativelanguage.googleapis.com',
         claude: 'https://api.anthropic.com'
     };
@@ -665,6 +694,7 @@ function getDefaultEndpoint(apiFormat) {
 function getDefaultProviderName(format) {
     const names = {
         openai: 'OpenAI',
+        'openai-responses': 'OpenAI Responses',
         gemini: 'Google Gemini',
         claude: 'Anthropic Claude'
     };

@@ -248,13 +248,13 @@ function showProviderForm(providerId) {
 
             <div class="form-group">
                 <label for="detail-provider-format">API 格式 *</label>
-                <select id="detail-provider-format" required ${isEdit ? 'disabled' : ''}>
+                <select id="detail-provider-format" required>
                     <option value="openai" ${provider?.apiFormat === 'openai' ? 'selected' : ''}>OpenAI (Chat Completions)</option>
                     <option value="openai-responses" ${provider?.apiFormat === 'openai-responses' ? 'selected' : ''}>OpenAI (Responses API)</option>
                     <option value="gemini" ${provider?.apiFormat === 'gemini' ? 'selected' : ''}>Gemini</option>
                     <option value="claude" ${provider?.apiFormat === 'claude' ? 'selected' : ''}>Claude</option>
                 </select>
-                ${isEdit ? '<p class="form-hint">保存后不可修改</p>' : ''}
+                ${isEdit ? '<p class="form-hint">修改格式后需确保端点与新格式匹配</p>' : ''}
             </div>
 
             <div class="form-group">
@@ -479,6 +479,19 @@ function saveProviderForm(providerId) {
 
     if (!apiFormat) {
         showNotification('请选择API格式', 'error');
+        return;
+    }
+
+    // 验证端点格式
+    if (endpoint && !endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+        showNotification('API 地址必须以 http:// 或 https:// 开头', 'error');
+        return;
+    }
+
+    // 检查提供商名称是否重复（排除当前编辑的）
+    const duplicateName = state.providers.find(p => p.name === name && p.id !== providerId);
+    if (duplicateName) {
+        showNotification(`已存在同名提供商 "${name}"`, 'error');
         return;
     }
 
@@ -1372,11 +1385,21 @@ function autoCompleteEndpoint(endpoint, apiFormat) {
     // 移除末尾斜杠
     endpoint = endpoint.replace(/\/$/, '');
 
+    // 解析 URL 获取精确的 pathname
+    let pathname = '';
+    try {
+        const url = new URL(endpoint);
+        pathname = url.pathname;
+    } catch {
+        // 无法解析为 URL，按字符串匹配回退
+        pathname = endpoint;
+    }
+
     switch (apiFormat) {
         case 'openai':
-            // OpenAI Chat Completions 格式自动补全
-            if (!endpoint.includes('/chat/completions')) {
-                if (endpoint.includes('/v1')) {
+            // 检查 pathname 是否已包含 /chat/completions
+            if (!pathname.includes('/chat/completions')) {
+                if (pathname.includes('/v1')) {
                     return endpoint + '/chat/completions';
                 } else {
                     return endpoint + '/v1/chat/completions';
@@ -1385,9 +1408,9 @@ function autoCompleteEndpoint(endpoint, apiFormat) {
             return endpoint;
 
         case 'openai-responses':
-            // OpenAI Responses API 格式自动补全
-            if (!endpoint.includes('/responses')) {
-                if (endpoint.includes('/v1')) {
+            // 检查 pathname 是否已包含 /responses
+            if (!pathname.includes('/responses')) {
+                if (pathname.includes('/v1')) {
                     return endpoint + '/responses';
                 } else {
                     return endpoint + '/v1/responses';
@@ -1396,18 +1419,17 @@ function autoCompleteEndpoint(endpoint, apiFormat) {
             return endpoint;
 
         case 'gemini':
-            // Gemini 格式自动补全
             // 如果已经是完整的 API 路径，不做修改
-            if (endpoint.includes('/v1beta/models') || endpoint.includes('/v1/models')) {
+            if (pathname.includes('/v1beta/models') || pathname.includes('/v1/models')) {
                 return endpoint;
             }
-            // 如果只是域名，返回基础 URL（不加具体路径，让后续逻辑处理）
+            // 如果只是域名，返回基础 URL
             return endpoint;
 
         case 'claude':
-            // Claude 格式自动补全
-            if (!endpoint.includes('/messages')) {
-                if (endpoint.includes('/v1')) {
+            // 检查 pathname 是否已包含 /messages
+            if (!pathname.includes('/messages')) {
+                if (pathname.includes('/v1')) {
                     return endpoint + '/messages';
                 } else {
                     return endpoint + '/v1/messages';

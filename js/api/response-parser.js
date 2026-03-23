@@ -337,13 +337,24 @@ export function parseApiResponse(data, format = 'openai') {
 
             // 检测原生 tool_calls（仅在非 XML 模式）
             if (message.tool_calls && finishReason === 'tool_calls' && !state.xmlToolCallingEnabled) {
-                const toolCalls = message.tool_calls.map(tc => ({
-                    id: tc.id,
-                    name: tc.function.name,
-                    arguments: typeof tc.function.arguments === 'string'
-                        ? JSON.parse(tc.function.arguments)
-                        : tc.function.arguments
-                }));
+                const toolCalls = message.tool_calls.map(tc => {
+                    let parsedArgs;
+                    if (typeof tc.function.arguments === 'string') {
+                        try {
+                            parsedArgs = JSON.parse(tc.function.arguments);
+                        } catch (e) {
+                            console.warn('[response-parser] 工具调用参数解析失败:', e);
+                            parsedArgs = {};
+                        }
+                    } else {
+                        parsedArgs = tc.function.arguments;
+                    }
+                    return {
+                        id: tc.id,
+                        name: tc.function.name,
+                        arguments: parsedArgs
+                    };
+                });
 
                 console.log('[Response Parser] 🔧 检测到 OpenAI 原生工具调用:', toolCalls.length);
                 return {

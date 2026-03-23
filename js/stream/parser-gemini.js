@@ -277,6 +277,26 @@ export async function parseGeminiStream(reader, sessionId = null) {
                             });
                         }
                         await reader.cancel();
+                        // 截断前刷新 <think> 解析器缓冲区
+                        const { displayText: truncDisplayText, thinkingDelta: truncThinkingDelta } = thinkTagParser.flush();
+                        if (truncThinkingDelta) {
+                            thinkingContent += truncThinkingDelta;
+                            const lastThinkPart = contentParts[contentParts.length - 1];
+                            if (lastThinkPart && lastThinkPart.type === 'thinking') {
+                                lastThinkPart.text += truncThinkingDelta;
+                            } else {
+                                contentParts.push({ type: 'thinking', text: truncThinkingDelta });
+                            }
+                        }
+                        if (truncDisplayText) {
+                            textContent += truncDisplayText;
+                            const lastPart = contentParts[contentParts.length - 1];
+                            if (lastPart && lastPart.type === 'text') {
+                                lastPart.text += truncDisplayText;
+                            } else {
+                                contentParts.push({ type: 'text', text: truncDisplayText });
+                            }
+                        }
                         finalizeGeminiStream(textContent, thinkingContent, thoughtSignature, _groundingMetadata, contentParts, sessionId);
                         return;
                     }
@@ -378,6 +398,8 @@ export async function parseGeminiStream(reader, sessionId = null) {
                 endpoint: state.endpoint,
                 apiKey: state.apiKey,
                 model: state.model
+            }).catch(error => {
+                console.error('[Parser] 工具调用流程失败:', error);
             });
 
             return; // 退出流处理

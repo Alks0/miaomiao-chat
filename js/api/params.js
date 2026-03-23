@@ -11,12 +11,13 @@ import { state } from '../core/state.js';
  * @returns {Object} 格式化的参数对象
  */
 export function buildModelParams(format) {
-    const params = state.modelParams[format];
+    const params = state.modelParams[format] || state.modelParams['openai'] || {};
     const result = {};
 
     switch (format) {
         case 'openai':
-            // OpenAI：仅添加非空参数
+        case 'openai-responses':
+            // OpenAI / Responses API：仅添加非空参数
             if (params.temperature !== null) result.temperature = params.temperature;
             if (params.max_tokens !== null) result.max_tokens = params.max_tokens;
             if (params.top_p !== null) result.top_p = params.top_p;

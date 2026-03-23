@@ -92,12 +92,14 @@ const markdownCache = new MarkdownCache(50);
  * @returns {string} 缓存键
  */
 function generateCacheKey(text) {
-    // 对于短文本，直接使用文本作为键
-    if (text.length < 1000) {
-        return text;
+    if (text.length <= 200) return text;
+    // djb2 哈希
+    let hash = 5381;
+    for (let i = 0; i < text.length; i++) {
+        hash = ((hash << 5) + hash) + text.charCodeAt(i);
+        hash = hash & hash; // 转32位整数
     }
-    // 对于长文本，使用长度 + 开头 + 结尾作为键
-    return `${text.length}_${text.substring(0, 100)}_${text.substring(text.length - 100)}`;
+    return `h_${text.length}_${hash}`;
 }
 
 /**

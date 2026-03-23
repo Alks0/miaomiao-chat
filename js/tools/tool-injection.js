@@ -131,6 +131,7 @@ export function trackXMLToolCall(success, tokenCount, error = null) {
             / metrics.xmlToolCallsSucceeded;
     } else {
         metrics.errors.push({ timestamp: Date.now(), error });
+        if (metrics.errors.length > 100) metrics.errors.shift();
     }
 
     // 每 100 次调用上报一次（可选：发送到监控服务）

@@ -145,10 +145,6 @@
     animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
 .status-text {
     flex: 1;
     font-size: 12px;

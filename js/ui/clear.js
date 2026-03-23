@@ -56,7 +56,7 @@ export async function handleClear() {
                     <circle cx="32" cy="32" r="28" fill="url(#gemini-gradient)"/>
                 </svg>
             </div>
-            <h2>你好，我是 喵喵喵</h2>
+            <h2>你好，我是 ${state.charName || 'AI'}</h2>
         </div>
     `;
 

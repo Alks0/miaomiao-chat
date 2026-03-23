@@ -417,6 +417,12 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
     // 防止重复切换（同一会话）
     if (state.currentSessionId === sessionId) return;
 
+    // 清除防抖保存定时器，防止跨会话保存
+    if (saveSessionTimer) {
+        clearTimeout(saveSessionTimer);
+        saveSessionTimer = null;
+    }
+
     // 如果正在切换，取消当前切换，开始新的切换
     if (state.isSwitchingSession && sessionSwitchController) {
         console.warn(`[Session] 取消正在进行的会话切换，切换到新目标: ${sessionId}`);
@@ -452,9 +458,42 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             return;
         }
 
-        // 取消当前进行的 API 请求
-        if (requestStateMachine.isBusy()) {
-            console.log('[Session] 取消正在进行的 API 请求');
+        const oldSessionId = state.currentSessionId;
+
+        // 将当前会话的生成任务移到后台（必须在 cancel 之前，否则 abort 会取消请求）
+        // 注意：AbortController 存储在状态机中，不在 state.currentAbortController
+        const activeAbortController = requestStateMachine.abortController;
+        const hasActiveRequest = requestStateMachine.isBusy() && activeAbortController;
+        if (oldSessionId && hasActiveRequest) {
+            console.log(`[sessions.js] 将会话 ${oldSessionId} 的任务移到后台`);
+            state.backgroundTasks.set(oldSessionId, {
+                abortController: activeAbortController,
+                messageElement: state.currentAssistantMessage,
+                createdAt: Date.now()
+            });
+            eventBus.emit('ui:notification', {
+                message: '上一个会话的生成将在后台继续',
+                type: 'info',
+                duration: 3000
+            });
+
+            // 3分钟后自动清理超时的后台任务
+            const cleanupTimer = setTimeout(() => {
+                const task = state.backgroundTasks.get(oldSessionId);
+                if (task && Date.now() - task.createdAt > 180000) {
+                    console.warn('[sessions.js] 清理超时后台任务:', oldSessionId);
+                    task.abortController?.abort();
+                    state.backgroundTasks.delete(oldSessionId);
+                    eventBus.emit('sessions:updated');
+                }
+            }, 180000);
+            state.backgroundTasks.get(oldSessionId).cleanupTimer = cleanupTimer;
+
+            // 不 cancel/abort 请求，只重置状态机到 IDLE
+            // 请求继续在后台运行，由 sendToAPI 的 finally 清理
+            requestStateMachine.forceReset({ skipAbort: true, silent: true });
+        } else if (requestStateMachine.isBusy()) {
+            // 没有 abortController 的异常情况，直接取消
             requestStateMachine.cancel();
         }
 
@@ -474,8 +513,6 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             console.error(`会话 ${sessionId} 不存在`);
             return;
         }
-
-        const oldSessionId = state.currentSessionId;
 
         // 切换会话 - 恢复所有三种格式
         state.currentSessionId = sessionId;
@@ -513,32 +550,6 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
         // 更新图片预览（清空）
         eventBus.emit('ui:update-image-preview');
 
-        // 将当前会话的生成任务移到后台（如果正在生成）
-        if (oldSessionId && state.isLoading && state.currentAbortController) {
-            console.log(`[sessions.js] 将会话 ${oldSessionId} 的任务移到后台, state.isLoading =`, state.isLoading);
-            state.backgroundTasks.set(oldSessionId, {
-                abortController: state.currentAbortController,
-                messageElement: state.currentAssistantMessage,
-                createdAt: Date.now()  // 添加创建时间戳
-            });
-            eventBus.emit('ui:notification', {
-                message: '上一个会话的生成将在后台继续',
-                type: 'info',
-                duration: 3000
-            });
-
-            // 3分钟后自动清理超时的后台任务
-            setTimeout(() => {
-                const task = state.backgroundTasks.get(oldSessionId);
-                if (task && Date.now() - task.createdAt > 180000) {
-                    console.warn('[sessions.js] 清理超时后台任务:', oldSessionId);
-                    task.abortController?.abort();
-                    state.backgroundTasks.delete(oldSessionId);
-                    eventBus.emit('sessions:updated');
-                }
-            }, 180000);
-        }
-
         // 恢复会话的 API 格式
         if (session.apiFormat && session.apiFormat !== state.apiFormat) {
             state.apiFormat = session.apiFormat;
@@ -563,11 +574,8 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             state.currentAssistantMessage = null;
             state.currentAbortController = null;
 
-            // 清除发送锁超时定时器
-            if (state.sendLockTimeout) {
-                clearTimeout(state.sendLockTimeout);
-                state.sendLockTimeout = null;
-            }
+            // 清除发送锁超时定时器（通过状态机统一管理）
+            requestStateMachine.clearSendLockTimeout();
 
             console.log('[sessions.js] 切换到空闲会话，已重置 state.isLoading =', state.isLoading, ', state.isSending =', state.isSending);
 
@@ -694,6 +702,9 @@ export async function deleteSession(sessionId) {
     // 停止该会话的后台任务
     const task = state.backgroundTasks.get(sessionId);
     if (task) {
+        if (task.cleanupTimer) {
+            clearTimeout(task.cleanupTimer);
+        }
         task.abortController.abort();
         state.backgroundTasks.delete(sessionId);
     }

@@ -267,7 +267,8 @@ async function handleNonStreamResponse(response, assistantMessageEl, sessionId) 
                     await handleToolCallStream(reply.toolCalls, {
                         endpoint: getCurrentEndpoint(),
                         apiKey: getCurrentApiKey(),
-                        model: getCurrentModel()
+                        model: getCurrentModel(),
+                        sessionId: sessionId
                     });
 
                     return; // 退出非流式处理
@@ -465,6 +466,7 @@ async function sendToAPI() {
 
     // 记录当前会话 ID（用于后台生成）
     const sessionId = state.currentSessionId;
+    let requestSucceeded = false;
 
     // 转换到 SENDING 状态
     requestStateMachine.transition(RequestState.SENDING, {
@@ -624,6 +626,8 @@ async function sendToAPI() {
                 // Bug 2 立即设置 dataset.messageIndex
                 setCurrentMessageIndex(messageIndex);
             }
+            // HTTP 错误时转换到错误状态，确保 UI 和状态正确重置
+            requestStateMachine.transition(RequestState.ERROR, { error: { status: response.status } });
             return;
         }
 
@@ -637,6 +641,7 @@ async function sendToAPI() {
         }
 
         // 请求成功完成
+        requestSucceeded = true;
         requestStateMachine.transition(RequestState.COMPLETED);
 
     } catch (error) {
@@ -692,6 +697,9 @@ async function sendToAPI() {
                         state.currentAssistantMessage.innerHTML = '<div class="thinking-dots retry-loading"><span></span><span></span><span></span></div><div style="margin-top: 8px; font-size: 12px; color: #888;">图片过大，已自动压缩后重试...</div>';
                     }
 
+                    // 重置状态机，确保递归调用时状态正确
+                    requestStateMachine.forceReset();
+
                     // 重新发送请求（递归调用 - 会复用当前消息元素）
                     await sendToAPI();
                     return;
@@ -721,8 +729,29 @@ async function sendToAPI() {
     } finally {
         // 从后台任务中移除（如果存在）
         if (sessionId && state.backgroundTasks.has(sessionId)) {
+            const task = state.backgroundTasks.get(sessionId);
+            if (task?.cleanupTimer) clearTimeout(task.cleanupTimer);
             state.backgroundTasks.delete(sessionId);
             eventBus.emit('sessions:updated', { sessions: state.sessions });
+
+            // 后台任务完成通知（仅当用户在其他会话时）
+            if (sessionId !== state.currentSessionId) {
+                const session = state.sessions.find(s => s.id === sessionId);
+                const sessionName = session?.name || '会话';
+                if (requestSucceeded) {
+                    eventBus.emit('ui:notification', {
+                        message: `「${sessionName}」的 AI 回复已完成`,
+                        type: 'success',
+                        duration: 5000
+                    });
+                } else {
+                    eventBus.emit('ui:notification', {
+                        message: `「${sessionName}」的 AI 回复失败`,
+                        type: 'error',
+                        duration: 5000
+                    });
+                }
+            }
         }
 
         // 清理 continuation 标志
@@ -924,12 +953,12 @@ export async function resendWithToolResults(toolResultMessages, apiConfig, assis
 export function initAPIHandler() {
     // 监听发送请求事件
     eventBus.on('api:send-requested', () => {
-        sendToAPI();
+        sendToAPI().catch(err => console.error('[handler] sendToAPI 失败:', err));
     });
 
     // 监听重新发送请求事件（retry功能）
     eventBus.on('api:resend-requested', () => {
-        sendToAPI();
+        sendToAPI().catch(err => console.error('[handler] sendToAPI 失败:', err));
     });
 
     // 监听取消请求事件

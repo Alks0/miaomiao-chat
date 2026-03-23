@@ -10,7 +10,7 @@ import { renderThinkingBlock, enhanceCodeBlocks, enhanceThinkingBlocks } from '.
 import { getMediaExtension, isVideoUrl } from '../utils/media.js';
 
 // 性能优化：防抖渲染（避免每个 token 都触发重绘）
-const renderDebounceTimer = null;
+let renderDebounceTimer = null;
 let pendingRenderData = null;
 let rafId = null;
 

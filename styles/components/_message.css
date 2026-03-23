@@ -49,10 +49,10 @@
     background: var(--color-bg-accent);
     color: var(--color-text-inverse);
     margin-left: 48px;
-    animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: messageSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideInRight {
+@keyframes messageSlideIn {
     from {
         opacity: 0;
         transform: translateX(30px) scale(0.95);
@@ -381,37 +381,37 @@
     justify-content: center;
 }
 
-.btn-primary {
+.edit-actions .btn-primary {
     background: var(--md-blue);
     color: var(--color-text-inverse);
     border-color: var(--md-blue);
 }
 
-.btn-primary:hover {
+.edit-actions .btn-primary:hover {
     background: #3a7bc8;
     transform: translate(2px, -2px);
     box-shadow: var(--shadow-md);
 }
 
-.btn-primary:active {
+.edit-actions .btn-primary:active {
     transform: translate(0, 0);
     box-shadow: var(--shadow-sm);
 }
 
-.btn-secondary {
+.edit-actions .btn-secondary {
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
     border-color: var(--md-muted);
 }
 
-.btn-secondary:hover {
+.edit-actions .btn-secondary:hover {
     background: var(--color-bg-primary);
     border-color: var(--color-text-primary);
     transform: translate(2px, -2px);
     box-shadow: var(--shadow-md);
 }
 
-.btn-secondary:active {
+.edit-actions .btn-secondary:active {
     transform: translate(0, 0);
     box-shadow: var(--shadow-sm);
 }

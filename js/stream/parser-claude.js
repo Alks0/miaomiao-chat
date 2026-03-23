@@ -206,6 +206,23 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                         type: 'warning'
                                     });
                                     await reader.cancel();
+                                    // 截断前刷新 <think> 解析器缓冲区
+                                    const { displayText: truncDisplayText, thinkingDelta: truncThinkingDelta } = thinkTagParser.flush();
+                                    if (truncThinkingDelta) {
+                                        currentThinkingBlock += truncThinkingDelta;
+                                    }
+                                    if (truncDisplayText) {
+                                        textContent += truncDisplayText;
+                                        const lastPart = contentParts[contentParts.length - 1];
+                                        if (lastPart && lastPart.type === 'text') {
+                                            lastPart.text += truncDisplayText;
+                                        } else {
+                                            contentParts.push({ type: 'text', text: truncDisplayText });
+                                        }
+                                    }
+                                    if (currentThinkingBlock) {
+                                        thinkingBlocks.push(currentThinkingBlock);
+                                    }
                                     const finalThinking = thinkingBlocks.join('\n\n---\n\n');
                                     const finalSignature = thinkingSignatures.join('\n\n---\n\n');
                                     finalizeClaudeStream(textContent, finalThinking, finalSignature, contentParts, sessionId);
@@ -313,6 +330,8 @@ export async function parseClaudeStream(reader, sessionId = null) {
                                         endpoint: state.endpoint,
                                         apiKey: state.apiKey,
                                         model: state.model
+                                    }).catch(error => {
+                                        console.error('[Parser] 工具调用流程失败:', error);
                                     });
 
                                     return; // 退出流处理

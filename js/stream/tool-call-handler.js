@@ -8,6 +8,7 @@ import { executeTool } from '../tools/executor.js';
 import { createToolCallUI, updateToolCallStatus } from '../ui/tool-display.js';
 import { getOrCreateMappedId } from '../api/format-converter.js';  // ID 转换
 import { state } from '../core/state.js';  // 访问应用状态
+import { requestStateMachine } from '../core/request-state-machine.js';
 
 /**
  * 处理工具返回的多媒体内容
@@ -214,7 +215,10 @@ async function enrichToolResultWithFiles(result, toolName) {
  * @returns {Promise<string>} Base64 编码的文件内容
  */
 async function downloadClaudeFile(fileId) {
-    const apiKey = state.apiKeys.claude;
+    // 从当前提供商获取 API key，而非硬编码 claude
+    const { getCurrentProvider, getActiveApiKey } = await import('../providers/manager.js');
+    const provider = getCurrentProvider();
+    const apiKey = provider ? getActiveApiKey(provider.id) : state.apiKeys?.claude;
     if (!apiKey) {
         throw new Error('Claude API key not found');
     }
@@ -304,7 +308,7 @@ class ToolCallAccumulator {
         const completed = [];
 
         for (const [index, call] of this.calls.entries()) {
-            if (call.name && call.arguments) {
+            if (call.name && call.arguments != null) {
                 try {
                     // 解析参数 JSON
                     const args = JSON.parse(call.arguments);
@@ -554,6 +558,9 @@ export async function handleToolCallStream(toolCalls, apiConfig) {
 
         // 清理工具调用标志，防止状态泄漏
         state.isToolCallPending = false;
+
+        // 重置请求状态机，防止永久卡在 TOOL_CALLING 状态
+        requestStateMachine.forceReset();
 
         eventBus.emit('ui:notification', {
             message: `工具调用失败: ${error.message}`,

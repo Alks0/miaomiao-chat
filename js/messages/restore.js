@@ -145,9 +145,9 @@ export function renderSessionMessages() {
     }
 
     // 如果消息数量超过阈值，使用虚拟滚动
-    if (messages.length >= 5) {  // 降低到5条，与VIRTUAL_SCROLL_CONFIG.threshold保持一致
+    if (messages.length >= 50) {
         console.log(`消息数量 ${messages.length}，启用虚拟滚动模式`);
-        initVirtualScroll(true); // 强制启用
+        initVirtualScroll(); // 由智能阈值决定是否启用
         rebuildMessageIdMap(); // 重建索引映射
         // 虚拟滚动模块会自动渲染
         return;

@@ -172,6 +172,14 @@ export function initDB() {
         request.onsuccess = () => {
             db = request.result;
             console.log(`IndexedDB 初始化成功（版本 ${DB_VERSION}）`);
+
+            // 监听连接关闭，自动重连
+            db.onclose = () => {
+                console.warn('IndexedDB 连接已关闭，尝试重新连接...');
+                db = null;
+                initDB().catch(e => console.error('IndexedDB 重连失败:', e));
+            };
+
             resolve(db);
         };
 
@@ -233,12 +241,12 @@ export function initDB() {
  * @param {Object} session - 会话对象
  * @returns {Promise<void>}
  */
-export function saveSessionToDB(session) {
+export async function saveSessionToDB(session) {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
     return new Promise((resolve, reject) => {
-        if (!db) {
-            reject(new Error('数据库未初始化'));
-            return;
-        }
 
         const transaction = db.transaction([STORE_NAME], 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
@@ -278,12 +286,12 @@ export function saveSessionToDB(session) {
  * 从 IndexedDB 加载所有会话
  * @returns {Promise<Array>} 会话数组
  */
-export function loadAllSessionsFromDB() {
+export async function loadAllSessionsFromDB() {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
     return new Promise((resolve, reject) => {
-        if (!db) {
-            reject(new Error('数据库未初始化'));
-            return;
-        }
 
         const transaction = db.transaction([STORE_NAME], 'readonly');
         const store = transaction.objectStore(STORE_NAME);
@@ -306,12 +314,12 @@ export function loadAllSessionsFromDB() {
  * @param {string} sessionId - 会话 ID
  * @returns {Promise<void>}
  */
-export function deleteSessionFromDB(sessionId) {
+export async function deleteSessionFromDB(sessionId) {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
     return new Promise((resolve, reject) => {
-        if (!db) {
-            reject(new Error('数据库未初始化'));
-            return;
-        }
 
         const transaction = db.transaction([STORE_NAME], 'readwrite');
         const store = transaction.objectStore(STORE_NAME);

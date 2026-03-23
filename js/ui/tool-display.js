@@ -443,7 +443,7 @@ function startDurationTimer(container, toolId) {
         if (durationEl) {
             durationEl.textContent = `${elapsed.toFixed(1)}s`;
         }
-    }, 100);
+    }, 500);
 
     durationTimers.set(toolId, timer);
 }

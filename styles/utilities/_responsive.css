@@ -124,9 +124,9 @@
 @media (max-width: 480px) {
     .settings-panel,
     .sidebar {
-        width: 100%;
-        max-width: none;
-        min-width: unset;
+        width: 100% !important;
+        max-width: none !important;
+        min-width: unset !important;
     }
 
     /* 输入栏紧凑布局 */
@@ -392,14 +392,3 @@
     }
 }
 
-/* ========== 动画性能优化 ========== */
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-    }
-}

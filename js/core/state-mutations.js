@@ -19,7 +19,8 @@ import { eventBus } from './events.js';
 function rebuildMessageIdMapFromIndex(fromIndex) {
     if (!state.messageIdMap) return;
 
-    const messages = state.apiFormat === 'gemini' ? state.geminiContents : state.messages;
+    // 始终从 OpenAI 格式（主存储）构建，避免格式耦合
+    const messages = state.messages;
 
     // 更新从 fromIndex 开始的所有消息索引
     for (let i = fromIndex; i < messages.length; i++) {
@@ -42,7 +43,8 @@ export function rebuildMessageIdMap() {
         state.messageIdMap.clear();
     }
 
-    const messages = state.apiFormat === 'gemini' ? state.geminiContents : state.messages;
+    // 始终从 OpenAI 格式（主存储）构建，避免格式耦合
+    const messages = state.messages;
 
     messages.forEach((msg, index) => {
         const messageId = msg.id;
@@ -147,7 +149,7 @@ export function removeMessagesAfter(fromIndex) {
 
     // 从 messageIdMap 中删除被移除的消息
     if (state.messageIdMap) {
-        const messages = state.apiFormat === 'gemini' ? state.geminiContents : state.messages;
+        const messages = state.messages;
         for (let i = fromIndex + 1; i < messages.length; i++) {
             const msg = messages[i];
             const messageId = msg.id;

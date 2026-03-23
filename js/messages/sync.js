@@ -996,7 +996,14 @@ export function convertFromGemini() {
         const openaiMsg = copyMessageMetadata(msg, toOpenAIMessage(role, content, images.length > 0 ? images : null));
         const claudeMsg = copyMessageMetadata(msg, toClaudeMessage(role, content, images.length > 0 ? images : null));
 
-        // ❌ 移除 P1 保留所有签名，避免格式往返丢失
+        // 保留工具调用相关属性
+        if (msg.tool_calls) {
+            openaiMsg.tool_calls = msg.tool_calls;
+        }
+        if (msg.role === 'tool') {
+            openaiMsg.role = 'tool';
+            claudeMsg.role = 'tool';
+        }
 
         state.messages.push(openaiMsg);
         state.claudeContents.push(claudeMsg);
@@ -1029,7 +1036,14 @@ export function convertFromClaude() {
         const openaiMsg = copyMessageMetadata(msg, toOpenAIMessage(msg.role, content, images.length > 0 ? images : null));
         const geminiMsg = copyMessageMetadata(msg, toGeminiMessage(msg.role, content, images.length > 0 ? images : null));
 
-        // ❌ 移除 P1 保留所有签名，避免格式往返丢失
+        // 保留工具调用相关属性
+        if (msg.tool_calls) {
+            openaiMsg.tool_calls = msg.tool_calls;
+        }
+        if (msg.role === 'tool') {
+            openaiMsg.role = 'tool';
+            geminiMsg.role = 'tool';
+        }
 
         state.messages.push(openaiMsg);
         state.geminiContents.push(geminiMsg);

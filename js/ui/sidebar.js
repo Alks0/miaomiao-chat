@@ -75,14 +75,13 @@ export async function toggleSidebar(skipSave = false) {
     const isOpening = !elements.sidebar.classList.contains('open');
     elements.sidebar.classList.toggle('open');
 
-    // 控制 overlay 显示（不依赖 CSS，直接用 JS）
+    // 同步控制 overlay 显示
     const overlay = document.querySelector('.sidebar-overlay');
     if (overlay) {
         if (isOpening) {
             overlay.style.visibility = 'visible';
             overlay.style.opacity = '1';
             overlay.style.pointerEvents = 'auto';
-            overlay.style.zIndex = '99';  // 在侧边栏(100)之下
         } else {
             overlay.style.visibility = 'hidden';
             overlay.style.opacity = '0';
@@ -424,10 +423,12 @@ function updateMatchedMessagesPreview(sessionEl, matchedMessages, query) {
 async function switchToSessionAndScrollToMessage(sessionId, messageIndex) {
     await switchToSession(sessionId);
 
-    // 等待消息渲染完成后滚动
-    setTimeout(() => {
-        scrollToMessage(messageIndex);
-    }, 300);
+    // 双重 rAF 确保 DOM 渲染完成后滚动
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            scrollToMessage(messageIndex);
+        });
+    });
 }
 
 /**
@@ -466,10 +467,10 @@ export function initSidebar() {
         return;
     }
 
-    // 初始化 overlay 的初始状态
+    // 初始化 overlay
     const sidebarOverlay = document.querySelector('.sidebar-overlay');
     if (sidebarOverlay) {
-        // 强制设置初始样式，覆盖所有CSS
+        // 设置初始样式
         sidebarOverlay.style.position = 'fixed';
         sidebarOverlay.style.inset = '0';
         sidebarOverlay.style.background = 'rgba(56, 56, 56, 0.6)';
@@ -482,12 +483,11 @@ export function initSidebar() {
         sidebarOverlay.style.padding = '0';
         sidebarOverlay.style.transition = 'opacity 0.2s ease-out, visibility 0.2s ease-out';
 
-        // 使用事件捕获确保一定能接收到点击
+        // 点击 overlay 关闭侧边栏
         sidebarOverlay.addEventListener('click', function(e) {
-            console.log('🔵 Sidebar overlay clicked');
-            e.stopPropagation();  // 阻止事件继续传播
+            e.stopPropagation();
             toggleSidebar();
-        }, true);  // true = 捕获阶段
+        }, true);
     }
 
     // 绑定侧边栏切换按钮

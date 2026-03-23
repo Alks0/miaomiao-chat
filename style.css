@@ -54,6 +54,9 @@
 @import "styles/components/_tool-manager.css";
 @import "styles/components/_tools-quick-selector.css";
 @import "styles/components/_latex.css";
+@import "styles/components/_code-collapser.css";
+@import "styles/components/_code-editor-modal.css";
+@import "styles/components/_tool-manager-enhancements.css";
 
 /* Utilities */
 @import "styles/utilities/_accessibility.css";

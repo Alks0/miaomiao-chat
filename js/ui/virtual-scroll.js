@@ -13,7 +13,7 @@ import { lazyImageManager, preloadImagesInRange } from '../utils/lazy-image.js';
 // 虚拟滚动配置
 const VIRTUAL_SCROLL_CONFIG = {
     enabled: true, // 默认启用虚拟滚动
-    threshold: 5, // 消息数量阈值（降低到5条，适合图片密集场景）
+    threshold: 50, // 消息数量阈值
     itemHeight: 150, // 预估每条消息高度（px）
     overscan: 8, // 上下额外渲染的消息数量（增加到8，减少闪烁）
     buffer: 15 // 缓冲区大小（增加到15，改善滚动体验）
@@ -277,6 +277,7 @@ function renderVirtualMessages() {
         }
 
         const msg = messages[i];
+        if (!msg) continue;
         const messageEl = createVirtualMessageElement(msg, i);
         fragment.appendChild(messageEl);
 

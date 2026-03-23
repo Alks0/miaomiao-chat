@@ -455,6 +455,26 @@ export async function parseOpenAIStream(reader, format = 'openai', sessionId = n
                                 type: 'warning'
                             });
                             await reader.cancel();
+                            // 截断前刷新 <think> 解析器缓冲区
+                            const { displayText: truncDisplayText, thinkingDelta: truncThinkingDelta } = thinkTagParser.flush();
+                            if (truncThinkingDelta) {
+                                thinkingContent += truncThinkingDelta;
+                                const lastThinkPart = contentParts[contentParts.length - 1];
+                                if (lastThinkPart && lastThinkPart.type === 'thinking') {
+                                    lastThinkPart.text += truncThinkingDelta;
+                                } else {
+                                    contentParts.push({ type: 'thinking', text: truncThinkingDelta });
+                                }
+                            }
+                            if (truncDisplayText) {
+                                textContent += truncDisplayText;
+                                const lastPart = contentParts[contentParts.length - 1];
+                                if (lastPart && lastPart.type === 'text') {
+                                    lastPart.text += truncDisplayText;
+                                } else {
+                                    contentParts.push({ type: 'text', text: truncDisplayText });
+                                }
+                            }
                             finalizeOpenAIStream(textContent, thinkingContent, contentParts, sessionId, encryptedContent);
                             return;
                         }

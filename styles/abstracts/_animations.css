@@ -1,3 +1,9 @@
+/* 通用旋转动画 */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 /* ========== 主题过渡动画 ========== */
 /* 只在用户主动切换主题时启用过渡，避免页面加载时闪烁 */
 html.theme-transition,

@@ -1052,11 +1052,6 @@
     margin-bottom: 16px;
 }
 
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
 .models-checklist {
     flex: 1;
     overflow-y: auto;
@@ -1398,7 +1393,7 @@
         height: 20px;
     }
 
-    .btn-primary,
+    .detail-footer .btn-primary,
     .btn-secondary {
         min-height: 44px;
         padding: 12px 20px;

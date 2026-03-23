@@ -63,10 +63,6 @@
     font-size: 11px;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
 .config-manager {
     display: flex;
     gap: 8px;

@@ -11,6 +11,8 @@
 import { state } from '../../core/state.js';
 import { eventBus } from '../../core/events.js';
 
+let wsRequestCounter = 0;
+
 /**
  * 检测当前运行平台
  * @returns {'electron'|'web'|'android'} 平台类型
@@ -1331,7 +1333,7 @@ export class MCPClient {
         if (protocol === 'websocket') {
             // WebSocket: 发送 list_tools 请求
             return new Promise((resolve, reject) => {
-                const requestId = Date.now().toString();
+                const requestId = 'ws_' + (++wsRequestCounter);
 
                 // 使用配置的超时时间
                 const timeout = setTimeout(() => {
@@ -1446,7 +1448,7 @@ export class MCPClient {
         if (protocol === 'websocket') {
             // WebSocket: 发送 call_tool 请求
             return new Promise((resolve, reject) => {
-                const requestId = Date.now().toString();
+                const requestId = 'ws_' + (++wsRequestCounter);
 
                 // 使用配置的超时时间
                 const timeout = setTimeout(() => {
@@ -1475,7 +1477,7 @@ export class MCPClient {
                         clearTimeout(timeout);
                         ws.removeEventListener('message', handler);
                         reject(new Error('工具执行已取消'));
-                    });
+                    }, { once: true });
                 }
 
                 ws.addEventListener('message', handler);
@@ -1505,7 +1507,7 @@ export class MCPClient {
                 options.signal.addEventListener('abort', () => {
                     clearTimeout(timeoutId);
                     abortController.abort();
-                });
+                }, { once: true });
             }
 
             try {

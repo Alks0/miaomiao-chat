@@ -5,6 +5,7 @@
 
 import { eventBus } from './events.js';
 import { elements } from './elements.js';
+import { state } from './state.js';
 
 /**
  * 请求状态枚举
@@ -74,6 +75,7 @@ export class RequestStateMachine {
         this.assistantMessageEl = null;
         this.sessionId = null;
         this.sendLockTimeout = null;
+        this._autoIdleTimer = null;
         this.stateHistory = []; // 用于调试
         this.maxHistorySize = 20;
     }
@@ -106,21 +108,32 @@ export class RequestStateMachine {
             return false;
         }
 
+        // 清理上一次的自动回 IDLE 定时器
+        if (this._autoIdleTimer) {
+            clearTimeout(this._autoIdleTimer);
+            this._autoIdleTimer = null;
+        }
+
         const oldState = this.state;
         this.state = newState;
 
-        // 记录状态历史
+        // 记录状态历史（精简 metadata，避免存储大对象）
+        const metaSummary = metadata ? { type: typeof metadata, keys: Object.keys(metadata).join(',') } : null;
         this.stateHistory.push({
             from: oldState,
             to: newState,
             timestamp: Date.now(),
-            metadata
+            meta: metaSummary
         });
         if (this.stateHistory.length > this.maxHistorySize) {
             this.stateHistory.shift();
         }
 
         console.log(`[StateMachine] 状态转换: ${oldState} -> ${newState}`, metadata);
+
+        // 同步旧版标志位
+        state.isLoading = [RequestState.SENDING, RequestState.STREAMING, RequestState.TOOL_CALLING, RequestState.CONTINUATION].includes(newState);
+        state.isSending = newState === RequestState.SENDING;
 
         // 执行状态进入钩子
         this._onEnterState(newState, metadata);
@@ -135,7 +148,8 @@ export class RequestStateMachine {
         // 自动转换临时状态
         if ([RequestState.COMPLETED, RequestState.ERROR, RequestState.CANCELLED].includes(newState)) {
             // 短暂延迟后转回 IDLE（确保 UI 更新完成）
-            setTimeout(() => {
+            this._autoIdleTimer = setTimeout(() => {
+                this._autoIdleTimer = null;
                 if (this.state === newState) {
                     this.transition(RequestState.IDLE);
                 }
@@ -289,6 +303,13 @@ export class RequestStateMachine {
      */
     _onCompleted() {
         console.log('[StateMachine] 请求完成');
+
+        // 立即重置 UI 按钮状态
+        this._updateUI({
+            sendButtonDisabled: false,
+            sendButtonVisible: true,
+            cancelButtonVisible: false
+        });
     }
 
     /**
@@ -297,6 +318,13 @@ export class RequestStateMachine {
     _onError(metadata) {
         const { error } = metadata || {};
         console.error('[StateMachine] 请求错误:', error);
+
+        // 立即重置 UI 按钮状态，不依赖 auto-idle 定时器
+        this._updateUI({
+            sendButtonDisabled: false,
+            sendButtonVisible: true,
+            cancelButtonVisible: false
+        });
     }
 
     /**
@@ -330,23 +358,31 @@ export class RequestStateMachine {
 
     /**
      * 强制重置到 IDLE 状态（用于异常恢复）
+     * @param {Object} options - 选项
+     * @param {boolean} options.skipAbort - 是否跳过 abort（用于后台任务提升场景）
+     * @param {boolean} options.silent - 是否静默（不显示通知）
      */
-    forceReset() {
-        console.warn('[StateMachine] 强制重置到 IDLE 状态');
+    forceReset({ skipAbort = false, silent = false } = {}) {
+        console.warn('[StateMachine] 强制重置到 IDLE 状态', skipAbort ? '(保留请求)' : '');
+
+        // 清理自动回 IDLE 定时器
+        if (this._autoIdleTimer) {
+            clearTimeout(this._autoIdleTimer);
+            this._autoIdleTimer = null;
+        }
 
         // 取消当前请求（忽略所有错误）
-        if (this.abortController) {
+        if (!skipAbort && this.abortController) {
             try {
-                // 检查 signal 是否已经 aborted，避免重复 abort
                 if (!this.abortController.signal.aborted) {
                     this.abortController.abort();
                 }
             } catch (e) {
-                // 忽略 abort 错误，这是正常的取消流程
+                // 忽略 abort 错误
             }
         }
 
-        // 性能优化：缓存 querySelectorAll 结果
+        // 清理 loading 元素
         const allLoadingElements = document.querySelectorAll('.thinking-dots, .continuation-loading, .retry-loading');
         if (allLoadingElements.length > 0) {
             allLoadingElements.forEach(el => el.remove());
@@ -362,7 +398,7 @@ export class RequestStateMachine {
             from: oldState,
             to: RequestState.IDLE,
             timestamp: Date.now(),
-            metadata: { forced: true }
+            meta: { type: 'object', keys: skipAbort ? 'forced-keep-request' : 'forced' }
         });
         if (this.stateHistory.length > this.maxHistorySize) {
             this.stateHistory.shift();
@@ -375,11 +411,12 @@ export class RequestStateMachine {
             metadata: { forced: true }
         });
 
-        // 发送通知
-        eventBus.emit('ui:notification', {
-            message: '已强制重置请求状态',
-            type: 'success'
-        });
+        if (!silent) {
+            eventBus.emit('ui:notification', {
+                message: '已强制重置请求状态',
+                type: 'success'
+            });
+        }
     }
 
     /**
@@ -406,6 +443,17 @@ export class RequestStateMachine {
     }
 
     /**
+     * 清除发送锁超时定时器
+     * 供外部模块（如 sessions.js）在会话切换时调用
+     */
+    clearSendLockTimeout() {
+        if (this.sendLockTimeout) {
+            clearTimeout(this.sendLockTimeout);
+            this.sendLockTimeout = null;
+        }
+    }
+
+    /**
      * 检查是否正忙（不是 IDLE 状态）
      */
     isBusy() {
@@ -426,7 +474,7 @@ export class RequestStateMachine {
         console.log('[StateMachine] 状态历史:');
         this.stateHistory.forEach((record, index) => {
             const time = new Date(record.timestamp).toLocaleTimeString();
-            console.log(`  ${index + 1}. [${time}] ${record.from} -> ${record.to}`, record.metadata);
+            console.log(`  ${index + 1}. [${time}] ${record.from} -> ${record.to}`, record.meta);
         });
     }
 }

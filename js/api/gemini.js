@@ -314,47 +314,34 @@ async function processContentsForRequest(contents) {
  * @returns {Array} 处理后的消息数组
  */
 function buildGeminiContentsWithSignatures(contents) {
-    // 第一遍扫描：检查是否有任何 content 或 part 包含 thoughtSignature
-    let globalSignature = null;
-
-    for (const content of contents) {
+    // 每条消息保留自己的签名，不做全局传播
+    return contents.map(content => {
         // 检查消息级别的签名
-        if (content.thoughtSignature) {
-            globalSignature = content.thoughtSignature;
-            console.log('[Gemini] 🔍 找到消息级别的 thoughtSignature');
-            break;
-        }
+        const msgSignature = content.thoughtSignature || null;
 
         // 检查 part 级别的签名
-        if (content.parts) {
-            const partSignature = content.parts.find(p => p.thoughtSignature)?.thoughtSignature;
-            if (partSignature) {
-                globalSignature = partSignature;
-                console.log('[Gemini] 🔍 找到 part 级别的 thoughtSignature');
-                break;
-            }
+        const partSignature = content.parts?.find(p => p.thoughtSignature)?.thoughtSignature || null;
+
+        // 该消息对应的签名（消息级别优先）
+        const signature = msgSignature || partSignature;
+
+        if (signature) {
+            // 有签名：应用到该消息的所有 parts
+            return {
+                role: content.role,
+                parts: content.parts.map(part => ({
+                    ...part,
+                    thoughtSignature: signature
+                }))
+            };
         }
-    }
 
-    // 第二遍处理：如果找到签名，应用到所有 contents 的所有 parts
-    if (globalSignature) {
-        console.log('[Gemini] 将 thoughtSignature 应用到所有', contents.length, '个 contents');
-        return contents.map(content => ({
+        // 没有签名：保持原样
+        return {
             role: content.role,
-            parts: content.parts.map(part => ({
-                ...part,
-                thoughtSignature: globalSignature  // 所有 part 都获得相同的签名
-            }))
-        }));
-    }
-
-    // 没有找到签名：保持原样（不自动生成签名）
-    // 根据 Gemini 官方文档：签名应该从 API 响应中接收并原样传回，而不是客户端生成
-    console.log('[Gemini] ℹ️ 未找到 thoughtSignature，保持原样');
-    return contents.map(content => ({
-        role: content.role,
-        parts: content.parts
-    }));
+            parts: content.parts
+        };
+    });
 }
 
 /**
