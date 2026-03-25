@@ -84,7 +84,7 @@ class MarkdownCache {
     }
 }
 
-const markdownCache = new MarkdownCache(50);
+const markdownCache = new MarkdownCache(300);
 
 /**
  * 生成缓存键（使用简单哈希）

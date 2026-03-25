@@ -697,8 +697,9 @@ async function connectToServer(serverId) {
     if (result.success) {
         console.log(`[MCP Settings] 已连接: ${server.name}`);
         showNotification(`已连接到 ${server.name}`, 'success');
-        // 重置重试计数
+        // 重置重试计数，标记为启用
         server.retryCount = 0;
+        server.enabled = true;
 
         // 保存到 IndexedDB
         try {
@@ -748,7 +749,19 @@ async function connectToServer(serverId) {
  */
 async function disconnectFromServer(serverId) {
     await mcpClient.disconnect(serverId);
-    renderServerList(); // 刷新列表
+
+    // 持久化断开状态，防止重启后自动重连
+    const server = state.mcpServers.find(s => s.id === serverId);
+    if (server) {
+        server.enabled = false;
+        try {
+            await saveMCPServer(server);
+        } catch (error) {
+            console.error('[MCP Settings] 保存断开状态失败:', error);
+        }
+    }
+
+    renderServerList();
 }
 
 /**

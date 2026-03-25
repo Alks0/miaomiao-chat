@@ -5,7 +5,7 @@
 
 import { state } from '../core/state.js';
 import { eventBus } from '../core/events.js';
-import { saveCurrentSessionMessages } from '../state/sessions.js';
+import { debouncedSaveSession } from '../state/sessions.js';
 
 /**
  * 记录工具调用
@@ -368,7 +368,7 @@ export function setToolHistoryEnabled(enabled) {
     console.log(`[ToolHistory] 历史记录已${enabled ? '启用' : '禁用'}`);
 
     // 保存配置
-    saveCurrentSessionMessages();
+    debouncedSaveSession();
 
     // 发布事件
     eventBus.emit('tool:history:enabled-changed', { enabled });
@@ -390,7 +390,7 @@ export function setMaxToolHistorySize(maxSize) {
     console.log(`[ToolHistory] 最大历史记录数已设为: ${maxSize}`);
 
     // 保存配置
-    saveCurrentSessionMessages();
+    debouncedSaveSession();
 }
 
 console.log('[ToolHistory] 📚 工具调用历史管理模块已加载');

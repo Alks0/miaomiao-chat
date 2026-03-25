@@ -7,7 +7,7 @@
 import { state } from '../core/state.js';
 import { elements, isElementsInitialized } from '../core/elements.js';
 import { eventBus } from '../core/events.js';
-import { saveSessionToDB, loadAllSessionsFromDB, deleteSessionFromDB, migrateFromLocalStorage, savePreference, loadPreference } from './storage.js';
+import { saveSessionToDB, loadAllSessionsFromDB, deleteSessionFromDB, migrateFromLocalStorage, savePreference, loadPreference, saveSessionMessages, loadSessionMessages, saveSessionAtomic } from './storage.js';
 import { generateSessionId, generateSessionName } from '../utils/helpers.js';
 import { renderSessionMessages } from '../messages/restore.js';
 import { replaceAllMessages } from '../core/state-mutations.js';
@@ -15,6 +15,8 @@ import { requestStateMachine } from '../core/request-state-machine.js';
 
 // 防抖保存定时器
 let saveSessionTimer = null;
+// 已删除会话 ID 集合，防止异步保存操作重建已删除的记录
+const _deletedSessionIds = new Set();
 
 // 会话切换 AbortController
 let sessionSwitchController = null;
@@ -280,8 +282,12 @@ export async function saveCurrentSessionId() {
 /**
  * 保存当前会话的消息（立即执行）
  */
-export async function saveCurrentSessionMessages() {
+export async function saveCurrentSessionMessages(force = false) {
     if (!state.currentSessionId) return;
+    // 防止保存已删除的会话
+    if (_deletedSessionIds.has(state.currentSessionId)) return;
+    // 跳过无变更的保存（除非强制）
+    if (!force && !state.sessionDirty) return;
 
     const session = state.sessions.find(s => s.id === state.currentSessionId);
     if (!session) return;
@@ -316,26 +322,36 @@ export async function saveCurrentSessionMessages() {
         }
     }
 
+    let persistedPayload;
     try {
-        const persistedPayload = await createPersistedSessionPayload({
+        persistedPayload = await createPersistedSessionPayload({
             messages: state.messages,
             geminiContents: state.geminiContents,
             claudeContents: state.claudeContents
         });
-
-        session.messages = persistedPayload.messages;
-        session.geminiContents = persistedPayload.geminiContents;
-        session.claudeContents = persistedPayload.claudeContents;
     } catch (error) {
         console.error('[Session] 构建持久化快照失败，回退到原始消息:', error);
-        session.messages = cloneSerializable(state.messages);
-        session.geminiContents = cloneSerializable(state.geminiContents);
-        session.claudeContents = cloneSerializable(state.claudeContents);
+        persistedPayload = {
+            messages: cloneSerializable(state.messages),
+            geminiContents: cloneSerializable(state.geminiContents),
+            claudeContents: cloneSerializable(state.claudeContents)
+        };
     }
 
-    // 保存到 IndexedDB
+    // 保存到 IndexedDB（消息和元数据原子写入同一事务）
     try {
-        await saveSessionToDB(session);
+        session.messageCount = state.messages.length;
+        const sessionMeta = {
+            id: session.id,
+            name: session.name,
+            apiFormat: session.apiFormat,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+            customName: session.customName,
+            messageCount: session.messageCount,
+        };
+        await saveSessionAtomic(sessionMeta, persistedPayload);
+        state.sessionDirty = false;
     } catch (e) {
         console.error('保存会话到 IndexedDB 失败:', e);
         eventBus.emit('ui:notification', { message: '保存会话失败', type: 'error' });
@@ -362,13 +378,13 @@ export function debouncedSaveSession() {
  */
 export async function createNewSession(shouldSwitch = true) {
     // 检查当前会话是否为空，如果为空则直接复用
+    // v4 架构下 session 是纯元数据，消息在 state.messages 中
     const currentSession = state.sessions.find(s => s.id === state.currentSessionId);
     if (currentSession) {
-        const hasMessages = (currentSession.messages?.length > 0) ||
-                           (currentSession.geminiContents?.length > 0) ||
-                           (currentSession.claudeContents?.length > 0);
+        const hasMessages = state.messages.length > 0 ||
+                           state.geminiContents.length > 0 ||
+                           state.claudeContents.length > 0;
         if (!hasMessages && !currentSession.customName) {
-            // 当前会话为空且没有自定义名称，直接复用
             eventBus.emit('ui:notification', { message: '当前会话为空，无需创建新会话', type: 'info' });
             return currentSession;
         }
@@ -380,13 +396,11 @@ export async function createNewSession(shouldSwitch = true) {
     const newSession = {
         id: generateSessionId(),
         name: '新会话',
-        messages: [],
-        geminiContents: [],
-        claudeContents: [],
-        apiFormat: state.apiFormat, // 继承当前 API 格式
+        apiFormat: state.apiFormat,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         customName: false,
+        messageCount: 0,
     };
 
     state.sessions.unshift(newSession);
@@ -514,14 +528,34 @@ export async function switchToSession(sessionId, saveOld = true, elements = null
             return;
         }
 
-        // 切换会话 - 恢复所有三种格式
+        // 切换会话 - 从 IndexedDB 按需加载消息
         state.currentSessionId = sessionId;
 
-        // 使用安全的状态更新函数替换消息数组
+        // v4: 从 messages store 按需加载（不再从内存中的 session 对象取消息）
+        let msgData = null;
+        try {
+            msgData = await loadSessionMessages(sessionId);
+        } catch (e) {
+            console.error('[Session] 从 IndexedDB 加载消息失败:', e);
+        }
+
+        // 兼容: 如果 messages store 没有数据，尝试从 session 对象中取（v3 未迁移数据）
+        if (!msgData) {
+            if (session._pendingMessages) {
+                msgData = {
+                    messages: session._pendingMessages,
+                    geminiContents: session._pendingGemini || [],
+                    claudeContents: session._pendingClaude || []
+                };
+            } else {
+                msgData = { messages: [], geminiContents: [], claudeContents: [] };
+            }
+        }
+
         replaceAllMessages(
-            session.messages || [],
-            session.geminiContents || [],
-            session.claudeContents || []
+            msgData.messages || [],
+            msgData.geminiContents || [],
+            msgData.claudeContents || []
         );
 
         state.lastUserMessage = null;
@@ -690,11 +724,22 @@ export async function deleteSession(sessionId) {
     const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
     if (sessionIndex === -1) return;
 
+    // 立即取消防抖保存，防止删除后定时器触发 saveSessionAtomic 重建已删除的记录
+    if (saveSessionTimer) {
+        clearTimeout(saveSessionTimer);
+        saveSessionTimer = null;
+    }
+    state.sessionDirty = false;
+
+    // 记录已删除的会话 ID，防止异步保存回写
+    _deletedSessionIds.add(sessionId);
+
     // 从数据库删除
     try {
         await deleteSessionFromDB(sessionId);
     } catch (e) {
         console.error('从数据库删除会话失败:', e);
+        _deletedSessionIds.delete(sessionId);
         eventBus.emit('ui:notification', { message: '删除会话失败', type: 'error' });
         return;
     }
@@ -712,14 +757,13 @@ export async function deleteSession(sessionId) {
     // 从状态中删除
     state.sessions.splice(sessionIndex, 1);
 
-    // 如果删除的是当前会话，切换到其他会话
+    // 如果删除的是当前会话，先清空 currentSessionId 再切换
     if (state.currentSessionId === sessionId) {
+        state.currentSessionId = null;
         if (state.sessions.length > 0) {
-            // 切换到下一个会话（或上一个）
             const nextSession = state.sessions[sessionIndex] || state.sessions[sessionIndex - 1];
             await switchToSession(nextSession.id, false);
         } else {
-            // 没有会话了，创建新会话
             await createNewSession(true);
         }
     }
@@ -748,6 +792,7 @@ export async function renameSession(sessionId, newName) {
 
 // 监听消息变更事件，自动保存会话
 eventBus.on('messages:changed', () => {
+    state.sessionDirty = true;
     debouncedSaveSession();
 });
 

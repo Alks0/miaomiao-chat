@@ -17,12 +17,16 @@ export function buildModelParams(format) {
     switch (format) {
         case 'openai':
         case 'openai-responses':
-            // OpenAI / Responses API：仅添加非空参数
+        case 'openclaw':
+            // OpenAI / Responses / OpenClaw：仅添加非空参数
             if (params.temperature !== null) result.temperature = params.temperature;
             if (params.max_tokens !== null) result.max_tokens = params.max_tokens;
             if (params.top_p !== null) result.top_p = params.top_p;
-            if (params.frequency_penalty !== null) result.frequency_penalty = params.frequency_penalty;
-            if (params.presence_penalty !== null) result.presence_penalty = params.presence_penalty;
+            if (format !== 'openclaw') {
+                // penalty 参数仅 OpenAI 原生格式使用
+                if (params.frequency_penalty !== null) result.frequency_penalty = params.frequency_penalty;
+                if (params.presence_penalty !== null) result.presence_penalty = params.presence_penalty;
+            }
             break;
 
         case 'gemini':
@@ -93,6 +97,13 @@ export function buildThinkingConfig(format, model = '') {
         gemini: { low: 4096, medium: 8192, high: 16384 },
         claude: { low: 2048, medium: 8192, high: 16384 }
     };
+
+    // OpenClaw 透传思维链配置给底层模型
+    if (format === 'openclaw') {
+        if (!state.thinkingEnabled) return null;
+        // 使用通用 budget 模式
+        return { thinking: { budget_tokens: state.thinkingBudget || 8192 } };
+    }
 
     // 处理 OpenAI 特有的 minimal 和 xhigh 值
     let normalizedStrength = state.thinkingStrength;

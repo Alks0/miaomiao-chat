@@ -266,7 +266,8 @@ export function renderReplyWithSelector(replies, selectedIndex, assistantMessage
     }
 
     // 渲染选中的回复内容
-    const reply = replies[selectedIndex];
+    const reply = replies[selectedIndex] || replies[0];
+    if (!reply) return;
     let html = '';
 
     // 检查是否是错误回复
@@ -531,10 +532,31 @@ export function renderThinkingBlock(thinkingContent, isStreaming = false) {
     }).join('');
 }
 
+// 思维链惰性渲染：用 Map 存储原始文本，避免 encodeURIComponent 膨胀 DOM 属性
+const thinkingRawContentMap = new Map(); // thinkingId -> rawText
+let thinkingIdCounter = 0;
+
+/** 清理思维链惰性渲染缓存（会话切换时调用） */
+export function clearThinkingCache() {
+    thinkingRawContentMap.clear();
+}
+
 /**
  * 渲染单个思维链块
  */
 function renderSingleThinkingBlock(content, label, streamingClass = '') {
+    // 流式传输中的思维链需要立即渲染内容
+    const isStreaming = streamingClass.includes('streaming');
+    const contentHtml = isStreaming ? safeMarkedParse(content || '') : '';
+
+    // 折叠状态下不解析 Markdown，存储原始文本到 JS Map 中
+    let lazyAttr = '';
+    if (!isStreaming && content) {
+        const tid = `t_${++thinkingIdCounter}`;
+        thinkingRawContentMap.set(tid, content);
+        lazyAttr = ` data-thinking-id="${tid}"`;
+    }
+
     return `
         <div class="thinking-block collapsed ${streamingClass}">
             <div class="thinking-header"
@@ -552,8 +574,8 @@ function renderSingleThinkingBlock(content, label, streamingClass = '') {
                 <span class="thinking-label">${label}</span>
                 <span class="thinking-toggle-icon" aria-hidden="true">▶</span>
             </div>
-            <div class="thinking-content">
-                ${safeMarkedParse(content || '')}
+            <div class="thinking-content"${lazyAttr}>
+                ${contentHtml}
             </div>
         </div>
     `;
@@ -776,6 +798,18 @@ export function enhanceThinkingBlocks(container = null) {
         const toggleThinking = () => {
             const isCollapsed = block.classList.toggle('collapsed');
             header.setAttribute('aria-expanded', !isCollapsed);
+
+            // 惰性渲染：首次展开时从 Map 取原始文本并解析 Markdown
+            if (!isCollapsed) {
+                const contentDiv = block.querySelector('.thinking-content');
+                const tid = contentDiv?.dataset.thinkingId;
+                if (tid && thinkingRawContentMap.has(tid)) {
+                    contentDiv.innerHTML = safeMarkedParse(thinkingRawContentMap.get(tid));
+                    thinkingRawContentMap.delete(tid); // 释放原始文本
+                    delete contentDiv.dataset.thinkingId;
+                    enhanceCodeBlocks(block);
+                }
+            }
 
             // 更新图标
             const icon = header.querySelector('.thinking-toggle-icon');

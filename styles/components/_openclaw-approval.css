@@ -1,0 +1,150 @@
+/* OpenClaw 审批 toast（右下角卡片，不遮挡聊天） */
+.openclaw-approval-overlay {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.openclaw-approval-modal {
+    pointer-events: auto;
+    background: var(--color-bg-elevated, #fff);
+    border: 1px solid var(--color-border-primary, #e0e0e0);
+    border-radius: 10px;
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+    animation: approvalSlideIn 0.3s ease-out;
+}
+
+@keyframes approvalSlideIn {
+    from { transform: translateX(120px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.openclaw-approval-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border-secondary, #eee);
+}
+
+.openclaw-approval-header h3 {
+    margin: 0;
+    font-size: 14px;
+    flex: 1;
+}
+
+.openclaw-approval-icon {
+    font-size: 16px;
+    color: #ff9800;
+}
+
+.openclaw-approval-countdown-wrap {
+    font-size: 12px;
+    color: var(--color-text-muted, #999);
+    font-variant-numeric: tabular-nums;
+}
+
+.openclaw-approval-body {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.openclaw-approval-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.openclaw-approval-label {
+    min-width: 56px;
+    font-size: 12px;
+    color: var(--color-text-secondary, #888);
+    flex-shrink: 0;
+}
+
+.openclaw-approval-value {
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.openclaw-approval-command {
+    font-size: 12px;
+    background: var(--color-bg-code, #f5f5f5);
+    padding: 3px 6px;
+    border-radius: 3px;
+    word-break: break-all;
+    display: block;
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.openclaw-approval-risk {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.openclaw-approval-actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--color-border-secondary, #eee);
+    justify-content: flex-end;
+}
+
+.openclaw-approval-btn {
+    padding: 6px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    min-height: 32px;
+}
+
+.openclaw-approval-btn:hover {
+    opacity: 0.85;
+}
+
+.openclaw-approval-btn.approve {
+    background: var(--md-teal, #14b8a6);
+    color: #fff;
+}
+
+.openclaw-approval-btn.reject {
+    background: transparent;
+    color: var(--color-text-primary, #333);
+    border: 1px solid var(--color-border-secondary, #ddd);
+}
+
+/* 移动端：全宽底部 toast */
+@media (max-width: 768px) {
+    .openclaw-approval-overlay {
+        bottom: 0;
+        right: 0;
+        left: 0;
+    }
+
+    .openclaw-approval-modal {
+        width: 100%;
+        max-width: none;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .openclaw-approval-btn {
+        min-height: 44px;
+        padding: 10px 24px;
+        font-size: 14px;
+    }
+
+    .openclaw-approval-actions {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+}

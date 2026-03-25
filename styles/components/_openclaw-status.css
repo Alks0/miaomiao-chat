@@ -1,0 +1,59 @@
+/* OpenClaw 连接状态条 */
+.openclaw-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 20px;
+    background: var(--color-bg-accent);
+    color: var(--color-text-inverse);
+    font-size: 12px;
+    flex-shrink: 0;
+    z-index: var(--z-sticky);
+}
+
+.openclaw-sb-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--md-teal, #14b8a6);
+    animation: openclaw-pulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+.openclaw-sb-text {
+    flex: 1;
+    opacity: 0.8;
+}
+
+.openclaw-sb-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: inherit;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    transition: background 0.15s;
+    min-height: 24px;
+}
+
+.openclaw-sb-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* 移动端 */
+@media (max-width: 768px) {
+    .openclaw-status-bar {
+        padding: 3px 12px;
+        font-size: 11px;
+    }
+
+    .openclaw-sb-btn {
+        min-width: 44px;
+        min-height: 44px;
+        justify-content: center;
+    }
+}

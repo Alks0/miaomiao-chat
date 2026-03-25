@@ -21,7 +21,7 @@ import {
 import { safeValidate } from '../tools/validator.js';
 import { executeTool } from '../tools/executor.js';
 import { getToolHistory, clearToolHistory } from '../tools/history.js';
-import { saveCurrentSessionMessages } from '../state/sessions.js';
+import { debouncedSaveSession } from '../state/sessions.js';
 import { showNotification } from './notifications.js';
 import { showConfirmDialog } from '../utils/dialogs.js';
 import { getIcon } from '../utils/icons.js';
@@ -676,7 +676,7 @@ async function handleDeleteTool() {
     if (!confirmed) return;
 
     removeTool(selectedToolId);
-    saveCurrentSessionMessages();
+    debouncedSaveSession();
 
     showNotification(`已删除工具: ${tool.name}`, 'success');
     showEmptyState();
@@ -768,7 +768,7 @@ async function handleSaveTool() {
             id: selectedToolId,
             ...toolConfig
         });
-        saveCurrentSessionMessages();
+        debouncedSaveSession();
 
         showNotification('工具已保存', 'success');
         isEditing = false;

@@ -28,7 +28,7 @@
 
 import { state } from '../core/state.js';
 import { eventBus } from '../core/events.js';
-import { saveCurrentSessionMessages } from '../state/sessions.js';
+import { debouncedSaveSession } from '../state/sessions.js';
 
 /**
  * 检查工具是否有执行权限
@@ -329,7 +329,7 @@ export function setBlacklist(tools, replace = false) {
  * 保存权限配置到 IndexedDB
  */
 function savePermissions() {
-    saveCurrentSessionMessages();
+    debouncedSaveSession();
 }
 
 console.log('[Permissions] 🔒 工具权限管理模块已加载');

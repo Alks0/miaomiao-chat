@@ -5,7 +5,7 @@
 
 import { state, elements } from '../core/state.js';
 import { eventBus } from '../core/events.js';
-import { saveCurrentSessionMessages } from '../state/sessions.js';
+import { debouncedSaveSession } from '../state/sessions.js';
 import { safeMarkedParse } from '../utils/markdown.js';
 import { renderThinkingBlock, enhanceCodeBlocks, renderContentParts } from './renderer.js';
 import { renderHumanizedError } from '../utils/errors.js';
@@ -97,6 +97,7 @@ export function selectReply(replyIndex, messageIndex = null) {
             state.messages[messageIndex].selectedReplyIndex = replyIndex;
             state.messages[messageIndex].content = textContent;
             state.messages[messageIndex].thinkingContent = reply.thinkingContent || null;
+            state.messages[messageIndex].contentParts = reply.contentParts || null;
         }
 
         // 更新 Gemini 格式
@@ -121,7 +122,7 @@ export function selectReply(replyIndex, messageIndex = null) {
             state.claudeContents[messageIndex].content = reply.claudeContent || [{ type: 'text', text: textContent }];
         }
 
-        saveCurrentSessionMessages();
+        debouncedSaveSession();
     } else {
         state.selectedReplyIndex = replyIndex;
         updateMessageHistoryWithSelectedReply();
@@ -268,7 +269,7 @@ function updateMessageHistoryWithSelectedReply() {
         }
     }
 
-    saveCurrentSessionMessages();
+    debouncedSaveSession();
 }
 
 /**

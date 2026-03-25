@@ -7,16 +7,17 @@ import { eventBus } from '../core/events.js';
 
 // IndexedDB 配置
 const DB_NAME = 'GeminiChatDB';
-const DB_VERSION = 3;  // 升级到版本 3（添加 MCP 服务器存储）
+const DB_VERSION = 4;  // 升级到版本 4（消息分离存储）
 const STORE_NAME = 'sessions';
 
-// 新增：对象存储名称常量
+// 对象存储名称常量
 const STORES = {
     SESSIONS: 'sessions',
     CONFIG: 'config',
     PREFERENCES: 'preferences',
     QUICK_MESSAGES: 'quickMessages',
-    MCP_SERVERS: 'mcpServers'  // 版本 3 新增
+    MCP_SERVERS: 'mcpServers',
+    MESSAGES: 'messages'  // 版本 4 新增：消息独立存储
 };
 
 let db = null;
@@ -232,6 +233,15 @@ export function initDB() {
                     console.log('创建对象存储: mcpServers');
                 }
             }
+
+            // 版本 4: 消息分离存储（从 session 中提取消息到独立 store）
+            if (oldVersion < 4) {
+                if (!database.objectStoreNames.contains(STORES.MESSAGES)) {
+                    const msgStore = database.createObjectStore(STORES.MESSAGES, { keyPath: 'sessionId' });
+                    console.log('创建对象存储: messages');
+                }
+                // 数据迁移在 onupgradeneeded 完成后由 migrateSessionsToV4 执行
+            }
         };
     });
 }
@@ -298,8 +308,29 @@ export async function loadAllSessionsFromDB() {
         const request = store.getAll();
 
         request.onsuccess = () => {
+            // v4+: sessions store 只包含元数据，直接返回
+            // v3 兼容: 如果 session 还包含消息数据（尚未迁移），剥离后返回
+            const sessions = request.result.map(s => {
+                if (s.messages) {
+                    // 未迁移的 v3 数据，返回元数据视图（不修改原始对象）
+                    return {
+                        id: s.id,
+                        name: s.name,
+                        apiFormat: s.apiFormat,
+                        createdAt: s.createdAt,
+                        updatedAt: s.updatedAt,
+                        customName: s.customName || false,
+                        messageCount: (s.messages || []).length,
+                        // 临时保留消息引用（v4 迁移前需要）
+                        _pendingMessages: s.messages,
+                        _pendingGemini: s.geminiContents,
+                        _pendingClaude: s.claudeContents
+                    };
+                }
+                return s;
+            });
             // 按更新时间排序，最新的在前
-            const sessions = request.result.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            sessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
             resolve(sessions);
         };
         request.onerror = () => {
@@ -320,16 +351,184 @@ export async function deleteSessionFromDB(sessionId) {
         if (!db) throw new Error('数据库未初始化且重连失败');
     }
     return new Promise((resolve, reject) => {
+        // 级联删除：同时删除 session 和对应的 messages
+        const storeNames = [STORE_NAME];
+        if (hasMessagesStore()) storeNames.push(STORES.MESSAGES);
 
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.delete(sessionId);
+        const transaction = db.transaction(storeNames, 'readwrite');
+        transaction.objectStore(STORE_NAME).delete(sessionId);
+        if (hasMessagesStore()) {
+            transaction.objectStore(STORES.MESSAGES).delete(sessionId);
+        }
 
-        request.onsuccess = () => resolve();
-        request.onerror = () => {
-            console.error('删除会话失败:', request.error);
-            reject(request.error);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => {
+            console.error('删除会话失败:', transaction.error);
+            reject(transaction.error);
         };
+    });
+}
+
+// ========== 消息分离存储 CRUD（v4） ==========
+
+/**
+ * 保存会话消息到独立的 messages store
+ */
+export async function saveSessionMessages(sessionId, data) {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.MESSAGES], 'readwrite');
+        const store = transaction.objectStore(STORES.MESSAGES);
+        store.put({ sessionId, messages: data.messages, geminiContents: data.geminiContents, claudeContents: data.claudeContents });
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => {
+            const error = transaction.error;
+            if (error && (error.name === 'QuotaExceededError' || error.message?.includes('quota'))) {
+                eventBus.emit('storage:quota-exceeded', { message: '存储空间不足！' });
+            }
+            reject(error);
+        };
+    });
+}
+
+/**
+ * 原子保存会话元数据 + 消息（单事务，两个 store）
+ */
+export async function saveSessionAtomic(sessionMeta, messagesData) {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME, STORES.MESSAGES], 'readwrite');
+        // 写 messages store
+        transaction.objectStore(STORES.MESSAGES).put({
+            sessionId: sessionMeta.id,
+            messages: messagesData.messages,
+            geminiContents: messagesData.geminiContents,
+            claudeContents: messagesData.claudeContents
+        });
+        // 写 sessions store（仅元数据）
+        transaction.objectStore(STORE_NAME).put(sessionMeta);
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => {
+            const error = transaction.error;
+            if (error && (error.name === 'QuotaExceededError' || error.message?.includes('quota'))) {
+                eventBus.emit('storage:quota-exceeded', { message: '存储空间不足！' });
+            }
+            reject(error);
+        };
+    });
+}
+
+/**
+ * 从 messages store 加载指定会话的消息
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<Object|null>} { messages, geminiContents, claudeContents } 或 null
+ */
+export async function loadSessionMessages(sessionId) {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.MESSAGES], 'readonly');
+        const store = transaction.objectStore(STORES.MESSAGES);
+        const request = store.get(sessionId);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * 删除指定会话的消息数据
+ * @param {string} sessionId - 会话 ID
+ */
+export async function deleteSessionMessages(sessionId) {
+    if (!db) {
+        try { await initDB(); } catch (_) { /* ignore */ }
+        if (!db) throw new Error('数据库未初始化且重连失败');
+    }
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.MESSAGES], 'readwrite');
+        const store = transaction.objectStore(STORES.MESSAGES);
+        const request = store.delete(sessionId);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * 检查 messages store 是否存在（v4 迁移是否完成）
+ */
+function hasMessagesStore() {
+    return db && db.objectStoreNames.contains(STORES.MESSAGES);
+}
+
+/**
+ * v4 数据迁移：将 sessions store 中嵌入的消息提取到 messages store
+ * 在 initDB 成功后调用
+ */
+export async function migrateSessionsToV4() {
+    if (!db || !hasMessagesStore()) return;
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.SESSIONS, STORES.MESSAGES], 'readwrite');
+        const sessionsStore = transaction.objectStore(STORES.SESSIONS);
+        const messagesStore = transaction.objectStore(STORES.MESSAGES);
+
+        const request = sessionsStore.openCursor();
+        let migratedCount = 0;
+
+        request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (!cursor) {
+                if (migratedCount > 0) {
+                    console.log(`[v4 迁移] 完成，迁移了 ${migratedCount} 个会话的消息`);
+                }
+                resolve(migratedCount);
+                return;
+            }
+
+            const session = cursor.value;
+
+            // 只迁移还包含消息数据的 session
+            if (session.messages && session.messages.length > 0) {
+                // 写入 messages store
+                messagesStore.put({
+                    sessionId: session.id,
+                    messages: session.messages,
+                    geminiContents: session.geminiContents || [],
+                    claudeContents: session.claudeContents || []
+                });
+
+                // 从 session 中移除消息，只保留元数据
+                const metaSession = {
+                    id: session.id,
+                    name: session.name,
+                    apiFormat: session.apiFormat,
+                    createdAt: session.createdAt,
+                    updatedAt: session.updatedAt,
+                    customName: session.customName || false,
+                    messageCount: (session.messages || []).length
+                };
+                cursor.update(metaSession);
+                migratedCount++;
+            } else if (!session.messageCount && session.messageCount !== 0) {
+                // 已迁移但没有 messageCount 字段的 session，补充字段
+                session.messageCount = 0;
+                cursor.update(session);
+            }
+
+            cursor.continue();
+        };
+
+        request.onerror = () => reject(request.error);
+        transaction.onerror = () => reject(transaction.error);
     });
 }
 

@@ -320,6 +320,7 @@ export function getToolsForAPI(apiFormat) {
 
     switch (apiFormat) {
         case 'openai':
+        case 'openclaw':  // OpenClaw 使用 OpenAI 格式的工具定义
             return enabledTools.map(convertToOpenAIFormat);
         case 'openai-responses':
             return enabledTools.map(convertToResponsesFormat);
@@ -623,27 +624,31 @@ export function removeTool(toolId) {
  * @param {string} serverId - MCP 服务器 ID
  */
 export async function clearMCPTools(serverId) {
-    // 在清除之前先保存当前状态
-    await saveToolStates();
-
     const mcpTools = Array.from(toolRegistry.values()).filter(
         tool => tool.type === 'mcp' && tool.serverId === serverId
     );
 
+    // 断开时自动禁用该服务器的所有工具
     mcpTools.forEach(tool => {
-        // 从名称索引中移除
+        toolEnabled.set(tool.id, false);
+    });
+
+    // 保存禁用状态
+    await saveToolStates();
+
+    mcpTools.forEach(tool => {
         if (tool.name) {
             removeFromNameIndex(tool.name, tool.id);
         }
-
         toolRegistry.delete(tool.id);
         toolHandlers.delete(tool.id);
         toolTypes.delete(tool.id);
-        // 保留 toolEnabled 中的状态，这样重连时可以恢复
-        // toolEnabled.delete(tool.id);
     });
 
-    console.log(`[Tools] 已清空 MCP 服务器 "${serverId}" 的 ${mcpTools.length} 个工具（状态已保存）`);
+    console.log(`[Tools] 已清空并禁用 MCP 服务器 "${serverId}" 的 ${mcpTools.length} 个工具`);
+
+    // 通知 UI 刷新工具列表
+    eventBus.emit('tool:enabled:changed', {});
 }
 
 // ========== 统计信息 ==========
@@ -771,8 +776,21 @@ export async function syncMCPTools(serverId) {
         console.error('[Tools] 恢复 MCP 工具状态失败:', error);
     }
 
-    // 无论是否恢复了额外状态，都触发事件确保 UI 更新
-    // 因为工具的初始状态可能在 registerMCPTool 中已经设置
+    // 自动启用该服务器的所有工具（连接即可用）
+    let autoEnabledCount = 0;
+    for (const tool of mcpTools) {
+        const toolId = `${serverId}__${tool.name}`;
+        if (toolEnabled.get(toolId) !== true) {
+            toolEnabled.set(toolId, true);
+            autoEnabledCount++;
+        }
+    }
+    if (autoEnabledCount > 0) {
+        console.log(`[Tools] 自动启用 ${autoEnabledCount} 个 MCP 工具 (${serverId})`);
+        await saveToolStates();
+    }
+
+    // 触发事件确保 UI 更新
     eventBus.emit('tool:enabled:changed', {});
 }
 

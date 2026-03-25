@@ -51,11 +51,22 @@ function bindSearchEvents() {
         }
     });
 
-    // 监听会话列表更新，如果有搜索则重新过滤
+    // 监听会话列表更新，刷新当前会话的搜索缓存
     eventBus.on('sessions:updated', () => {
+        buildSearchCacheForCurrentSession(); // 覆盖旧缓存
         if (currentQuery) {
             performSearch(currentQuery);
         }
+    });
+
+    // 切换离开前：为当前会话快照搜索缓存（之后消息从内存释放）
+    eventBus.on('session:before-switch', () => {
+        buildSearchCacheForCurrentSession();
+    });
+
+    // 切换完成后：为新会话构建搜索缓存
+    eventBus.on('session:switched', () => {
+        buildSearchCacheForCurrentSession();
     });
 }
 
@@ -99,6 +110,59 @@ function performSearch(query) {
  * @param {string} query - 搜索关键词
  * @returns {Array} 匹配的会话数组（增强版，包含匹配消息信息）
  */
+// 搜索文本缓存：sessionId -> { text, messages } （避免每次搜索都遍历消息数组）
+const searchTextCache = new Map();
+
+/**
+ * 获取会话的搜索文本（优先缓存，否则从当前 state 或 IndexedDB 加载）
+ */
+function getSearchableMessages(session) {
+    // 当前会话：直接从 state 取
+    if (session.id === state.currentSessionId) {
+        const messages = state.apiFormat === 'gemini' ? state.geminiContents : state.messages;
+        return { messages, format: state.apiFormat };
+    }
+    // 非当前会话：使用缓存的搜索文本
+    const cached = searchTextCache.get(session.id);
+    if (cached) return cached;
+    // 没有缓存——无法同步搜索非当前会话的消息内容
+    // 返回空（只搜名称）
+    return { messages: [], format: session.apiFormat || 'openai' };
+}
+
+/**
+ * 为当前会话构建搜索缓存
+ */
+export function buildSearchCacheForCurrentSession() {
+    if (!state.currentSessionId) return;
+    const format = state.apiFormat;
+    let messages;
+    switch (format) {
+        case 'gemini': messages = state.geminiContents; break;
+        case 'claude': messages = state.claudeContents; break;
+        default: messages = state.messages;
+    }
+    // 提取所有消息文本用于搜索
+    const extracted = messages.map((msg, index) => ({
+        text: extractMessageText(msg, format),
+        role: msg.role || 'unknown',
+        id: msg.id || `msg_${index}`,
+        index
+    }));
+    searchTextCache.set(state.currentSessionId, { messages: extracted, format });
+}
+
+/**
+ * 清除指定会话的搜索缓存
+ */
+export function clearSearchCache(sessionId) {
+    if (sessionId) {
+        searchTextCache.delete(sessionId);
+    } else {
+        searchTextCache.clear();
+    }
+}
+
 export function searchSessions(query) {
     if (!query || query.trim() === '') {
         return state.sessions.map(s => ({ session: s, matchedMessages: [] }));
@@ -110,66 +174,43 @@ export function searchSessions(query) {
     for (const session of state.sessions) {
         let matchCount = 0;
         let matchedInName = false;
-        const matchedMessages = []; // 存储匹配的消息信息
+        const matchedMessages = [];
 
         // 1. 搜索会话名称
-        if (session.name.toLowerCase().includes(lowerQuery)) {
-            matchCount += 10; // 名称匹配权重更高
+        if (session.name && session.name.toLowerCase().includes(lowerQuery)) {
+            matchCount += 10;
             matchedInName = true;
         }
 
-        // 2. 搜索所有消息内容
-        const messagesToSearch = session.messages || [];
-        const geminiToSearch = session.geminiContents || [];
-        const claudeToSearch = session.claudeContents || [];
+        // 2. 搜索消息内容
+        const searchData = getSearchableMessages(session);
+        const messagesArray = searchData.messages || [];
+        const format = searchData.format || session.apiFormat || 'openai';
 
-        // 根据会话的 apiFormat 选择对应的消息数组
-        let messagesArray = [];
-        switch (session.apiFormat) {
-            case 'gemini':
-                messagesArray = geminiToSearch;
-                break;
-            case 'claude':
-                messagesArray = claudeToSearch;
-                break;
-            default: // 'openai'
-                messagesArray = messagesToSearch;
-        }
-
-        // 遍历消息，找出所有匹配的
-        messagesArray.forEach((msg, index) => {
-            const text = extractMessageText(msg, session.apiFormat);
+        // 如果是预提取的缓存格式
+        messagesArray.forEach((item, idx) => {
+            const text = item.text !== undefined ? item.text : extractMessageText(item, format);
             const lowerText = text.toLowerCase();
 
             if (lowerText.includes(lowerQuery)) {
                 matchCount++;
 
-                // 提取匹配的上下文（前后各50个字符）
                 const matchIndex = lowerText.indexOf(lowerQuery);
                 const contextStart = Math.max(0, matchIndex - 50);
                 const contextEnd = Math.min(text.length, matchIndex + lowerQuery.length + 50);
                 let preview = text.slice(contextStart, contextEnd);
-
-                // 添加省略号
                 if (contextStart > 0) preview = '...' + preview;
                 if (contextEnd < text.length) preview = preview + '...';
 
-                // 获取消息角色
-                let role = 'unknown';
-                if (session.apiFormat === 'openai' || session.apiFormat === 'openai-responses') {
-                    role = msg.role || 'unknown';
-                } else if (session.apiFormat === 'gemini') {
-                    role = msg.role || 'unknown';
-                } else if (session.apiFormat === 'claude') {
-                    role = msg.role || 'unknown';
-                }
+                const role = item.role || item.role || 'unknown';
+                const index = item.index !== undefined ? item.index : idx;
 
                 matchedMessages.push({
-                    index,           // 消息索引
-                    messageId: msg.id || `msg_${index}`, // 消息ID
-                    role,            // 角色
-                    preview,         // 预览文本
-                    fullText: text   // 完整文本（用于后续高亮）
+                    index,
+                    messageId: item.id || `msg_${index}`,
+                    role,
+                    preview,
+                    fullText: text
                 });
             }
         });
@@ -179,12 +220,11 @@ export function searchSessions(query) {
                 session,
                 matchCount,
                 matchedInName,
-                matchedMessages: matchedMessages.slice(0, 3) // 只保留前3条匹配消息
+                matchedMessages: matchedMessages.slice(0, 3)
             });
         }
     }
 
-    // 按相关性排序：名称匹配 > 匹配次数
     results.sort((a, b) => {
         if (a.matchedInName && !b.matchedInName) return -1;
         if (!a.matchedInName && b.matchedInName) return 1;
@@ -206,6 +246,7 @@ function extractMessageText(message, format) {
     switch (format) {
         case 'openai':
         case 'openai-responses':  // Responses API 消息格式与 OpenAI 相同
+        case 'openclaw':          // OpenClaw 使用 OpenAI 格式存储
             // OpenAI 格式：content 可以是字符串或数组
             if (typeof message.content === 'string') {
                 return message.content;

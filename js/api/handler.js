@@ -11,6 +11,7 @@ import { getCurrentProvider, getActiveApiKey, rotateToNextKey } from '../provide
 import { parseOpenAIStream } from '../stream/parser-openai.js';
 import { parseClaudeStream } from '../stream/parser-claude.js';
 import { parseGeminiStream } from '../stream/parser-gemini.js';
+import { handleOpenClawStream } from '../stream/parser-openclaw.js';
 import { resetStreamStats, finalizeStreamStats, getCurrentStreamStatsData, appendStreamStats } from '../stream/stats.js';
 import { saveErrorMessage, saveAssistantMessage } from '../messages/sync.js';
 import { setCurrentMessageIndex } from '../messages/dom-sync.js';
@@ -47,6 +48,7 @@ export function getCurrentEndpoint() {
         'openai-responses': 'https://api.openai.com/v1/responses',
         gemini: 'https://generativelanguage.googleapis.com',
         claude: 'https://api.anthropic.com/v1/messages',
+        openclaw: 'ws://localhost:18789',
     };
 
     const endpoint = defaultEndpoints[format] || '';
@@ -174,13 +176,19 @@ function createAssistantMessagePlaceholder() {
  * @param {string} sessionId - 请求发起时的会话ID
  */
 async function handleStreamResponse(response, abortController, sessionId) {
+    // 使用提供商的原始 apiFormat 选择解析器（响应格式由提供商格式决定）
+    const provider = getCurrentProvider();
+    const responseFormat = provider?.apiFormat || 'openai';
+
+    // OpenClaw 使用 WebSocket，不需要 reader
+    if (responseFormat === 'openclaw') {
+        await handleOpenClawStream(sessionId);
+        return;
+    }
+
     const reader = response.body.getReader();
 
     try {
-        // 使用提供商的原始 apiFormat 选择解析器（响应格式由提供商格式决定）
-        const provider = getCurrentProvider();
-        const responseFormat = provider?.apiFormat || 'openai';
-
         switch (responseFormat) {
             case 'claude':
                 await parseClaudeStream(reader, sessionId);

@@ -35,8 +35,15 @@ export async function autoConnectMCPServers(options = {}) {
         errors: []
     };
 
-    // 按顺序连接每个服务器（避免并发过多）
+    // 按顺序连接每个服务器（跳过用户手动断开的）
     for (const server of state.mcpServers) {
+        // 用户主动断开的服务器不自动重连
+        if (server.enabled === false) {
+            console.log(`[MCP AutoConnect] 跳过已禁用: ${server.name}`);
+            results.total--;
+            continue;
+        }
+
         try {
             console.log(`[MCP AutoConnect] 正在连接: ${server.name} (${server.type})`);
 
@@ -80,8 +87,8 @@ export async function autoConnectMCPServers(options = {}) {
         }
     }
 
-    // 显示汇总通知
-    if (showNotifications) {
+    // 显示汇总通知（没有需要连接的服务器时不弹窗）
+    if (showNotifications && results.total > 0) {
         if (results.connected === results.total) {
             showNotification(
                 `✅ 成功连接所有 ${results.total} 个 MCP 服务器`,

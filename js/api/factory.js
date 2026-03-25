@@ -6,6 +6,7 @@
 import { sendOpenAIRequest } from './openai.js';
 import { sendGeminiRequest } from './gemini.js';
 import { sendClaudeRequest } from './claude.js';
+import { sendOpenClawRequest } from './openclaw.js';
 
 /**
  * 根据 API 格式获取对应的发送函数
@@ -18,6 +19,7 @@ export function getSendFunction(format) {
         'openai-responses': sendOpenAIRequest,  // Responses API 使用相同的函数
         gemini: sendGeminiRequest,
         claude: sendClaudeRequest,
+        openclaw: sendOpenClawRequest,
     };
 
     const sender = senders[format];

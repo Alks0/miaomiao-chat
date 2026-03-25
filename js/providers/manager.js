@@ -681,7 +681,8 @@ function getDefaultEndpoint(apiFormat) {
         openai: 'https://api.openai.com',
         'openai-responses': 'https://api.openai.com/v1/responses',
         gemini: 'https://generativelanguage.googleapis.com',
-        claude: 'https://api.anthropic.com'
+        claude: 'https://api.anthropic.com',
+        openclaw: 'ws://localhost:18789'
     };
     return defaults[apiFormat] || '';
 }
@@ -696,7 +697,8 @@ function getDefaultProviderName(format) {
         openai: 'OpenAI',
         'openai-responses': 'OpenAI Responses',
         gemini: 'Google Gemini',
-        claude: 'Anthropic Claude'
+        claude: 'Anthropic Claude',
+        openclaw: 'OpenClaw'
     };
     return names[format] || format;
 }
@@ -902,7 +904,26 @@ async function fetchModelsFromAPI(provider) {
     let allModels = [];
 
     try {
-        if (apiFormat === 'gemini') {
+        if (apiFormat === 'openclaw') {
+            // OpenClaw 通过 WebSocket 获取模型列表
+            try {
+                const { openclawClient } = await import('../api/openclaw.js');
+                if (!openclawClient.connected) {
+                    const result = await openclawClient.connect(endpoint, apiKey);
+                    if (!result.success) throw new Error(result.error);
+                }
+                const result = await openclawClient.send('models.list');
+                const models = Array.isArray(result) ? result : (result?.models || []);
+                return models.map(m => ({
+                    id: typeof m === 'string' ? m : m.id,
+                    name: typeof m === 'string' ? m : (m.name || m.id),
+                    capabilities: getDefaultCapabilities('openai')
+                }));
+            } catch (e) {
+                console.warn('[OpenClaw] 获取模型列表失败:', e.message);
+                return [];
+            }
+        } else if (apiFormat === 'gemini') {
             // Gemini API 格式 - 支持分页获取所有模型
             const baseModelsEndpoint = `${endpoint.replace(/\/$/, '')}/v1beta/models`;
             console.log('Fetching Gemini models from:', baseModelsEndpoint);

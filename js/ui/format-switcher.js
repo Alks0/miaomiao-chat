@@ -16,7 +16,7 @@ import { convertFromOpenAI, convertFromGemini, convertFromClaude } from '../mess
  */
 export function setApiFormat(format, shouldFetchModels = true) {
     // 验证格式有效性（支持 openai-responses）
-    if (!['openai', 'openai-responses', 'gemini', 'claude'].includes(format)) {
+    if (!['openai', 'openai-responses', 'gemini', 'claude', 'openclaw'].includes(format)) {
         console.warn(`无效的 API 格式: ${format}`);
         return;
     }
@@ -73,7 +73,8 @@ export function setApiFormat(format, shouldFetchModels = true) {
         openai: 'API 端点 (如: http://localhost:8000/v1/chat/completions)',
         'openai-responses': 'API 端点 (如: https://api.openai.com/v1/responses)',
         gemini: 'API 端点 (如: https://generativelanguage.googleapis.com)',
-        claude: 'API 端点 (如: https://api.anthropic.com/v1/messages)'
+        claude: 'API 端点 (如: https://api.anthropic.com/v1/messages)',
+        openclaw: 'WebSocket 地址 (如: ws://localhost:18789)'
     };
     if (elements.apiEndpoint) {
         elements.apiEndpoint.placeholder = placeholders[format] || placeholders.openai;

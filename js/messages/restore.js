@@ -4,12 +4,12 @@
  */
 
 import { state, elements } from '../core/state.js';
-import { createMessageElement, renderThinkingBlock, renderReplyWithSelector, enhanceCodeBlocks, renderContentParts, bindImageClickEvents } from './renderer.js';
+import { createMessageElement, renderThinkingBlock, renderReplyWithSelector, enhanceCodeBlocks, renderContentParts, bindImageClickEvents, clearThinkingCache } from './renderer.js';
 import { safeMarkedParse } from '../utils/markdown.js';
 import { renderStreamStatsFromData } from '../stream/stats.js';
 import { generateMessageId } from '../utils/helpers.js';
 import { rebuildMessageIdMap } from '../core/state-mutations.js';
-import { initVirtualScroll } from '../ui/virtual-scroll.js';
+import { initVirtualScroll, disableVirtualScroll } from '../ui/virtual-scroll.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { restoreToolCallsGroup } from '../ui/tool-display.js';  // 工具UI恢复
 import { categorizeFile } from '../utils/file-helpers.js';
@@ -26,7 +26,8 @@ function parseGeminiUserContent(parts) {
 
     if (Array.isArray(parts)) {
         parts.forEach(part => {
-            if (part.text) {
+            if (part.text && !part.thought) {
+                // 过滤掉思维链 parts（thought: true），只提取正文
                 text += (text ? '\n' : '') + part.text;
             } else if (part.inlineData || part.inline_data) {
                 const inlineData = part.inlineData || part.inline_data;
@@ -117,6 +118,12 @@ function parseUserContent(content) {
  * 渲染会话消息
  */
 export function renderSessionMessages() {
+    // 清理旧的虚拟滚动状态（修复会话切换时 listener 泄漏和状态残留）
+    disableVirtualScroll();
+
+    // 清理思维链惰性渲染缓存（防止跨会话内存泄漏）
+    clearThinkingCache();
+
     // 清空消息区域
     elements.messagesArea.innerHTML = '';
 
@@ -158,6 +165,7 @@ export function renderSessionMessages() {
     // 性能优化：使用 DocumentFragment 批量插入，避免频繁 reflow
     const fragment = document.createDocumentFragment();
     const enhancementQueue = []; // 增强操作队列（异步执行）
+    let idsGenerated = false; // 追踪是否有旧消息补充了ID
 
     // 渲染所有消息
     if (state.apiFormat === 'gemini') {
@@ -169,9 +177,9 @@ export function renderSessionMessages() {
             // 确保消息有唯一ID（为旧消息生成ID）
             if (!msg.id) {
                 msg.id = generateMessageId();
-                // 同步到其他格式
                 if (openaiMsg) openaiMsg.id = msg.id;
                 if (state.claudeContents[index]) state.claudeContents[index].id = msg.id;
+                idsGenerated = true;
             }
 
             const messageEl = createMessageElement(role, text, images.length > 0 ? images : null, msg.id, openaiMsg?.modelName, openaiMsg?.providerName);
@@ -216,9 +224,9 @@ export function renderSessionMessages() {
             // 确保消息有唯一ID（为旧消息生成ID）
             if (!msg.id) {
                 msg.id = generateMessageId();
-                // 同步到其他格式
                 if (state.geminiContents[index]) state.geminiContents[index].id = msg.id;
                 if (state.claudeContents[index]) state.claudeContents[index].id = msg.id;
+                idsGenerated = true;
             }
 
             const messageEl = createMessageElement(msg.role, text, images.length > 0 ? images : null, msg.id, msg.modelName, msg.providerName);
@@ -261,17 +269,20 @@ export function renderSessionMessages() {
     // 一次性插入所有消息（只触发一次 reflow）
     elements.messagesArea.appendChild(fragment);
 
-    // 异步增强消息（不阻塞 UI）
-    if (enhancementQueue.length > 0) {
-        requestIdleCallback(() => {
-            enhancementQueue.forEach(({ messageEl, msg, openaiMsg }) => {
-                enhanceAssistantMessage(messageEl, msg, openaiMsg);
-            });
-        }, { timeout: 2000 }); // 2秒超时，确保即使在繁忙时也能完成
+    // Render assistant enhancements immediately on restore.
+    for (let idx = 0; idx < enhancementQueue.length; idx++) {
+        const { messageEl, msg, openaiMsg } = enhancementQueue[idx];
+        try {
+            enhanceAssistantMessage(messageEl, msg, openaiMsg);
+        } catch (e) {
+            console.error('[Restore] 消息增强失败 (index:', idx, '):', e);
+        }
     }
 
-    // 重建 messageIdMap（确保索引映射正确）
-    rebuildMessageIdMap();
+    // 仅在有旧消息补充了ID时才重建（replaceAllMessages已经重建过一次）
+    if (idsGenerated) {
+        rebuildMessageIdMap();
+    }
 
     // 观察所有懒加载图片
     requestIdleCallback(() => {
@@ -340,15 +351,27 @@ function enhanceAssistantMessage(_messageEl, msg, openaiMsg) {
         let contentRendered = false;  // 跟踪是否成功渲染了内容
 
         // 1. 先渲染思维链（如果有）
-        if (openaiMsg.thinkingContent) {
-            html += renderThinkingBlock(openaiMsg.thinkingContent);
+        // 优先从 OpenAI 格式取，回退到 Gemini parts 中的 thought:true
+        let thinkingText = openaiMsg.thinkingContent || '';
+        if (!thinkingText && msg?.parts && Array.isArray(msg.parts)) {
+            thinkingText = msg.parts
+                .filter(p => p.text && p.thought)
+                .map(p => p.text)
+                .join('');
+        }
+        if (thinkingText) {
+            html += renderThinkingBlock(thinkingText);
+            // 回写到 OpenAI 格式，确保编辑器能正确读取
+            if (!openaiMsg.thinkingContent && thinkingText) {
+                openaiMsg.thinkingContent = thinkingText;
+            }
         }
 
         // 2. 优先渲染 contentParts（text, image）
         if (openaiMsg.contentParts && openaiMsg.contentParts.length > 0) {
-            // 过滤掉占位符和 thinking 类型（thinking 已经在上面单独渲染过了）
+            // 过滤占位符；只有当步骤1已渲染了thinking时才过滤thinking类型
             const validContentParts = openaiMsg.contentParts.filter(
-                p => !(p.type === 'text' && p.text === '(调用工具)') && p.type !== 'thinking'
+                p => !(p.type === 'text' && p.text === '(调用工具)') && (thinkingText ? p.type !== 'thinking' : true)
             );
 
             if (validContentParts.length > 0) {

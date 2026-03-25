@@ -12,7 +12,7 @@ import { sessionToMarkdown } from '../messages/converters.js';
 import { getIcon } from '../utils/icons.js';
 import { showNotification } from './notifications.js';
 // 新增：IndexedDB 偏好设置 API
-import { savePreference, loadPreference } from '../state/storage.js';
+import { savePreference, loadPreference, loadSessionMessages } from '../state/storage.js';
 // 新增：自定义对话框（替代 Electron 中不支持的 prompt/confirm）
 import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
 
@@ -20,6 +20,45 @@ import { showInputDialog, showConfirmDialog } from '../utils/dialogs.js';
 let _initialized = false;
 let _subscriptions = [];
 let _searchResults = null; // 搜索结果（包含匹配消息信息）
+
+/**
+ * 获取用于导出的完整会话数据
+ * v4 之后 state.sessions 里通常只有元数据，需要按需加载 messages store
+ * @param {Object} sessionMeta - 会话元数据
+ * @returns {Promise<Object>} 包含完整消息的会话对象
+ */
+async function getSessionDataForExport(sessionMeta) {
+    if (!sessionMeta) return null;
+
+    // 兼容旧结构：session 对象本身已包含消息
+    if (Array.isArray(sessionMeta.messages)) {
+        return sessionMeta;
+    }
+
+    // 当前激活会话优先使用内存中的实时消息，避免导出到旧快照
+    if (sessionMeta.id === state.currentSessionId) {
+        return {
+            ...sessionMeta,
+            messages: state.messages || [],
+            geminiContents: state.geminiContents || [],
+            claudeContents: state.claudeContents || []
+        };
+    }
+
+    // v4 正常路径：从独立 messages store 读取
+    const messageData = await loadSessionMessages(sessionMeta.id);
+    if (messageData) {
+        return { ...sessionMeta, ...messageData };
+    }
+
+    // 兼容未迁移的 v3 数据
+    return {
+        ...sessionMeta,
+        messages: sessionMeta._pendingMessages || [],
+        geminiContents: sessionMeta._pendingGemini || [],
+        claudeContents: sessionMeta._pendingClaude || []
+    };
+}
 
 /**
  * 焦点陷阱 - 限制焦点在指定元素内
@@ -256,7 +295,11 @@ export function updateSessionList() {
                 exportBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
-                        const markdown = sessionToMarkdown(sessionData);
+                        const exportSession = await getSessionDataForExport(sessionData);
+                        const markdown = sessionToMarkdown(exportSession);
+                        if (!markdown.trim()) {
+                            throw new Error('会话内容为空，无法复制');
+                        }
                         await navigator.clipboard.writeText(markdown);
                         showNotification('会话已作为 Markdown 复制到剪切板', 'success');
                     } catch (err) {

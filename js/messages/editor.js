@@ -13,6 +13,7 @@ import { showConfirmDialog } from '../utils/dialogs.js';
 import { canEditMessage, safeDeleteMessage } from '../tools/message-compat.js';
 import { clearThoughtSignatures, hasThoughtSignatures } from '../api/format-converter.js';  // thoughtSignature 清理
 import { categorizeFile } from '../utils/file-helpers.js';
+import { enhanceCodeBlocks } from './renderer.js';
 
 /**
  * 自动调整文本框高度（通用函数）
@@ -59,6 +60,12 @@ function getMessageIndexById(messageId) {
  * @param {HTMLElement} messageEl - 消息元素
  */
 export function enterEditMode(messageEl) {
+    // 流式响应中禁止编辑
+    if (state.isLoading) {
+        eventBus.emit('ui:notification', { message: '请等待回复完成后再编辑', type: 'warning' });
+        return;
+    }
+
     console.log('[editor.js] enterEditMode 被调用', { messageEl });
     const targetIndex = resolveMessageIndex(messageEl);
     console.log('[editor.js] targetIndex =', targetIndex);
@@ -115,6 +122,12 @@ export function enterEditMode(messageEl) {
  * @param {HTMLElement} messageEl - 消息元素
  */
 export function editMessageInPlace(messageEl) {
+    // 流式响应中禁止编辑
+    if (state.isLoading) {
+        eventBus.emit('ui:notification', { message: '请等待回复完成后再编辑', type: 'warning' });
+        return;
+    }
+
     const index = resolveMessageIndex(messageEl);
     if (index === -1) return;
 
@@ -142,6 +155,13 @@ export function editMessageInPlace(messageEl) {
                 }
             });
         }
+        // Fallback: thinking 可能存在 OpenAI 格式的元数据字段中
+        if (!thinkingContent) {
+            const openaiMsg = state.messages[index];
+            if (openaiMsg?.thinkingContent) {
+                thinkingContent = openaiMsg.thinkingContent;
+            }
+        }
     } else if (state.apiFormat === 'claude') {
         const message = state.claudeContents[index];
         if (message?.content) {
@@ -150,7 +170,7 @@ export function editMessageInPlace(messageEl) {
             } else if (Array.isArray(message.content)) {
                 message.content.forEach(p => {
                     if (p.type === 'thinking' && p.thinking) {
-                        // Claude 思维链部分
+                        // Claude 思维链部分（原生 Claude API 响应）
                         thinkingContent += p.thinking;
                     } else if (p.type === 'text') {
                         textContent += p.text || '';
@@ -159,6 +179,10 @@ export function editMessageInPlace(messageEl) {
                     }
                 });
             }
+        }
+        // Fallback: thinking 可能存在元数据字段而非 content 数组中
+        if (!thinkingContent && message?.thinkingContent) {
+            thinkingContent = message.thinkingContent;
         }
     } else {
         const message = state.messages[index];
@@ -332,6 +356,11 @@ export function editMessageInPlace(messageEl) {
     cancelBtn.onclick = () => {
         contentDiv.innerHTML = originalHTML;
         messageEl.classList.remove('editing');
+        // 恢复 HTML 后事件监听器丢失，清除所有增强标记并重新绑定
+        contentDiv.querySelectorAll('.thinking-header[data-enhanced="true"]').forEach(h => delete h.dataset.enhanced);
+        contentDiv.querySelectorAll('.code-block-enhanced').forEach(el => el.classList.remove('code-block-enhanced'));
+        contentDiv.querySelectorAll('table[data-enhanced="true"]').forEach(t => delete t.dataset.enhanced);
+        enhanceCodeBlocks(contentDiv);
     };
 
     editActions.appendChild(saveBtn);
@@ -363,12 +392,14 @@ export function updateMessageContent(index, newContent, role) {
         } else {
             state.messages[index].content = newContent;
         }
+        clearEditMetadata(state.messages[index]);
     }
 
     // 更新 Gemini 格式
     if (state.geminiContents[index]) {
         const textPart = state.geminiContents[index].parts?.find(p => p.text !== undefined);
         if (textPart) textPart.text = newContent;
+        clearEditMetadata(state.geminiContents[index]);
     }
 
     // 更新 Claude 格式
@@ -379,37 +410,34 @@ export function updateMessageContent(index, newContent, role) {
         } else {
             state.claudeContents[index].content = newContent;
         }
+        clearEditMetadata(state.claudeContents[index]);
     }
 
     // 编辑消息后清除后续 thoughtSignature（所有格式）
-    if (hasThoughtSignatures(state.messages, index + 1)) {
-        const clearedCount = clearThoughtSignatures(state.messages, index + 1);
-
-        // 同时清除其他格式的签名（防止格式切换后残留）
-        if (state.geminiContents[index + 1]) {
-            clearThoughtSignatures(state.geminiContents, index + 1);
-        }
-        if (state.claudeContents[index + 1]) {
-            clearThoughtSignatures(state.claudeContents, index + 1);
-        }
-
-        // 通知用户
-        eventBus.emit('ui:notification', {
-            message: `编辑消息会影响思维链，已清除 ${clearedCount} 个签名。下次对话将重新生成思维链。`,
-            type: 'warning',
-            duration: 5000
-        });
-
-        console.warn('[Message Editor] ⚠️ 编辑历史消息导致后续签名失效', {
-            editedIndex: index,
-            clearedCount
-        });
-    }
+    clearSubsequentSignatures(index);
 
     // 发出事件通知会话保存
     eventBus.emit('messages:changed', {
         action: 'updated',
         index
+    });
+}
+
+/**
+ * 清除编辑消息后续的 thoughtSignature（三种格式统一处理）
+ */
+function clearSubsequentSignatures(index) {
+    if (index >= state.messages.length - 1) return;
+    if (!hasThoughtSignatures(state.messages, index + 1)) return;
+
+    const clearedCount = clearThoughtSignatures(state.messages, index + 1);
+    clearThoughtSignatures(state.geminiContents, index + 1);
+    clearThoughtSignatures(state.claudeContents, index + 1);
+
+    eventBus.emit('ui:notification', {
+        message: `编辑消息会影响思维链，已清除 ${clearedCount} 个签名。下次对话将重新生成思维链。`,
+        type: 'warning',
+        duration: 5000
     });
 }
 
@@ -422,75 +450,37 @@ export function updateMessageContent(index, newContent, role) {
  * @param {string} role - 角色
  */
 export function updateMessageContentWithImages(index, newText, images, role) {
+    const normalized = images.map(normalizeImage).filter(Boolean);
+    const hasImages = normalized.length > 0;
+    const fmt = hasImages ? buildFormatImages(normalized) : null;
+
     // 更新 OpenAI 格式
     if (state.messages[index]) {
-        if (images.length > 0) {
-            // 重建 content 数组：文本 + 图片
-            state.messages[index].content = [
-                { type: 'text', text: newText },
-                ...images
-            ];
-        } else {
-            // 只有文本
-            state.messages[index].content = newText;
-        }
+        state.messages[index].content = hasImages
+            ? [{ type: 'text', text: newText }, ...fmt.openai]
+            : newText;
+        clearEditMetadata(state.messages[index]);
     }
 
     // 更新 Gemini 格式
     if (state.geminiContents[index]) {
-        if (images.length > 0) {
-            state.geminiContents[index].parts = [
-                { text: newText },
-                ...images
-            ];
-        } else {
-            state.geminiContents[index].parts = [{ text: newText }];
-        }
+        state.geminiContents[index].parts = hasImages
+            ? [{ text: newText }, ...fmt.gemini]
+            : [{ text: newText }];
+        clearEditMetadata(state.geminiContents[index]);
     }
 
     // 更新 Claude 格式
     if (state.claudeContents[index]) {
-        if (images.length > 0) {
-            // Claude 格式：图片在前，文本在后
-            state.claudeContents[index].content = [
-                ...images,
-                { type: 'text', text: newText }
-            ];
-        } else {
-            state.claudeContents[index].content = [{ type: 'text', text: newText }];
-        }
+        state.claudeContents[index].content = hasImages
+            ? [...fmt.claude, { type: 'text', text: newText }]
+            : [{ type: 'text', text: newText }];
+        clearEditMetadata(state.claudeContents[index]);
     }
 
-    // 编辑消息后清除后续 thoughtSignature（所有格式）
-    if (hasThoughtSignatures(state.messages, index + 1)) {
-        const clearedCount = clearThoughtSignatures(state.messages, index + 1);
+    clearSubsequentSignatures(index);
 
-        // 同时清除其他格式的签名（防止格式切换后残留）
-        if (state.geminiContents[index + 1]) {
-            clearThoughtSignatures(state.geminiContents, index + 1);
-        }
-        if (state.claudeContents[index + 1]) {
-            clearThoughtSignatures(state.claudeContents, index + 1);
-        }
-
-        // 通知用户
-        eventBus.emit('ui:notification', {
-            message: `编辑消息会影响思维链，已清除 ${clearedCount} 个签名。下次对话将重新生成思维链。`,
-            type: 'warning',
-            duration: 5000
-        });
-
-        console.warn('[Message Editor] ⚠️ 编辑历史消息导致后续签名失效', {
-            editedIndex: index,
-            clearedCount
-        });
-    }
-
-    // 发出事件通知会话保存
-    eventBus.emit('messages:changed', {
-        action: 'updated',
-        index
-    });
+    eventBus.emit('messages:changed', { action: 'updated', index });
 }
 
 /**
@@ -796,6 +786,57 @@ eventBus.on('message:retry-requested', ({ messageEl }) => {
 });
 
 /**
+ * 从任意格式的图片对象中提取 {mimeType, data} 结构
+ * 避免 data URL 字符串的往返拼接/解析
+ */
+function normalizeImage(img) {
+    // OpenAI 格式
+    const url = img.image_url?.url || img.url || (typeof img === 'string' ? img : '');
+    if (url) {
+        const match = url.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) return { mimeType: match[1], data: match[2], dataUrl: url };
+        return { mimeType: '', data: '', dataUrl: url }; // 远程 URL
+    }
+    // Gemini 格式（直接取结构，无需拼字符串）
+    const inlineData = img.inlineData || img.inline_data;
+    if (inlineData) {
+        const mime = inlineData.mimeType || inlineData.mime_type;
+        return { mimeType: mime, data: inlineData.data, dataUrl: `data:${mime};base64,${inlineData.data}` };
+    }
+    // Claude 格式
+    if (img.source?.data) {
+        const mime = img.source.media_type;
+        return { mimeType: mime, data: img.source.data, dataUrl: `data:${mime};base64,${img.source.data}` };
+    }
+    return null;
+}
+
+/**
+ * 将标准化图片数组转为三种格式的内容数组
+ * 消除 updateMessageContentWithImages/updateMessageWithThinking 的重复代码
+ */
+function buildFormatImages(normalizedImages) {
+    const openai = normalizedImages.map(n => ({ type: 'image_url', image_url: { url: n.dataUrl } }));
+    const gemini = normalizedImages
+        .filter(n => n.mimeType && n.data)
+        .map(n => ({ inlineData: { mimeType: n.mimeType, data: n.data } }));
+    const claude = normalizedImages
+        .filter(n => n.mimeType && n.data)
+        .map(n => ({ type: 'image', source: { type: 'base64', media_type: n.mimeType, data: n.data } }));
+    return { openai, gemini, claude };
+}
+
+/**
+ * 清除编辑后不再有效的元数据
+ * @param {boolean} keepContentParts - 为 true 时保留 contentParts（updateMessageWithThinking 自行管理）
+ */
+function clearEditMetadata(msg, keepContentParts = false) {
+    if (!keepContentParts) delete msg.contentParts;
+    delete msg.allReplies;
+    delete msg.selectedReplyIndex;
+}
+
+/**
  * 添加新图片到编辑中的消息
  * 完整的图片管理功能
  * @param {Array} editableImages - 可编辑的图片数组
@@ -907,105 +948,54 @@ function fileToBase64(file) {
  * @param {string} role - 角色
  */
 export function updateMessageWithThinking(index, newText, newThinking, images, role) {
+    const normalized = images.map(normalizeImage).filter(Boolean);
+    const hasImages = normalized.length > 0;
+    const fmt = hasImages ? buildFormatImages(normalized) : null;
+
     // 构建 contentParts（用于渲染）
     const contentParts = [];
-
-    // 添加思维链部分（如果存在）
     if (newThinking) {
         contentParts.push({ type: 'thinking', text: newThinking });
     }
-
-    // 添加文本部分
     contentParts.push({ type: 'text', text: newText });
-
-    // 添加图片部分
-    if (images.length > 0) {
-        contentParts.push(...images);
+    if (hasImages) {
+        normalized.forEach(n => contentParts.push({ type: 'image_url', url: n.dataUrl, complete: true }));
     }
 
     // 更新 OpenAI 格式
     if (state.messages[index]) {
         state.messages[index].thinkingContent = newThinking;
-        state.messages[index].contentParts = contentParts;  // 关键：更新 contentParts
-
-        if (images.length > 0) {
-            state.messages[index].content = [
-                { type: 'text', text: newText },
-                ...images
-            ];
-        } else {
-            state.messages[index].content = newText;
-        }
-
-        // 清除当前消息的签名
+        state.messages[index].contentParts = contentParts;
+        state.messages[index].content = hasImages
+            ? [{ type: 'text', text: newText }, ...fmt.openai]
+            : newText;
         delete state.messages[index].thinkingSignature;
         delete state.messages[index].thoughtSignature;
+        clearEditMetadata(state.messages[index], true);
     }
 
-    // 更新 Gemini 格式
+    // 更新 Gemini 格式（不放 thought，Gemini 要求 thoughtSignature）
     if (state.geminiContents[index]) {
-        const parts = [];
-
-        // ⚠️ 不要把编辑后的 thought 放入 parts 数组！
-        // Gemini API 要求所有 thought parts 必须有 thoughtSignature
-        // 编辑后的思维链没有签名，只保存在 contentParts 中（用于显示）
-
-        // 添加文本部分
-        parts.push({ text: newText });
-
-        // 添加图片部分
-        if (images.length > 0) {
-            parts.push(...images);
-        }
-
-        state.geminiContents[index].parts = parts;
-        state.geminiContents[index].contentParts = contentParts;  // 关键：更新 contentParts（用于显示）
+        state.geminiContents[index].parts = hasImages
+            ? [{ text: newText }, ...fmt.gemini]
+            : [{ text: newText }];
+        state.geminiContents[index].contentParts = contentParts;
         delete state.geminiContents[index].thoughtSignature;
+        clearEditMetadata(state.geminiContents[index], true);
     }
 
-    // 更新 Claude 格式
+    // 更新 Claude 格式（不放 thinking，Claude 要求 signature）
     if (state.claudeContents[index]) {
-        const content = [];
-
-        // ⚠️ 不要把编辑后的 thinking 放入 content 数组！
-        // Claude API 要求所有 thinking 块必须有 signature
-        // 编辑后的思维链没有签名，只保存在 thinkingContent 和 contentParts 中
-
-        // 添加图片部分（Claude 格式图片在前）
-        if (images.length > 0) {
-            content.push(...images);
-        }
-
-        // 添加文本部分
-        content.push({ type: 'text', text: newText });
-
-        state.claudeContents[index].content = content;
-        state.claudeContents[index].thinkingContent = newThinking;  // 关键：Claude 思维链作为额外属性
-        state.claudeContents[index].contentParts = contentParts;    // 关键：更新 contentParts（用于显示）
+        state.claudeContents[index].content = hasImages
+            ? [...fmt.claude, { type: 'text', text: newText }]
+            : [{ type: 'text', text: newText }];
+        state.claudeContents[index].thinkingContent = newThinking;
+        state.claudeContents[index].contentParts = contentParts;
         delete state.claudeContents[index].thinkingSignature;
+        clearEditMetadata(state.claudeContents[index], true);
     }
 
-    // 清除后续签名（与智能签名清除逻辑一致）
-    if (index < state.messages.length - 1 && hasThoughtSignatures(state.messages, index + 1)) {
-        const clearedCount = clearThoughtSignatures(state.messages, index + 1);
+    clearSubsequentSignatures(index);
 
-        // 同时清除其他格式的签名
-        if (state.geminiContents[index + 1]) {
-            clearThoughtSignatures(state.geminiContents, index + 1);
-        }
-        if (state.claudeContents[index + 1]) {
-            clearThoughtSignatures(state.claudeContents, index + 1);
-        }
-
-        console.warn('[Message Editor] ⚠️ 编辑历史消息导致后续签名失效', {
-            editedIndex: index,
-            clearedCount
-        });
-    }
-
-    // 发出事件通知会话保存
-    eventBus.emit('messages:changed', {
-        action: 'updated',
-        index
-    });
+    eventBus.emit('messages:changed', { action: 'updated', index });
 }

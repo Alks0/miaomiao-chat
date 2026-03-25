@@ -1400,3 +1400,24 @@
         font-size: 15px;
     }
 }
+
+/* OpenClaw 连接状态 */
+.openclaw-connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.openclaw-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f44336;
+    flex-shrink: 0;
+}
+
+.openclaw-connection-status .btn-secondary {
+    padding: 4px 12px;
+    font-size: 12px;
+    min-height: unset;
+}

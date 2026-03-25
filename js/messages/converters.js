@@ -236,34 +236,164 @@ export function toClaudeMessage(role, content, attachments = null) {
  * @param {Object} session - 会话对象
  * @returns {string} Markdown 字符串
  */
+function getExportMessages(session) {
+    if (Array.isArray(session?.messages) && session.messages.length > 0) {
+        return session.messages;
+    }
+    if (Array.isArray(session?.geminiContents) && session.geminiContents.length > 0) {
+        return session.geminiContents;
+    }
+    if (Array.isArray(session?.claudeContents) && session.claudeContents.length > 0) {
+        return session.claudeContents;
+    }
+    return [];
+}
+
+function getSelectedReply(msg) {
+    if (!Array.isArray(msg?.allReplies) || msg.allReplies.length === 0) {
+        return null;
+    }
+    const selectedIndex = Number.isInteger(msg.selectedReplyIndex) ? msg.selectedReplyIndex : 0;
+    return msg.allReplies[selectedIndex] || msg.allReplies[0] || null;
+}
+
+function getAttachmentMarker(part) {
+    if (!part || typeof part !== 'object') return '';
+
+    if (part.type === 'image_url' || part.type === 'image') return '[图片]';
+    if (part.type === 'video_url') return '[视频]';
+    if (part.type === 'document' || part.type === 'file') return '[文档]';
+
+    const inlineData = part.inlineData || part.inline_data;
+    if (inlineData) {
+        const mimeType = inlineData.mimeType || inlineData.mime_type || '';
+        const category = categorizeFile(mimeType);
+        if (category === 'image') return '[图片]';
+        if (category === 'video') return '[视频]';
+        if (category === 'pdf' || category === 'text') return '[文档]';
+        return '[附件]';
+    }
+
+    return '';
+}
+
+function extractTextFromParts(parts = []) {
+    return parts
+        .map((part) => {
+            if (!part || typeof part !== 'object') return '';
+            if (part.thought || part.type === 'thinking') return '';
+            if (typeof part.text === 'string') return part.text;
+            return getAttachmentMarker(part);
+        })
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+}
+
+function extractThinkingContent(msg) {
+    const selectedReply = getSelectedReply(msg);
+    if (selectedReply?.thinkingContent) {
+        return selectedReply.thinkingContent;
+    }
+    if (msg?.thinkingContent) {
+        return msg.thinkingContent;
+    }
+    if (msg?.thought) {
+        return msg.thought;
+    }
+    if (Array.isArray(msg?.contentParts)) {
+        const thinking = msg.contentParts
+            .filter(part => part?.type === 'thinking' && typeof part.text === 'string')
+            .map(part => part.text)
+            .join('\n\n')
+            .trim();
+        if (thinking) return thinking;
+    }
+    if (Array.isArray(msg?.parts)) {
+        const thinking = msg.parts
+            .filter(part => part?.thought && typeof part.text === 'string')
+            .map(part => part.text)
+            .join('\n\n')
+            .trim();
+        if (thinking) return thinking;
+    }
+    return '';
+}
+
+function extractMessageBody(msg) {
+    const selectedReply = getSelectedReply(msg);
+
+    if (selectedReply) {
+        if (typeof selectedReply.content === 'string' && selectedReply.content.trim()) {
+            return selectedReply.content.trim();
+        }
+        if (Array.isArray(selectedReply.contentParts) && selectedReply.contentParts.length > 0) {
+            return extractTextFromParts(selectedReply.contentParts);
+        }
+        if (Array.isArray(selectedReply.parts) && selectedReply.parts.length > 0) {
+            return extractTextFromParts(selectedReply.parts);
+        }
+        if (Array.isArray(selectedReply.claudeContent) && selectedReply.claudeContent.length > 0) {
+            return extractTextFromParts(selectedReply.claudeContent);
+        }
+    }
+
+    if (typeof msg?.content === 'string') {
+        return msg.content.trim();
+    }
+    if (Array.isArray(msg?.content)) {
+        return extractTextFromParts(msg.content);
+    }
+    if (Array.isArray(msg?.contentParts)) {
+        return extractTextFromParts(msg.contentParts);
+    }
+    if (Array.isArray(msg?.parts)) {
+        return extractTextFromParts(msg.parts);
+    }
+    return '';
+}
+
+function extractToolCalls(msg) {
+    const toolCalls = msg?.toolCalls;
+    if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+        return '';
+    }
+
+    const lines = toolCalls
+        .map(toolCall => toolCall?.name || toolCall?.function?.name || toolCall?.id || '')
+        .filter(Boolean);
+
+    if (lines.length === 0) return '';
+    return lines.map(name => `- ${name}`).join('\n');
+}
+
 export function sessionToMarkdown(session) {
-    if (!session || !session.messages) return '';
+    if (!session) return '';
+
+    const messages = getExportMessages(session);
+    if (messages.length === 0) return '';
 
     let markdown = `# ${session.name || 'Untitled Session'}\n\n`;
 
-    session.messages.forEach((msg) => {
+    messages.forEach((msg) => {
         // 跳过系统消息
         if (msg.role === 'system') return;
 
         const roleName = msg.role === 'user' ? 'User' : 'Assistant';
         markdown += `## ${roleName}\n\n`;
 
-        // 处理思考过程 (如果存在)
-        if (msg.thought) {
-            markdown += `> **Thinking:**\n> ${msg.thought.replace(/\n/g, '\n> ')}\n\n`;
+        const thinkingContent = extractThinkingContent(msg);
+        if (thinkingContent) {
+            markdown += `> **Thinking:**\n> ${thinkingContent.replace(/\n/g, '\n> ')}\n\n`;
         }
 
-        // 处理主要内容
-        if (Array.isArray(msg.content)) {
-            // 处理多模态内容数组
-            const textContent = msg.content
-                .filter(part => part.type === 'text')
-                .map(part => part.text)
-                .join('\n');
-            markdown += `${textContent}\n\n`;
-        } else {
-            markdown += `${msg.content || ''}\n\n`;
+        const toolCalls = extractToolCalls(msg);
+        if (toolCalls) {
+            markdown += `> **Tool Calls:**\n> ${toolCalls.replace(/\n/g, '\n> ')}\n\n`;
         }
+
+        const content = extractMessageBody(msg);
+        markdown += `${content || '[无文本内容]'}\n\n`;
 
         // 分隔符
         markdown += `---\n\n`;

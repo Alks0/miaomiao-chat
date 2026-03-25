@@ -4,6 +4,7 @@
  */
 
 import { state } from '../core/state.js';
+import { eventBus } from '../core/events.js';
 import { saveCurrentConfig } from '../state/config.js';
 import { handleAttachFile } from './input.js';
 
@@ -80,13 +81,16 @@ export function initQuickToggles() {
         toggleCodeExec.classList.toggle('active', state.codeExecutionEnabled);
 
         // 点击事件
-        toggleCodeExec.addEventListener('click', () => {
+        toggleCodeExec.addEventListener('click', async () => {
             state.codeExecutionEnabled = !state.codeExecutionEnabled;
             toggleCodeExec.classList.toggle('active', state.codeExecutionEnabled);
 
             // 同步设置面板开关
             const panelSwitch = document.getElementById('code-execution-enabled');
             if (panelSwitch) panelSwitch.checked = state.codeExecutionEnabled;
+
+            // ⭐ 同步到工具管理器（Code Execution 不在工具管理器中，无需同步）
+            // Code Execution 是通过 API 直接传递的特殊工具，不注册到 toolRegistry
 
             saveCurrentConfig();
         });
@@ -104,7 +108,7 @@ export function initQuickToggles() {
         toggleComputerUse.classList.toggle('active', state.computerUseEnabled);
 
         // 点击事件
-        toggleComputerUse.addEventListener('click', () => {
+        toggleComputerUse.addEventListener('click', async () => {
             state.computerUseEnabled = !state.computerUseEnabled;
             toggleComputerUse.classList.toggle('active', state.computerUseEnabled);
 
@@ -112,9 +116,46 @@ export function initQuickToggles() {
             const panelSwitch = document.getElementById('computer-use-enabled');
             if (panelSwitch) panelSwitch.checked = state.computerUseEnabled;
 
+            // ⭐ 同步到工具管理器（Computer Use 工具 ID 为 'computer'）
+            try {
+                const { setToolEnabled } = await import('../tools/manager.js');
+                setToolEnabled('computer', state.computerUseEnabled);
+                console.log(`[Quick Toggle] Computer Use 工具已${state.computerUseEnabled ? '启用' : '禁用'}`);
+            } catch (error) {
+                console.error('[Quick Toggle] 同步 Computer Use 状态失败:', error);
+            }
+
             saveCurrentConfig();
         });
     }
+
+    // ========== OpenClaw 自动化 + 状态条 ==========
+    const toggleCron = document.getElementById('toggle-cron');
+    const statusBar = document.getElementById('openclaw-status-bar');
+    const statusCronBtn = document.getElementById('openclaw-sb-cron');
+
+    // 打开定时任务面板
+    const openCron = async () => {
+        const { openCronPanel } = await import('./openclaw-cron.js');
+        openCronPanel();
+    };
+
+    if (toggleCron) toggleCron.addEventListener('click', openCron);
+    if (statusCronBtn) statusCronBtn.addEventListener('click', openCron);
+
+    // 条件显隐：apiFormat === 'openclaw' && connected
+    const updateOpenClawUI = () => {
+        import('../api/openclaw.js').then(({ openclawClient }) => {
+            const visible = state.apiFormat === 'openclaw' && openclawClient.connected;
+            if (toggleCron) toggleCron.style.display = visible ? '' : 'none';
+            if (statusBar) statusBar.style.display = visible ? 'flex' : 'none';
+        });
+    };
+
+    eventBus.on('openclaw:connected', updateOpenClawUI);
+    eventBus.on('openclaw:disconnected', updateOpenClawUI);
+    eventBus.on('config:format-change-requested', updateOpenClawUI);
+    updateOpenClawUI();
 
     console.log('Quick toggles initialized');
 }

@@ -57,6 +57,10 @@
 @import "styles/components/_code-collapser.css";
 @import "styles/components/_code-editor-modal.css";
 @import "styles/components/_tool-manager-enhancements.css";
+@import "styles/components/_openclaw-approval.css";
+@import "styles/components/_openclaw-screen.css";
+@import "styles/components/_openclaw-cron.css";
+@import "styles/components/_openclaw-status.css";
 
 /* Utilities */
 @import "styles/utilities/_accessibility.css";

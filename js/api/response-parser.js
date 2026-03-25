@@ -19,6 +19,10 @@ export function parseApiResponse(data, format = 'openai') {
     console.log('parseApiResponse data:', data, 'format:', format);
 
     switch (format) {
+        case 'openclaw':
+            // OpenClaw 返回 OpenAI 兼容格式，复用 OpenAI 解析
+            return parseApiResponse(data, 'openai');
+
         case 'gemini': {
             // Gemini 格式
             if (data.error) return null;

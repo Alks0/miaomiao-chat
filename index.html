@@ -31,14 +31,109 @@
         3. connect-src 包含 https: wss: ws: 允许所有 HTTPS/WebSocket 连接（用于用户自定义API端点）
     -->
 
-    <!-- mathjs 使用本地 UMD 构建版本，兼容所有平台（Web/Electron/Android）-->
-    <script src="libs/mathjs/math.js"></script>
+    <!-- 第三方库统一 defer 加载（浏览器并行下载，按顺序执行，不阻塞 HTML 解析） -->
+    <script src="libs/marked/marked.min.js" defer></script>
+    <script src="libs/marked-highlight/index.umd.js" defer></script>
+    <script src="libs/highlight/highlight.min.js" defer></script>
+    <script src="libs/highlight/languages/python.min.js" defer></script>
+    <script src="libs/highlight/languages/java.min.js" defer></script>
+    <script src="libs/highlight/languages/cpp.min.js" defer></script>
+    <script src="libs/katex/katex.min.js" defer></script>
+    <script src="libs/dompurify/purify.min.js" defer></script>
+    <script src="libs/mathjs/math.js" defer></script>
 
     <title>Web Chat</title>
+    <!-- 骨架屏内联样式（零 JS 成本，立即渲染） -->
+    <style>
+        #app-skeleton {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            background: #F4EFEA;
+            font-family: system-ui, sans-serif;
+        }
+        .dark-theme #app-skeleton { background: #0a0a0a; }
+        #app-skeleton .skel-sidebar {
+            width: 280px;
+            background: #FFFFFF;
+            border-right: 2px solid #383838;
+            padding: 16px;
+            flex-shrink: 0;
+            display: none;
+        }
+        .dark-theme #app-skeleton .skel-sidebar {
+            background: #161616;
+            border-color: #2a2a2a;
+        }
+        #app-skeleton .skel-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #app-skeleton .skel-header {
+            height: 48px;
+            background: #383838;
+            flex-shrink: 0;
+        }
+        .dark-theme #app-skeleton .skel-header { background: #2a2a2a; }
+        #app-skeleton .skel-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #app-skeleton .skel-bar {
+            height: 14px;
+            border-radius: 7px;
+            background: linear-gradient(90deg, #e0d8d0 25%, #ede7e0 50%, #e0d8d0 75%);
+            background-size: 200% 100%;
+            animation: skel-shimmer 1.5s infinite;
+            margin-bottom: 12px;
+        }
+        .dark-theme #app-skeleton .skel-bar {
+            background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+            background-size: 200% 100%;
+        }
+        #app-skeleton .skel-loader {
+            width: 36px; height: 36px;
+            border: 3px solid #e0d8d0;
+            border-top-color: #383838;
+            border-radius: 50%;
+            animation: skel-spin 0.8s linear infinite;
+        }
+        .dark-theme #app-skeleton .skel-loader {
+            border-color: #2a2a2a;
+            border-top-color: #e8e8e8;
+        }
+        @keyframes skel-shimmer { to { background-position: -200% 0; } }
+        @keyframes skel-spin { to { transform: rotate(360deg); } }
+        @media (min-width: 769px) {
+            #app-skeleton .skel-sidebar { display: block; }
+        }
+    </style>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="libs/marked-highlight/index.css">
 </head>
 <body>
+    <!-- 骨架屏：JS 加载前立即显示，init 完成后移除 -->
+    <div id="app-skeleton">
+        <div class="skel-sidebar">
+            <div style="height:20px;margin-bottom:20px;"></div>
+            <div class="skel-bar" style="width:80%"></div>
+            <div class="skel-bar" style="width:65%"></div>
+            <div class="skel-bar" style="width:90%"></div>
+            <div class="skel-bar" style="width:55%"></div>
+            <div class="skel-bar" style="width:75%"></div>
+        </div>
+        <div class="skel-main">
+            <div class="skel-header"></div>
+            <div class="skel-body">
+                <div class="skel-loader"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- 会话侧边栏 -->
     <aside id="sidebar" class="sidebar">
         <div class="sidebar-resize-handle"
@@ -870,6 +965,17 @@
             </div>
         </header>
 
+        <!-- OpenClaw 连接状态条 -->
+        <div id="openclaw-status-bar" class="openclaw-status-bar" style="display: none;">
+            <span class="openclaw-sb-dot"></span>
+            <span class="openclaw-sb-text">已连接 OpenClaw</span>
+            <button id="openclaw-sb-cron" class="openclaw-sb-btn" title="自动化任务">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </button>
+        </div>
+
         <!-- 聊天容器 -->
         <main class="chat-container">
             <div id="messages" class="messages-area">
@@ -1008,6 +1114,13 @@
                     </svg>
                     <span>控制</span>
                 </button>
+                <!-- OpenClaw 自动化任务按钮（连接后显示） -->
+                <button id="toggle-cron" class="quick-toggle-btn" title="自动化任务" style="display: none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span>自动化</span>
+                </button>
             </div>
         </footer>
     </div>
@@ -1018,18 +1131,8 @@
         <img id="image-viewer-img" src="" alt="查看大图">
     </div>
 
-    <!-- 加载 marked.js 用于 Markdown 渲染 -->
-    <script src="libs/marked/marked.min.js"></script>
-    <script src="libs/marked-highlight/index.umd.js"></script>
-    <script src="libs/highlight/highlight.min.js"></script>
-    <script src="libs/highlight/languages/python.min.js"></script>
-    <script src="libs/highlight/languages/java.min.js"></script>
-    <script src="libs/highlight/languages/cpp.min.js"></script>
-    <!-- 加载 KaTeX 用于数学公式渲染 -->
+    <!-- 第三方库已移至 <head> 以 defer 方式加载 -->
     <link rel="stylesheet" href="libs/katex/katex.min.css">
-    <script src="libs/katex/katex.min.js"></script>
-    <!-- 加载 DOMPurify 用于 HTML 净化（XSS 防护）-->
-    <script src="libs/dompurify/purify.min.js"></script>
 
     <!-- ========== 快捷消息模态框 ========== -->
     <div id="quick-messages-modal" class="modal" role="dialog" aria-labelledby="quick-messages-modal-title" aria-modal="true">
@@ -1438,6 +1541,68 @@
             <!-- 添加/编辑表单 -->
             <div id="mcp-server-form" class="mcp-server-form" style="display: none;">
                 <!-- 表单内容将由 JS 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- OpenClaw 审批弹窗 -->
+    <div id="openclaw-approval-overlay" class="openclaw-approval-overlay" style="display: none;">
+        <div class="openclaw-approval-modal">
+            <div class="openclaw-approval-header">
+                <span class="openclaw-approval-icon">&#9888;</span>
+                <h3>操作确认</h3>
+                <span class="openclaw-approval-countdown-wrap">
+                    <span id="openclaw-approval-countdown">60</span>s
+                </span>
+            </div>
+            <div class="openclaw-approval-body">
+                <div class="openclaw-approval-row">
+                    <span class="openclaw-approval-label">操作描述</span>
+                    <span id="openclaw-approval-desc" class="openclaw-approval-value">-</span>
+                </div>
+                <div class="openclaw-approval-row">
+                    <span class="openclaw-approval-label">工具</span>
+                    <span id="openclaw-approval-tool" class="openclaw-approval-value">-</span>
+                </div>
+                <div class="openclaw-approval-row">
+                    <span class="openclaw-approval-label">命令</span>
+                    <code id="openclaw-approval-command" class="openclaw-approval-command">-</code>
+                </div>
+                <div class="openclaw-approval-row">
+                    <span class="openclaw-approval-label">风险等级</span>
+                    <span id="openclaw-approval-risk" class="openclaw-approval-risk">中</span>
+                </div>
+            </div>
+            <div class="openclaw-approval-actions">
+                <button id="openclaw-reject-btn" class="openclaw-approval-btn reject">拒绝</button>
+                <button id="openclaw-approve-btn" class="openclaw-approval-btn approve">允许</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OpenClaw 定时任务面板 -->
+    <div id="openclaw-cron-overlay" class="openclaw-cron-overlay" style="display: none;">
+        <div class="openclaw-cron-panel">
+            <div class="openclaw-cron-header">
+                <h3>自动化任务</h3>
+                <button id="openclaw-cron-close" class="icon-button" title="关闭">&times;</button>
+            </div>
+            <div class="openclaw-cron-body">
+                <div id="openclaw-cron-list" class="openclaw-cron-list">
+                    <div class="openclaw-cron-empty">暂无定时任务</div>
+                </div>
+            </div>
+            <div class="openclaw-cron-footer">
+                <input type="text" id="openclaw-cron-message" class="openclaw-cron-input" placeholder="任务描述，如「检查服务器状态」" />
+                <select id="openclaw-cron-schedule" class="openclaw-cron-select">
+                    <option value="*/5 * * * *">每 5 分钟</option>
+                    <option value="0 * * * *">每小时</option>
+                    <option value="0 9 * * *" selected>每天 09:00</option>
+                    <option value="0 9 * * 1-5">工作日 09:00</option>
+                    <option value="custom">自定义 cron</option>
+                </select>
+                <input type="text" id="openclaw-cron-custom" class="openclaw-cron-input openclaw-cron-custom" placeholder="cron 表达式" style="display:none;" />
+                <button id="openclaw-cron-add" class="openclaw-approval-btn approve">添加</button>
             </div>
         </div>
     </div>

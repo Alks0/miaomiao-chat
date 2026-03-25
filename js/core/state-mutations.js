@@ -79,6 +79,8 @@ export function pushMessage(openaiMsg, geminiMsg, claudeMsg) {
         state.messageIdMap.set(messageId, index);
     }
 
+    state.sessionDirty = true;
+
     // 发出事件通知
     eventBus.emit('state:messages-pushed', {
         index,
@@ -122,6 +124,8 @@ export function removeMessageAt(index) {
         rebuildMessageIdMapFromIndex(index);
     }
 
+    state.sessionDirty = true;
+
     // 发出事件通知
     eventBus.emit('state:message-removed', {
         index,
@@ -164,6 +168,8 @@ export function removeMessagesAfter(fromIndex) {
     state.geminiContents = state.geminiContents.slice(0, fromIndex + 1);
     state.claudeContents = state.claudeContents.slice(0, fromIndex + 1);
 
+    state.sessionDirty = true;
+
     // 发出事件通知
     eventBus.emit('state:messages-removed-after', {
         fromIndex,
@@ -198,6 +204,8 @@ export function updateMessageAt(index, updates) {
         state.claudeContents[index] = { ...oldClaude, ...updates.claude };
     }
 
+    state.sessionDirty = true;
+
     // 发出事件通知
     eventBus.emit('state:message-updated', {
         index,
@@ -224,6 +232,9 @@ export function replaceAllMessages(messages, geminiContents, claudeContents) {
     state.messages = [...messages];
     state.geminiContents = [...geminiContents];
     state.claudeContents = [...claudeContents];
+
+    // 刚加载的会话是干净的
+    state.sessionDirty = false;
 
     // 重建 messageIdMap
     rebuildMessageIdMap();

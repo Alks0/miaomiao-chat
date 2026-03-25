@@ -97,6 +97,9 @@ export const state = {
     // messageId -> 数组索引，用于快速查找和防止删除错位
     messageIdMap: new Map(), // Map<messageId, number>
 
+    // 会话脏标记（消息变更追踪，避免无变更时冗余保存）
+    sessionDirty: false,
+
     // UI 状态
     isLoading: false,
     currentAssistantMessage: null,

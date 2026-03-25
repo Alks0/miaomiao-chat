@@ -60,8 +60,9 @@ export async function handleClear() {
         </div>
     `;
 
-    // 保存会话状态
-    saveCurrentSessionMessages();
+    // 标记脏并立即保存（force=true 确保空消息写入 DB）
+    state.sessionDirty = true;
+    await saveCurrentSessionMessages(true);
 }
 
 /**

@@ -1126,10 +1126,8 @@ export function updateToolCallResult(toolId, status, result) {
                 console.log('[Sync] 工具调用结果已保存到消息 #' + i);
 
                 // 保存到会话
-                import('../state/sessions.js').then(({ saveCurrentSessionMessages }) => {
-                    saveCurrentSessionMessages().catch(error => {
-                        console.error('[Sync] 保存工具调用结果失败:', error);
-                    });
+                import('../state/sessions.js').then(({ debouncedSaveSession }) => {
+                    debouncedSaveSession();
                 }).catch(error => {
                     console.error('[Sync] 加载会话保存模块失败:', error);
                 });

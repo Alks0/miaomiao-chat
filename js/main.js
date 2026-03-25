@@ -97,10 +97,10 @@ import { loadTheme, initTheming } from './ui/theming.js';
 import './ui/notifications.js';
 
 // ========== State Layer ==========
-import { initDB, loadPreference, isIndexedDBAvailable, isLocalStorageAvailable, migrateMCPServersFromLocalStorage, loadAllMCPServers } from './state/storage.js';
+import { initDB, loadPreference, isIndexedDBAvailable, isLocalStorageAvailable, migrateMCPServersFromLocalStorage, loadAllMCPServers, migrateSessionsToV4 } from './state/storage.js';
 import { loadConfig, saveCurrentConfigImmediate } from './state/config.js';
 import { loadSessions, switchToSession } from './state/sessions.js';
-import { initExportImport } from './state/export-import.js';
+// initExportImport → 延迟动态加载
 import { initQuickMessages } from './state/quick-messages.js';
 // 新增：数据迁移
 import {
@@ -113,7 +113,7 @@ import {
 
 // ========== Providers Layer ==========
 import { migrateFromLegacyConfig } from './providers/manager.js';
-import { initProvidersUI } from './providers/ui.js';
+// initProvidersUI → 延迟动态加载
 
 // ========== Messages Layer ==========
 import './messages/converters.js';
@@ -144,29 +144,23 @@ import './stream/tool-call-handler.js';
 import { initTools } from './tools/init.js';
 import './tools/message-compat.js';
 
-// ========== UI Layer (Interactive) ==========
+// ========== UI Layer (Critical — 首屏交互必需) ==========
 import { initInputHandlers } from './ui/input.js';
 import { initSidebar } from './ui/sidebar.js';
-import { initSettings } from './ui/settings.js';
-import { initImageViewer } from './ui/viewer.js';
 import { initScrollControl } from './ui/scroll.js';
 import { initClearChat } from './ui/clear.js';
+import { initKeyboard } from './ui/keyboard.js';
+import { initInputResize, initPanelResize } from './ui/resize.js';
 import { initModels } from './ui/models.js';
 import { initFormatSwitcher } from './ui/format-switcher.js';
-import { initKeyboard } from './ui/keyboard.js';
 import { initQuickToggles, exposeToggleFunctions } from './ui/quick-toggles.js';
-import { initEndpointInputListeners, initThinkingControls, initConfigManagement, initOtherConfigInputs } from './ui/config-helpers.js';
-import { initInputResize, initPanelResize } from './ui/resize.js';
-import { initPrefillControls, initSystemPrefillControls, initGeminiSystemParts } from './ui/prefill.js';
-import { initPasswordToggles, initCustomHeaders, initRippleEffects } from './ui/enhancements.js';
-import { initQuickMessagesUI } from './ui/quick-messages.js';
-import { initSessionSearch } from './ui/session-search.js';
-import { initMCPSettings } from './ui/mcp-settings.js';
-import { initToolManager } from './ui/tool-manager.js';
-import { initToolsQuickSelector } from './ui/tools-quick-selector.js';
+import { initPasswordToggles, initRippleEffects } from './ui/enhancements.js';
 
-// ========== Update Layer ==========
-import { initUpdateModal } from './update/update-modal.js';
+// ========== UI Layer (Deferred — 非首屏，动态加载) ==========
+// settings, viewer, prefill, config-helpers, custom-headers,
+// session-search, mcp-settings, tool-manager, quick-messages-ui,
+// tools-quick-selector, update-modal, export-import
+// → 改为 init() 中延迟动态 import
 
 // ========== Performance & Memory ==========
 import { memoryManager } from './utils/memory-manager.js';
@@ -242,16 +236,13 @@ async function init() {
         console.log('⚡ Step 1/9: Loading theme...');
         loadTheme();
 
-        // 3. 存储层（异步，按顺序）
+        // 3. 存储层
         console.log('💾 Step 2/9: Initializing IndexedDB...');
-        // 增强错误处理：IndexedDB 失败时启用降级模式
+        let dbReady = false;
         try {
             const dbInstance = await initDB();
-
-            // 请求持久化存储（防止 Android/iOS 自动清理）
             if (dbInstance) {
-                const { requestPersistentStorage } = await import('./state/storage.js');
-                await requestPersistentStorage();
+                dbReady = true;
             } else {
                 console.warn('IndexedDB 初始化返回空实例，启用 localStorage 降级模式');
                 state.storageMode = 'localStorage';
@@ -259,103 +250,108 @@ async function init() {
         } catch (error) {
             console.error('IndexedDB 初始化失败，启用 localStorage 降级模式:', error);
             state.storageMode = 'localStorage';
-            // 显示警告通知（通过 eventBus）
-            import('./core/events.js').then(({ eventBus }) => {
-                eventBus.emit('ui:notification', {
-                    message: 'IndexedDB 不可用，数据将保存到 localStorage',
-                    type: 'warning',
-                    duration: 5000
-                });
+            eventBus.emit('ui:notification', {
+                message: 'IndexedDB 不可用，数据将保存到 localStorage',
+                type: 'warning',
+                duration: 5000
             });
         }
 
-        // 3.5. 执行一次性迁移（仅第一次运行或失败时重试）
+        // 3.4. v4 消息分离存储迁移（将 session 中嵌入的消息提取到独立 store）
+        if (dbReady) {
+            try {
+                const v4Count = await migrateSessionsToV4();
+                if (v4Count > 0) console.log(`[v4] 迁移完成: ${v4Count} 个会话`);
+            } catch (e) {
+                console.error('[v4] 消息分离迁移失败:', e);
+            }
+        }
+
+        // 3.5. 迁移检查与配置加载并行（迁移已完成时省去串行等待）
         if (state.storageMode !== 'localStorage') {
-            console.log('🔄 Step 2.5/9: Checking migration status...');
-            const migrationStatus = await getMigrationStatus();
+            const [migrationStatus] = await Promise.all([
+                getMigrationStatus(),
+                // 乐观并行：多数情况迁移已完成，loadConfig 可以安全并行
+                (async () => {
+                    console.log('⚙️  Step 3/9: Loading configuration...');
+                    await loadConfig();
+                })()
+            ]);
 
             if (migrationStatus !== MIGRATION_STATES.COMPLETED) {
-                console.log(`迁移状态: ${migrationStatus}，准备执行迁移...`);
-
-                // 并发保护：检查其他标签页是否正在迁移
+                console.log(`迁移状态: ${migrationStatus}，执行迁移...`);
                 try {
                     acquireMigrationLock();
                 } catch (lockError) {
                     console.warn('迁移锁获取失败:', lockError.message);
-                    console.log('跳过迁移，使用现有数据');
-                    // 不阻塞初始化，继续加载配置
                 }
-
-                // 只有成功获取锁时才执行迁移
                 if (localStorage.getItem('migration_lock')) {
                     try {
-                        console.log('🔄 开始执行数据迁移...');
                         await executeMigration();
-                        console.log('迁移完成');
+                        // 迁移完成后重新加载配置（覆盖乐观加载的结果）
+                        await loadConfig();
                     } catch (migrationError) {
                         console.error('迁移失败:', migrationError);
-                        // 迁移失败不阻塞初始化
                     } finally {
                         releaseMigrationLock();
                     }
                 }
-            } else {
-                console.log('迁移已完成，跳过');
             }
+        } else {
+            console.log('⚙️  Step 3/9: Loading configuration...');
+            await loadConfig();
         }
-
-        console.log('⚙️  Step 3/9: Loading configuration...');
-        await loadConfig();
 
         // 迁移旧配置到提供商系统 (如果需要)
         console.log('🔄 Step 4/9: Migrating to provider system...');
         migrateFromLegacyConfig();
 
-        console.log('📚 Step 5/9: Loading sessions...');
-        await loadSessions();
+        // 并行加载会话、快捷消息、MCP 配置（三者互不依赖，都只依赖 IndexedDB）
+        console.log('📚 Step 5/9: Loading sessions, quick messages, MCP config (parallel)...');
 
-        // 加载快捷消息（在配置和会话加载后）
-        console.log('💬 Step 5.5/9: Loading quick messages...');
-        await initQuickMessages();
-
-        // 加载 MCP 配置（在 IndexedDB 初始化后）
-        console.log('🔌 Step 5.6/9: Loading MCP configuration...');
-        if (state.storageMode !== 'localStorage') {
-            try {
-                // 执行迁移（仅首次运行或需要时）
-                const migratedCount = await migrateMCPServersFromLocalStorage();
-                if (migratedCount > 0) {
-                    console.log(`[Main] 迁移 ${migratedCount} 个 MCP 服务器`);
+        const loadMCPConfig = async () => {
+            if (state.storageMode !== 'localStorage') {
+                try {
+                    const migratedCount = await migrateMCPServersFromLocalStorage();
+                    if (migratedCount > 0) {
+                        console.log(`[Main] 迁移 ${migratedCount} 个 MCP 服务器`);
+                    }
+                    state.mcpServers = await loadAllMCPServers();
+                    console.log(`[Main] 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                } catch (error) {
+                    console.error('[Main] 加载 MCP 配置失败:', error);
+                    try {
+                        const saved = localStorage.getItem('mcpServers');
+                        if (saved) {
+                            state.mcpServers = JSON.parse(saved);
+                            console.log(`[Main] 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                        }
+                    } catch (fallbackError) {
+                        console.error('[Main] 从 localStorage 加载失败:', fallbackError);
+                    }
                 }
-
-                // 加载 MCP 服务器配置
-                state.mcpServers = await loadAllMCPServers();
-                console.log(`[Main] 加载 ${state.mcpServers.length} 个 MCP 服务器`);
-            } catch (error) {
-                console.error('[Main] ❌ 加载 MCP 配置失败:', error);
-                // 降级：从 localStorage 读取
+            } else {
                 try {
                     const saved = localStorage.getItem('mcpServers');
                     if (saved) {
                         state.mcpServers = JSON.parse(saved);
-                        console.log(`[Main] ⚠️ 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
+                        console.log(`[Main] 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
                     }
-                } catch (fallbackError) {
-                    console.error('[Main] ❌ 从 localStorage 加载失败:', fallbackError);
+                } catch (error) {
+                    console.error('[Main] 从 localStorage 加载 MCP 配置失败:', error);
                 }
             }
-        } else {
-            // 使用 localStorage 模式
-            try {
-                const saved = localStorage.getItem('mcpServers');
-                if (saved) {
-                    state.mcpServers = JSON.parse(saved);
-                    console.log(`[Main] 从 localStorage 加载 ${state.mcpServers.length} 个 MCP 服务器`);
-                }
-            } catch (error) {
-                console.error('[Main] ❌ 从 localStorage 加载 MCP 配置失败:', error);
-            }
-        }
+        };
+
+        await Promise.all([
+            loadSessions(),
+            initQuickMessages(),
+            loadMCPConfig()
+        ]);
+
+        // 会话消息已渲染，移除骨架屏
+        const skeleton = document.getElementById('app-skeleton');
+        if (skeleton) skeleton.remove();
 
         // 4. API 层
         console.log('🌐 Step 6/9: Initializing API handler...');
@@ -378,75 +374,102 @@ async function init() {
 
         console.log('🖱️  Step 8/9: Initializing UI handlers...');
 
-        // 基础UI
+        // 首屏关键 UI（同步，用户立即需要交互）
         initTheming();
         initKeyboard();
         initPasswordToggles();
         initRippleEffects();
-
-        // 输入和消息
         initInputHandlers();
-        await initInputResize(); // 改为 await（需要从 IndexedDB 加载高度）
         initClearChat();
-
-        // API和配置
         initModels();
         initFormatSwitcher();
-        initEndpointInputListeners();
-        initThinkingControls();
-        initConfigManagement();
-        initOtherConfigInputs();
-
-        // 快捷开关
         initQuickToggles();
         exposeToggleFunctions();
-
-        // 面板和侧边栏
         initSidebar();
-        initSettings();
-        await initPanelResize(); // 改为 await（需要从 IndexedDB 加载宽度）
-
-        // 更新系统
-        initUpdateModal();  // Electron 更新
-
-        // APK 更新（仅 Android Capacitor 环境）
-        if (window.Capacitor && window.Capacitor.getPlatform() === 'android') {
-            const { initAPKUpdater } = await import('./update/apk-updater.js');
-            initAPKUpdater();
-        }
-
-        // 快捷消息 UI（数据已在 Step 5.5 加载）
-        initQuickMessagesUI();
-
-        // 会话搜索
-        initSessionSearch();
-
-        // 其他UI
-        initImageViewer();
         initScrollControl();
-        initProvidersUI();
-        initMCPSettings();
-        initToolManager();
-        initToolsQuickSelector();
 
-        // 初始化工具管理器 MCP 增强
-        import('./ui/tool-manager-mcp-enhancements.js').then(({ initToolManagerMCPEnhancements }) => {
-            initToolManagerMCPEnhancements();
-        });
+        // 需要 await 的调整尺寸操作
+        await Promise.all([
+            initInputResize(),
+            initPanelResize()
+        ]);
 
-        // 初始化快速选择器 MCP 增强
-        import('./ui/tools-quick-selector-enhancements.js').then(({ initQuickSelectorEnhancements }) => {
-            initQuickSelectorEnhancements();
-        });
+        // 非首屏 UI（延迟动态加载，不阻塞首次交互）
+        requestIdleCallback(async () => {
+            const [
+                { initSettings },
+                { initImageViewer },
+                { initEndpointInputListeners, initThinkingControls, initConfigManagement, initOtherConfigInputs },
+                { initPrefillControls, initSystemPrefillControls, initGeminiSystemParts },
+                { initCustomHeaders },
+                { initQuickMessagesUI },
+                { initSessionSearch },
+                { initMCPSettings },
+                { initToolManager },
+                { initToolsQuickSelector },
+                { initUpdateModal },
+                { initExportImport },
+                { initProvidersUI }
+            ] = await Promise.all([
+                import('./ui/settings.js'),
+                import('./ui/viewer.js'),
+                import('./ui/config-helpers.js'),
+                import('./ui/prefill.js'),
+                import('./ui/enhancements.js'),
+                import('./ui/quick-messages.js'),
+                import('./ui/session-search.js'),
+                import('./ui/mcp-settings.js'),
+                import('./ui/tool-manager.js'),
+                import('./ui/tools-quick-selector.js'),
+                import('./update/update-modal.js'),
+                import('./state/export-import.js'),
+                import('./providers/ui.js')
+            ]);
 
-        // 高级功能
-        initPrefillControls();
-        initSystemPrefillControls();
-        initGeminiSystemParts();
-        initCustomHeaders();
+            initSettings();
+            initImageViewer();
+            initEndpointInputListeners();
+            initThinkingControls();
+            initConfigManagement();
+            initOtherConfigInputs();
+            initPrefillControls();
+            initSystemPrefillControls();
+            initGeminiSystemParts();
+            initCustomHeaders();
+            initQuickMessagesUI();
+            initSessionSearch();
+            initProvidersUI();
+            initMCPSettings();
+            initToolManager();
+            initToolsQuickSelector();
+            initUpdateModal();
+            initExportImport();
 
-        // 导入导出
-        initExportImport();
+            // MCP 增强
+            import('./ui/tool-manager-mcp-enhancements.js').then(({ initToolManagerMCPEnhancements }) => {
+                initToolManagerMCPEnhancements();
+            });
+            import('./ui/tools-quick-selector-enhancements.js').then(({ initQuickSelectorEnhancements }) => {
+                initQuickSelectorEnhancements();
+            });
+
+            // OpenClaw 模块（审批、屏幕截图、定时任务）
+            import('./ui/openclaw-approval.js').then(({ initOpenClawApproval }) => {
+                initOpenClawApproval();
+            });
+            import('./ui/openclaw-screen.js').then(({ initOpenClawScreen }) => {
+                initOpenClawScreen();
+            });
+            import('./ui/openclaw-cron.js').then(({ initOpenClawCron }) => {
+                initOpenClawCron();
+            });
+
+            // APK 更新（仅 Android）
+            if (window.Capacitor && window.Capacitor.getPlatform() === 'android') {
+                const { initAPKUpdater } = await import('./update/apk-updater.js');
+                initAPKUpdater();
+            }
+        }, { timeout: 1000 });
 
         // 会话恢复已由 loadSessions() 处理（Line 183）
         // loadSessions() 中已包含：
@@ -495,10 +518,17 @@ async function init() {
         console.log(`🎨 Theme: ${document.documentElement.classList.contains('dark-theme') ? 'dark' : 'light'}`);
         console.log(`🔌 API Format: ${state.apiFormat}`);
 
-        // 7. 自动连接 MCP 服务器
-        console.log('🔗 Step 10/10: Auto-connecting MCP servers...');
+        // 7. 延迟执行非关键任务
+        // 请求持久化存储（不影响功能，延迟执行）
+        if (dbReady) {
+            import('./state/storage.js').then(({ requestPersistentStorage }) => {
+                requestPersistentStorage();
+            });
+        }
+
+        // 自动连接 MCP 服务器
         import('./ui/mcp-auto-connect.js').then(({ initMCPAutoConnect }) => {
-            initMCPAutoConnect(1000); // 延迟 1 秒后开始连接，确保 UI 已完全加载
+            initMCPAutoConnect(1000);
         });
 
         // 添加页面关闭前保存配置

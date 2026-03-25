@@ -5,6 +5,7 @@
 
 import { state } from '../core/state.js';
 import { elements } from '../core/elements.js';
+import { eventBus } from '../core/events.js';
 import { toggleSettings } from './settings.js';
 import { toggleSidebar } from './sidebar.js';
 import { closeImageViewer } from './viewer.js';
@@ -36,11 +37,14 @@ function cancelEdit() {
     }
     state.editingIndex = null;
 
-    // 更新取消编辑按钮
+    // 隐藏保存和取消按钮
     const cancelBtn = document.getElementById('cancel-edit');
-    if (cancelBtn) {
-        cancelBtn.classList.remove('show');
-    }
+    if (cancelBtn) cancelBtn.classList.remove('show');
+    const saveBtn = document.getElementById('save-edit');
+    if (saveBtn) saveBtn.classList.remove('show');
+
+    // 通知其他模块编辑模式已关闭
+    eventBus.emit('editor:mode-changed', { isEditing: false });
 }
 
 /**

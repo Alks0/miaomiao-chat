@@ -170,9 +170,10 @@ function renderProviderItem(provider) {
     const isSelected = provider.id === selectedProviderId;
     const formatLabels = {
         openai: 'OpenAI',
-        'openai-responses': 'OpenAI Responses',  // ⭐ 新增
+        'openai-responses': 'OpenAI Responses',
         gemini: 'Gemini',
-        claude: 'Claude'
+        claude: 'Claude',
+        openclaw: 'OpenClaw'
     };
 
     return `
@@ -253,6 +254,7 @@ function showProviderForm(providerId) {
                     <option value="openai-responses" ${provider?.apiFormat === 'openai-responses' ? 'selected' : ''}>OpenAI (Responses API)</option>
                     <option value="gemini" ${provider?.apiFormat === 'gemini' ? 'selected' : ''}>Gemini</option>
                     <option value="claude" ${provider?.apiFormat === 'claude' ? 'selected' : ''}>Claude</option>
+                    <option value="openclaw" ${provider?.apiFormat === 'openclaw' ? 'selected' : ''}>OpenClaw</option>
                 </select>
                 ${isEdit ? '<p class="form-hint">修改格式后需确保端点与新格式匹配</p>' : ''}
             </div>
@@ -288,6 +290,18 @@ function showProviderForm(providerId) {
                 </div>
                 <p class="form-hint">启用后使用 x-goog-api-key 请求头（适用于代理）</p>
             </div>
+
+            ${isEdit && provider?.apiFormat === 'openclaw' ? `
+                <div class="form-group openclaw-connection-section">
+                    <label>连接状态</label>
+                    <div class="openclaw-connection-status">
+                        <span class="openclaw-status-dot" id="openclaw-status-dot"></span>
+                        <span id="openclaw-status-text">未连接</span>
+                        <button type="button" id="openclaw-connect-btn" class="btn-secondary">连接</button>
+                        <button type="button" id="openclaw-disconnect-btn" class="btn-secondary" style="display:none;">断开</button>
+                    </div>
+                </div>
+            ` : ''}
 
             ${isEdit ? `
                 <div class="form-group">
@@ -457,7 +471,94 @@ function bindFormEvents(providerId) {
                 openEditModelModal(providerId, modelId);
             });
         });
+
+        // OpenClaw 连接/断开按钮
+        bindOpenClawConnectionEvents(providerId);
     }
+}
+
+// 跟踪 OpenClaw 连接状态 listener，防止重复注册
+let _openclawStatusUnsubs = [];
+
+/**
+ * 绑定 OpenClaw 连接状态相关事件
+ * @param {string} providerId - 提供商 ID
+ */
+function bindOpenClawConnectionEvents(providerId) {
+    const connectBtn = document.getElementById('openclaw-connect-btn');
+    const disconnectBtn = document.getElementById('openclaw-disconnect-btn');
+    if (!connectBtn) return;
+
+    // 清理上一次注册的 listener
+    _openclawStatusUnsubs.forEach(unsub => unsub());
+    _openclawStatusUnsubs = [];
+
+    // 动态导入 openclawClient（避免循环依赖）
+    const getClient = async () => {
+        const { openclawClient } = await import('../api/openclaw.js');
+        return openclawClient;
+    };
+
+    // 更新状态显示
+    const updateStatus = async () => {
+        const dot = document.getElementById('openclaw-status-dot');
+        const text = document.getElementById('openclaw-status-text');
+        if (!dot || !text) return;
+
+        const client = await getClient();
+        const status = client.getStatus();
+
+        const statusMap = {
+            connected: { color: '#4caf50', label: '已连接' },
+            connecting: { color: '#ff9800', label: '连接中...' },
+            reconnecting: { color: '#ff9800', label: '重连中...' },
+            disconnected: { color: '#f44336', label: '未连接' }
+        };
+        const s = statusMap[status] || statusMap.disconnected;
+        dot.style.background = s.color;
+        text.textContent = s.label;
+
+        connectBtn.style.display = status === 'connected' ? 'none' : '';
+        disconnectBtn.style.display = status === 'connected' ? '' : 'none';
+    };
+
+    connectBtn.addEventListener('click', async () => {
+        const provider = state.providers.find(p => p.id === providerId);
+        if (!provider) return;
+
+        const client = await getClient();
+        const url = provider.endpoint || 'ws://localhost:18789';
+        const token = getActiveApiKey(providerId);
+
+        connectBtn.textContent = '连接中...';
+        connectBtn.disabled = true;
+
+        const result = await client.connect(url, token);
+        connectBtn.textContent = '连接';
+        connectBtn.disabled = false;
+
+        if (result.success) {
+            showNotification('OpenClaw 已连接', 'success');
+        } else {
+            showNotification(`连接失败: ${result.error}`, 'error');
+        }
+        updateStatus();
+    });
+
+    disconnectBtn.addEventListener('click', async () => {
+        const client = await getClient();
+        client.disconnect();
+        showNotification('OpenClaw 已断开', 'info');
+        updateStatus();
+    });
+
+    // 使用已导入的 eventBus，并追踪 unsub 以避免泄漏
+    _openclawStatusUnsubs.push(
+        eventBus.on('openclaw:connected', updateStatus),
+        eventBus.on('openclaw:disconnected', updateStatus)
+    );
+
+    updateStatus();
 }
 
 /**
