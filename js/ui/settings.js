@@ -151,14 +151,14 @@ export function initSettings() {
         });
     }
 
-    // PDF 兼容模式开关
-    const pdfImageModeSwitch = document.getElementById('pdf-image-mode-enabled');
-    if (pdfImageModeSwitch) {
-        pdfImageModeSwitch.checked = state.pdfImageModeEnabled || false;
-        pdfImageModeSwitch.addEventListener('change', (e) => {
-            state.pdfImageModeEnabled = e.target.checked;
+    // PDF 处理模式选择器
+    const pdfModeSelect = document.getElementById('pdf-mode-select');
+    if (pdfModeSelect) {
+        pdfModeSelect.value = state.pdfMode || 'standard';
+        pdfModeSelect.addEventListener('change', (e) => {
+            state.pdfMode = e.target.value;
             saveCurrentConfig();
-            console.log('[Settings] 📄 PDF 兼容模式已', e.target.checked ? '启用' : '禁用');
+            console.log(`[Settings] PDF 处理模式: ${e.target.value}`);
         });
     }
 
@@ -247,6 +247,9 @@ export function initSettings() {
         }
     }
 
+    // 移动端手风琴折叠
+    initMobileSettingsAccordion();
+
     console.log('Settings panel initialized');
 }
 
@@ -255,6 +258,95 @@ export function initSettings() {
  */
 function isElectron() {
     return window.electronAPI && window.electronAPI.isElectron && window.electronAPI.isElectron();
+}
+
+/**
+ * 移动端设置面板手风琴折叠
+ * 768px 以下将设置组转为可折叠的手风琴
+ */
+function initMobileSettingsAccordion() {
+    const mq = window.matchMedia('(max-width: 768px)');
+    let initialized = false;
+
+    function setup() {
+        if (initialized) return;
+        initialized = true;
+
+        const groups = document.querySelectorAll('.settings-content > .settings-group');
+        groups.forEach((group, index) => {
+            // 跳过已经有 <details> 的组
+            if (group.querySelector('details')) return;
+
+            const label = group.querySelector('.settings-label');
+            if (!label) return;
+
+            // 将 label 之后的内容包裹到 body 容器
+            const body = document.createElement('div');
+            body.className = 'settings-group-body';
+
+            const children = Array.from(group.children).filter(c => c !== label);
+            children.forEach(c => body.appendChild(c));
+            group.appendChild(body);
+
+            group.classList.add('accordion');
+
+            // 第一个设置组（模型选择）默认展开
+            if (index === 0) {
+                group.classList.add('expanded');
+            } else {
+                body.classList.add('collapsed');
+            }
+
+            label.addEventListener('click', () => {
+                const isExpanded = group.classList.contains('expanded');
+                if (isExpanded) {
+                    group.classList.remove('expanded');
+                    body.classList.add('collapsed');
+                } else {
+                    group.classList.add('expanded');
+                    body.classList.remove('collapsed');
+                    // 设置 max-height 为内容实际高度
+                    body.style.maxHeight = body.scrollHeight + 'px';
+                }
+            });
+
+            // 展开时设置 max-height
+            if (index === 0) {
+                requestAnimationFrame(() => {
+                    body.style.maxHeight = body.scrollHeight + 'px';
+                });
+            }
+        });
+    }
+
+    function teardown() {
+        if (!initialized) return;
+        initialized = false;
+
+        const groups = document.querySelectorAll('.settings-content > .settings-group.accordion');
+        groups.forEach(group => {
+            group.classList.remove('accordion', 'expanded');
+            const body = group.querySelector('.settings-group-body');
+            if (body) {
+                // 将 body 内的元素移回 group
+                while (body.firstChild) {
+                    group.appendChild(body.firstChild);
+                }
+                body.remove();
+            }
+        });
+    }
+
+    function handleChange(e) {
+        if (e.matches) {
+            setup();
+        } else {
+            teardown();
+        }
+    }
+
+    mq.addEventListener('change', handleChange);
+    if (mq.matches) setup();
 }
 
 function isCapacitor() {

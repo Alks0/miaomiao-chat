@@ -4,8 +4,8 @@
  */
 
 /* 对话框遮罩层 */
-#input-dialog-modal.modal,
-#confirm-dialog-modal.modal {
+:where(#input-dialog-modal).modal,
+:where(#confirm-dialog-modal).modal {
     display: none;
     position: fixed;
     top: 0;
@@ -17,27 +17,27 @@
     justify-content: center;
 }
 
-#input-dialog-modal.modal[style*="display: flex"],
-#confirm-dialog-modal.modal[style*="display: flex"] {
-    display: flex !important;
+:where(#input-dialog-modal).modal[style*="display: flex"],
+:where(#confirm-dialog-modal).modal[style*="display: flex"] {
+    display: flex;
 }
 
-#input-dialog-modal .modal-overlay,
-#confirm-dialog-modal .modal-overlay {
+:where(#input-dialog-modal) .modal-overlay,
+:where(#confirm-dialog-modal) .modal-overlay {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(40, 40, 43, 0.85);
+    background: var(--overlay-backdrop);
     backdrop-filter: blur(4px);
     z-index: var(--z-base);
     pointer-events: none;
 }
 
 /* 对话框内容 */
-#input-dialog-modal .modal-content,
-#confirm-dialog-modal .modal-content {
+:where(#input-dialog-modal) .modal-content,
+:where(#confirm-dialog-modal) .modal-content {
     position: relative;
     z-index: var(--z-sticky);
     background: var(--color-bg-surface);
@@ -64,8 +64,8 @@
 }
 
 /* 对话框头部 */
-#input-dialog-modal .modal-header,
-#confirm-dialog-modal .modal-header {
+:where(#input-dialog-modal) .modal-header,
+:where(#confirm-dialog-modal) .modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -74,46 +74,46 @@
     border-bottom: 3px solid var(--color-border-primary);
 }
 
-#input-dialog-modal .modal-header h2,
-#confirm-dialog-modal .modal-header h2 {
+:where(#input-dialog-modal) .modal-header h2,
+:where(#confirm-dialog-modal) .modal-header h2 {
     font-family: 'Press Start 2P', 'Courier New', monospace;
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--color-text-inverse);
     margin: 0;
     text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
 }
 
-#input-dialog-modal .modal-header .icon-button,
-#confirm-dialog-modal .modal-header .icon-button {
+:where(#input-dialog-modal) .modal-header .icon-button,
+:where(#confirm-dialog-modal) .modal-header .icon-button {
     width: 44px;
     height: 44px;
     padding: 0;
     background: rgba(0, 0, 0, 0.2);
     border: 2px solid rgba(255, 255, 255, 0.3);
     color: var(--color-text-inverse);
-    font-size: 20px;
+    font-size: var(--fs-3xl);
     line-height: 1;
     cursor: pointer;
     transition: all 0.2s;
 }
 
-#input-dialog-modal .modal-header .icon-button:hover,
-#confirm-dialog-modal .modal-header .icon-button:hover {
-    background: rgba(0, 0, 0, 0.3);
+:where(#input-dialog-modal) .modal-header .icon-button:hover,
+:where(#confirm-dialog-modal) .modal-header .icon-button:hover {
+    background: var(--overlay-light);
     border-color: rgba(255, 255, 255, 0.5);
     transform: scale(1.1);
 }
 
 /* 对话框主体 */
-#input-dialog-modal .modal-body,
-#confirm-dialog-modal .modal-body {
+:where(#input-dialog-modal) .modal-body,
+:where(#confirm-dialog-modal) .modal-body {
     padding: 20px;
 }
 
-#input-dialog-modal .modal-body p,
-#confirm-dialog-modal .modal-body p {
+:where(#input-dialog-modal) .modal-body p,
+:where(#confirm-dialog-modal) .modal-body p {
     font-family: 'Courier New', monospace;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     color: var(--color-text-primary);
     line-height: 1.6;
     margin: 0 0 16px 0;
@@ -124,7 +124,7 @@
     width: 100%;
     padding: 10px 12px;
     font-family: 'Courier New', monospace;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     color: var(--color-text-primary);
     background: var(--color-bg-input);
     border: 2px solid var(--color-border-primary);
@@ -141,8 +141,8 @@
 }
 
 /* 对话框底部按钮 */
-#input-dialog-modal .modal-footer,
-#confirm-dialog-modal .modal-footer {
+:where(#input-dialog-modal) .modal-footer,
+:where(#confirm-dialog-modal) .modal-footer {
     display: flex;
     gap: 12px;
     padding: 16px 20px;
@@ -150,16 +150,16 @@
     border-top: 2px solid rgba(0, 0, 0, 0.1);
 }
 
-#input-dialog-modal .btn-primary,
-#input-dialog-modal .btn-secondary,
-#confirm-dialog-modal .btn-primary,
-#confirm-dialog-modal .btn-secondary {
+:where(#input-dialog-modal) .btn-primary,
+:where(#input-dialog-modal) .btn-secondary,
+:where(#confirm-dialog-modal) .btn-primary,
+:where(#confirm-dialog-modal) .btn-secondary {
     flex: 1;
     min-width: 44px;
     min-height: 44px;
     padding: 10px 16px;
     font-family: 'Press Start 2P', 'Courier New', monospace;
-    font-size: 10px;
+    font-size: var(--fs-xs);
     border: 2px solid var(--color-border-primary);
     cursor: pointer;
     transition: all 0.2s;
@@ -167,8 +167,8 @@
     position: relative;
 }
 
-#input-dialog-modal .btn-primary,
-#confirm-dialog-modal .btn-primary {
+:where(#input-dialog-modal) .btn-primary,
+:where(#confirm-dialog-modal) .btn-primary {
     background: var(--md-blue);
     color: var(--color-text-inverse);
     box-shadow:
@@ -176,8 +176,8 @@
         0 6px 8px rgba(0, 0, 0, 0.2);
 }
 
-#input-dialog-modal .btn-primary:hover,
-#confirm-dialog-modal .btn-primary:hover {
+:where(#input-dialog-modal) .btn-primary:hover,
+:where(#confirm-dialog-modal) .btn-primary:hover {
     background: #5BA0F2;
     transform: translateY(-2px);
     box-shadow:
@@ -185,16 +185,16 @@
         0 8px 12px rgba(0, 0, 0, 0.3);
 }
 
-#input-dialog-modal .btn-primary:active,
-#confirm-dialog-modal .btn-primary:active {
+:where(#input-dialog-modal) .btn-primary:active,
+:where(#confirm-dialog-modal) .btn-primary:active {
     transform: translateY(2px);
     box-shadow:
         0 2px 0 #2C5F9E,
         0 3px 4px rgba(0, 0, 0, 0.2);
 }
 
-#input-dialog-modal .btn-secondary,
-#confirm-dialog-modal .btn-secondary {
+:where(#input-dialog-modal) .btn-secondary,
+:where(#confirm-dialog-modal) .btn-secondary {
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
     box-shadow:
@@ -202,8 +202,8 @@
         0 6px 8px rgba(0, 0, 0, 0.15);
 }
 
-#input-dialog-modal .btn-secondary:hover,
-#confirm-dialog-modal .btn-secondary:hover {
+:where(#input-dialog-modal) .btn-secondary:hover,
+:where(#confirm-dialog-modal) .btn-secondary:hover {
     background: var(--color-bg-primary);
     transform: translateY(-2px);
     box-shadow:
@@ -211,8 +211,8 @@
         0 8px 12px rgba(0, 0, 0, 0.25);
 }
 
-#input-dialog-modal .btn-secondary:active,
-#confirm-dialog-modal .btn-secondary:active {
+:where(#input-dialog-modal) .btn-secondary:active,
+:where(#confirm-dialog-modal) .btn-secondary:active {
     transform: translateY(2px);
     box-shadow:
         0 2px 0 #A0A0A0,
@@ -221,26 +221,26 @@
 
 /* 移动端适配 */
 @media (max-width: 480px) {
-    #input-dialog-modal .modal-content,
-    #confirm-dialog-modal .modal-content {
+    :where(#input-dialog-modal) .modal-content,
+    :where(#confirm-dialog-modal) .modal-content {
         width: 95%;
         max-width: none;
     }
 
-    #input-dialog-modal .modal-header h2,
-    #confirm-dialog-modal .modal-header h2 {
-        font-size: 10px;
+    :where(#input-dialog-modal) .modal-header h2,
+    :where(#confirm-dialog-modal) .modal-header h2 {
+        font-size: var(--fs-base);
     }
 
-    #input-dialog-modal .modal-footer,
-    #confirm-dialog-modal .modal-footer {
+    :where(#input-dialog-modal) .modal-footer,
+    :where(#confirm-dialog-modal) .modal-footer {
         flex-direction: column;
     }
 
-    #input-dialog-modal .btn-primary,
-    #input-dialog-modal .btn-secondary,
-    #confirm-dialog-modal .btn-primary,
-    #confirm-dialog-modal .btn-secondary {
+    :where(#input-dialog-modal) .btn-primary,
+    :where(#input-dialog-modal) .btn-secondary,
+    :where(#confirm-dialog-modal) .btn-primary,
+    :where(#confirm-dialog-modal) .btn-secondary {
         width: 100%;
     }
 }

@@ -46,7 +46,14 @@ export function initProvidersUI() {
     // 添加按钮
     elements.addProviderBtn?.addEventListener('click', () => {
         showProviderForm(null); // null = 新建模式
+        showMobileDetail();
     });
+
+    // 移动端返回按钮
+    document.getElementById('mobile-back-btn')?.addEventListener('click', backToProviderList);
+
+    // 移动端列表页关闭按钮
+    document.getElementById('mobile-close-providers')?.addEventListener('click', closeProvidersModal);
 
     // 监听提供商变更事件
     eventBus.on('providers:added', () => {
@@ -106,6 +113,24 @@ function openProvidersModal() {
 function closeProvidersModal() {
     elements.providersModal?.classList.remove('active');
     selectedProviderId = null;
+    // 重置移动端视图
+    document.querySelector('.providers-modal-content')?.classList.remove('mobile-detail-view');
+}
+
+/**
+ * 移动端：切换到详情视图
+ */
+function showMobileDetail() {
+    if (window.innerWidth <= 768) {
+        document.querySelector('.providers-modal-content')?.classList.add('mobile-detail-view');
+    }
+}
+
+/**
+ * 移动端：返回列表视图
+ */
+function backToProviderList() {
+    document.querySelector('.providers-modal-content')?.classList.remove('mobile-detail-view');
 }
 
 /**
@@ -148,6 +173,7 @@ function renderProvidersList() {
             selectedProviderId = id;
             renderProvidersList(); // 更新选中状态
             showProviderForm(id);
+            showMobileDetail();
         });
     });
 
@@ -176,6 +202,8 @@ function renderProviderItem(provider) {
         openclaw: 'OpenClaw'
     };
 
+    const modelCount = provider.models?.length || 0;
+
     return `
         <div class="provider-item ${isSelected ? 'selected' : ''}"
              data-provider-id="${provider.id}">
@@ -184,7 +212,7 @@ function renderProviderItem(provider) {
             </div>
             <div class="provider-item-info">
                 <div class="provider-item-name">${escapeHtml(provider.name)}</div>
-                <div class="provider-item-format">${formatLabels[provider.apiFormat]}</div>
+                <div class="provider-item-format">${formatLabels[provider.apiFormat]} · ${modelCount}个模型</div>
             </div>
             <button class="provider-toggle-btn" data-provider-id="${provider.id}" title="${provider.enabled ? '禁用（不显示模型）' : '启用（显示模型）'}">
                 <div class="toggle-switch ${provider.enabled ? 'on' : 'off'}">

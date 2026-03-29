@@ -12,7 +12,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--overlay-heavy);
     z-index: var(--z-modal-settings);
     align-items: center;
     justify-content: center;
@@ -262,7 +262,7 @@
     background: var(--md-blue);
     border: var(--border);
     border-radius: 8px;
-    color: white;
+    color: var(--color-text-inverse);
     font-weight: bold;
     cursor: pointer;
     transition: all 0.15s var(--ease);
@@ -431,7 +431,7 @@
 }
 
 .validation-result.error {
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-error-bg);
     border: 2px solid var(--md-coral);
 }
 
@@ -524,7 +524,7 @@
 .btn-primary {
     background: var(--md-blue);
     border-color: var(--md-blue);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-primary:hover {
@@ -534,21 +534,21 @@
 .btn-secondary {
     background: var(--md-muted);
     border-color: var(--md-muted);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-secondary:hover {
-    background: #777777;
+    background: var(--md-muted);
 }
 
 .btn-danger {
     background: var(--md-coral);
     border-color: var(--md-coral);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-danger:hover {
-    background: #dc2626;
+    background: var(--md-coral);
 }
 
 .btn-default {
@@ -562,53 +562,161 @@
     border-color: var(--md-muted);
 }
 
+/* ========== 桌面端隐藏移动端专用元素 ========== */
+.tool-list-header,
+.tool-detail-header,
+.mobile-close-tools {
+    display: none;
+}
+
 /* ========== 响应式设计 ========== */
 
 @media (max-width: 768px) {
+    /* 全屏 + 列表/详情切换 */
     .tool-manager-content {
-        width: 95%;
-        height: 85vh;
-        max-height: 90vh;
-        min-height: 400px;
+        width: 100vw;
+        height: 100dvh;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        position: relative;
+        overflow: hidden;
     }
 
+    /* 隐藏桌面端头部和tab导航 (实际覆盖在 _responsive.css，此处作为补充) */
+
+    /* body 撑满 */
     .tool-manager-body {
-        flex-direction: column;
-        min-height: 0;
-    }
-
-    .tool-list-panel {
-        width: 100%;
-        max-height: 40%;
-        min-height: 200px;
-        border-right: none;
-        border-bottom: var(--border);
-        flex-shrink: 0;
-    }
-
-    .tool-detail-panel {
-        width: 100%;
+        position: relative;
+        overflow: hidden;
         min-height: 0;
         flex: 1;
     }
 
-    .form-actions {
-        flex-direction: column;
-    }
-
-    .form-actions .btn {
+    /* 列表面板：绝对定位全屏 */
+    .tool-list-panel {
+        position: absolute;
+        inset: 0;
         width: 100%;
-    }
-
-    .rate-limit-inputs {
+        max-height: none;
+        min-height: auto;
+        border-right: none;
+        border-bottom: none;
+        z-index: 1;
+        transition: transform 0.25s ease-out;
+        display: flex;
         flex-direction: column;
-        align-items: flex-start;
+        background: var(--color-bg-primary);
     }
 
-    .rate-limit-inputs input,
-    .rate-limit-inputs select {
-        width: 100%;
+    /* 移动端列表头部 */
+    .tool-list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--color-border-secondary);
+        flex-shrink: 0;
+        background: var(--color-bg-accent);
+        color: var(--color-text-inverse);
     }
+
+    .tool-list-header h2 {
+        font-size: var(--fs-lg);
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .mobile-close-tools {
+        display: flex;
+        color: var(--color-text-primary);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+    }
+
+    /* 详情面板：右侧滑入 */
+    .tool-detail-panel {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        z-index: 2;
+        transform: translateX(100%);
+        transition: transform 0.25s ease-out;
+        display: flex;
+        flex-direction: column;
+        background: var(--color-bg-primary);
+    }
+
+    .tool-manager-content.mobile-detail-view .tool-detail-panel {
+        transform: translateX(0);
+    }
+
+    /* 详情头部（返回按钮 + 标题） */
+    .tool-detail-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--color-border-secondary);
+        flex-shrink: 0;
+        background: var(--color-bg-accent);
+        color: var(--color-text-inverse);
+    }
+
+    .tool-detail-header .mobile-back-btn {
+        display: flex;
+        color: var(--color-text-inverse);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .tool-detail-title {
+        font-size: var(--fs-lg);
+        font-weight: 600;
+        margin: 0;
+    }
+
+    /* 详情内容可滚动 */
+    #tool-detail-container {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    /* 工具列表项样式 */
+    .tool-item {
+        position: relative;
+        padding: 10px 32px 10px 10px;
+    }
+
+    .tool-item::after {
+        content: '〉';
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--md-muted);
+        font-size: var(--fs-lg);
+        pointer-events: none;
+    }
+
+    /* 搜索框 */
+    .tool-search-box {
+        padding: 8px;
+    }
+
+    .tool-search-box input {
+        font-size: var(--fs-xl);
+        padding: 6px 8px;
+    }
+
+    /* 表单缩小 */
+    .form-actions { flex-direction: column; }
+    .form-actions .btn { width: 100%; }
+    .rate-limit-inputs { flex-direction: column; align-items: flex-start; }
+    .rate-limit-inputs input, .rate-limit-inputs select { width: 100%; }
 }
 
 /* ========== 滚动条样式 ========== */

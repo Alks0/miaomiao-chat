@@ -15,7 +15,7 @@ import { XMLStreamAccumulator } from '../tools/xml-formatter.js';  // XML 工具
 import { state } from '../core/state.js';  // 访问 xmlToolCallingEnabled 配置
 import { ThinkTagParser } from './think-tag-parser.js';  // <think> 标签解析器
 import { requestStateMachine, RequestState } from '../core/request-state-machine.js';
-import { isVideoMimeType } from '../utils/media.js';
+import { isVideoMimeType, isAudioMimeType } from '../utils/media.js';
 
 // 响应长度限制（防止内存溢出）
 const MAX_TEXT_RESPONSE_LENGTH = 200000;     // 纯文本响应：200KB
@@ -245,7 +245,10 @@ export async function parseGeminiStream(reader, sessionId = null) {
                             } else {
                                 // 正常的 base64 数据
                                 const dataUrl = `data:${mimeType};base64,${inlineData.data}`;
-                                const mediaType = isVideoMimeType(mimeType) ? 'video_url' : 'image_url';
+                                let mediaType;
+                                if (isVideoMimeType(mimeType)) mediaType = 'video_url';
+                                else if (isAudioMimeType(mimeType)) mediaType = 'audio_url';
+                                else mediaType = 'image_url';
                                 contentParts.push({ type: mediaType, url: dataUrl, complete: true, mimeType });
                                 // 计数 base64 数据长度（防止超长）
                                 totalReceived += inlineData.data.length;
@@ -254,9 +257,9 @@ export async function parseGeminiStream(reader, sessionId = null) {
                     }
 
                     // 智能截断检查（区分文本和图片响应）
-                    const hasMedia = contentParts.some(p => p.type === 'image_url' || p.type === 'video_url');
+                    const hasMedia = contentParts.some(p => p.type === 'image_url' || p.type === 'video_url' || p.type === 'audio_url');
                     const mediaDataSize = contentParts
-                        .filter(p => p.type === 'image_url' || p.type === 'video_url')
+                        .filter(p => p.type === 'image_url' || p.type === 'video_url' || p.type === 'audio_url')
                         .reduce((sum, p) => sum + (p.url ? p.url.length : 0), 0);
                     const textDataSize = totalReceived - mediaDataSize;
 

@@ -6,7 +6,7 @@
     padding: 4px 20px;
     background: var(--color-bg-accent);
     color: var(--color-text-inverse);
-    font-size: 12px;
+    font-size: var(--fs-base);
     flex-shrink: 0;
     z-index: var(--z-sticky);
 }
@@ -35,7 +35,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     transition: background 0.15s;
     min-height: 24px;
 }
@@ -48,7 +48,7 @@
 @media (max-width: 768px) {
     .openclaw-status-bar {
         padding: 3px 12px;
-        font-size: 11px;
+        font-size: var(--fs-sm);
     }
 
     .openclaw-sb-btn {

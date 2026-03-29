@@ -15,7 +15,7 @@
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s var(--ease);
@@ -37,7 +37,7 @@
     background: var(--md-yellow);
     border: var(--border);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 .multi-reply-progress::before {

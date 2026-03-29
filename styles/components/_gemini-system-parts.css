@@ -29,7 +29,7 @@
 }
 
 .system-part-index {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     color: var(--md-muted);
     font-weight: 600;
     font-family: var(--font-mono);
@@ -42,7 +42,7 @@
     color: var(--md-coral);
     cursor: pointer;
     padding: 2px 6px;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: bold;
 }
 
@@ -58,7 +58,7 @@
     padding: 8px;
     border: 1px solid var(--md-border);
     border-radius: 2px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     background: var(--md-bg);
     color: var(--md-text);
     resize: vertical;

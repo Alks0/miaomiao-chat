@@ -54,7 +54,7 @@
     background: transparent;
     color: var(--color-text-primary);
     font-family: var(--font-sans);
-    font-size: 15px;
+    font-size: var(--fs-lg);
     line-height: 1.5;
     resize: none;
     outline: none;
@@ -103,7 +103,7 @@
     position: absolute;
     bottom: -24px;
     right: 12px;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-family: var(--font-mono);
     color: var(--md-muted);
     transition: color 0.2s ease;
@@ -188,7 +188,7 @@
 .cancel-btn:hover {
     transform: translate(3px, -3px);
     box-shadow: none, 0 0 30px rgba(255, 107, 107, 0.6);
-    background: #d32f2f;
+    background: var(--md-coral);
 }
 
 .cancel-btn:active {
@@ -214,7 +214,7 @@
     border: var(--border);
     color: var(--md-muted);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     cursor: pointer;
     transition: all 0.15s var(--ease);
     box-shadow: var(--shadow-sm);
@@ -369,7 +369,7 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 16px;
+    font-size: var(--fs-xl);
     line-height: 1;
     opacity: 0;
     transform: scale(0.8);
@@ -456,7 +456,7 @@
 
 .quote-preview-label {
     font-family: var(--font-sans);
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--md-muted);
 }
 
@@ -467,7 +467,7 @@
 
 .quote-preview-message {
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     color: var(--color-text-primary);
     line-height: 1.4;
     overflow: hidden;
@@ -525,17 +525,17 @@
 
 .file-preview-item .pdf-icon {
     background: rgba(239, 83, 80, 0.15);
-    color: #EF5350;
+    color: var(--md-red);
 }
 
 .file-preview-item .txt-icon {
     background: rgba(66, 165, 245, 0.15);
-    color: #42A5F5;
+    color: var(--md-blue);
 }
 
 .file-preview-item .md-icon {
     background: rgba(156, 39, 176, 0.15);
-    color: #9C27B0;
+    color: var(--md-pink);
 }
 
 .file-preview-item .file-preview-info {
@@ -548,7 +548,7 @@
 }
 
 .file-preview-item .file-name {
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-family: var(--font-mono);
     color: var(--color-text-primary);
     font-weight: 500;
@@ -559,7 +559,7 @@
 }
 
 .file-preview-item .file-size {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     color: var(--md-muted);
     font-family: var(--font-mono);
 }
@@ -571,7 +571,7 @@
     margin: 0;
     width: 32px;
     height: 32px;
-    font-size: 16px;
+    font-size: var(--fs-xl);
 }
 
 /* 自动转换标记 */
@@ -585,7 +585,7 @@
     right: -6px;
     background: var(--color-primary);
     color: white;
-    font-size: 9px;
+    font-size: var(--fs-2xs);
     font-weight: 600;
     padding: 2px 4px;
     border-radius: 8px;

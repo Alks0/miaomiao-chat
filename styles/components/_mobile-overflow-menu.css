@@ -1,0 +1,62 @@
+/* 移动端溢出菜单 */
+.mobile-overflow-menu {
+    position: absolute;
+    top: 100%;
+    right: 12px;
+    background: var(--color-bg-elevated);
+    border: var(--border);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-dropdown);
+    min-width: 180px;
+    transform-origin: top right;
+    transform: scale(0.95);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.15s var(--ease), opacity 0.15s var(--ease);
+    overflow: hidden;
+}
+
+.mobile-overflow-menu.open {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.mobile-overflow-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    min-height: 48px;
+    border: none;
+    background: transparent;
+    width: 100%;
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--fs-lg);
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: left;
+}
+
+.mobile-overflow-item:active {
+    background: var(--color-bg-primary);
+}
+
+.mobile-overflow-item + .mobile-overflow-item {
+    border-top: 1px solid var(--color-border-secondary);
+}
+
+.mobile-overflow-item svg {
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+}
+
+/* 桌面端隐藏 */
+@media (min-width: 769px) {
+    .mobile-overflow-btn,
+    .mobile-header-title,
+    .mobile-overflow-menu {
+        display: none;
+    }
+}

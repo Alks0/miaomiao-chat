@@ -15,6 +15,7 @@ import { pushMessage } from '../core/state-mutations.js';
 import { truncateFileName } from '../utils/file-helpers.js';
 import { MAX_ATTACHMENTS, MAX_FILE_SIZE, MAX_MESSAGE_LENGTH, IMAGE_COMPRESSION_TIMEOUT, AUTO_DOCUMENT_TOKEN_THRESHOLD } from '../utils/constants.js';
 import { estimateTokenCount } from '../stream/stats.js';
+import { renderPdfToImages } from '../utils/pdf.js';
 
 // 支持的文件类型
 const SUPPORTED_TYPES = {
@@ -127,6 +128,12 @@ export function handleAttachFile() {
         const filesToProcess = files.slice(0, remaining);
 
         for (const file of filesToProcess) {
+            // P1 修复：每次处理文件前重新检查附件上限
+            if (state.uploadedImages.length >= MAX_ATTACHMENTS) {
+                showNotification(`已达到附件上限 ${MAX_ATTACHMENTS}，跳过剩余文件`, 'warning');
+                break;
+            }
+
             // 检查文件大小
             if (file.size > MAX_FILE_SIZE) {
                 showNotification(`文件 "${file.name}" 超过 20MB 限制`, 'error');
@@ -179,15 +186,50 @@ export function handleAttachFile() {
                     });
                     console.log(`已添加图片: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
                 } else if (fileCategory === 'pdf') {
-                    // PDF：直接保存
-                    state.uploadedImages.push({
-                        name: file.name,
-                        type: fileType,
-                        category: 'pdf',
-                        data: base64,
-                        size: file.size,
-                    });
-                    console.log(`已添加 PDF: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+                    // PDF：根据处理模式决定
+                    if (state.pdfMode === 'render') {
+                        // 渲染模式：将 PDF 逐页渲染为图片
+                        try {
+                            // 先检查附件上限，避免白渲染
+                            const canAdd = MAX_ATTACHMENTS - state.uploadedImages.length;
+                            if (canAdd <= 0) {
+                                showNotification(`已达到附件上限，无法添加 PDF 渲染的图片`, 'warning');
+                                break;
+                            }
+
+                            showNotification(`正在渲染 PDF: ${file.name}...`, 'info');
+                            const renderedImages = await renderPdfToImages(base64, {
+                                scale: 1.5,
+                                format: 'image/jpeg',
+                                quality: 0.85,
+                                maxPages: Math.min(20, canAdd),
+                            });
+
+                            for (const img of renderedImages) {
+                                state.uploadedImages.push(img);
+                            }
+
+                            if (renderedImages.length === 0) {
+                                showNotification(`PDF 渲染未产生有效图片`, 'warning');
+                            } else {
+                                showNotification(`PDF 已渲染为 ${renderedImages.length} 张图片`, 'success');
+                            }
+                            console.log(`已渲染 PDF: ${file.name} → ${renderedImages.length} 张图片`);
+                        } catch (err) {
+                            console.error('[PDF 渲染失败]', err);
+                            showNotification(`PDF 渲染失败: ${err.message}`, 'error');
+                        }
+                    } else {
+                        // 标准模式：直接保存 PDF 原文件
+                        state.uploadedImages.push({
+                            name: file.name,
+                            type: fileType,
+                            category: 'pdf',
+                            data: base64,
+                            size: file.size,
+                        });
+                        console.log(`已添加 PDF: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+                    }
                 }
             }
         }

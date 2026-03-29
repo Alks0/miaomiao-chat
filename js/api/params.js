@@ -163,7 +163,7 @@ export function buildThinkingConfig(format, model = '') {
             }
 
             // 传统 budget_tokens 模式
-            return { thinking: { budget_tokens: budget } };
+            return { thinking: { type: 'enabled', budget_tokens: budget } };
 
         default:
             return null;

@@ -3,7 +3,7 @@
     position: fixed;
     inset: 0;
     z-index: 9000;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--overlay-medium);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -32,7 +32,7 @@
 
 .openclaw-cron-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--fs-xl);
 }
 
 .openclaw-cron-body {
@@ -46,7 +46,7 @@
     text-align: center;
     color: var(--text-secondary, #888);
     padding: 40px 0;
-    font-size: 14px;
+    font-size: var(--fs-lg);
 }
 
 .openclaw-cron-list {
@@ -71,12 +71,12 @@
 
 .openclaw-cron-item-message {
     flex: 1;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 500;
 }
 
 .openclaw-cron-item-meta {
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--text-secondary, #888);
     display: flex;
     align-items: center;
@@ -95,11 +95,11 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #4caf50;
+    background: var(--md-green);
 }
 
 .openclaw-cron-item-status.paused::before {
-    background: #ff9800;
+    background: var(--md-orange);
 }
 
 .openclaw-cron-item-actions {
@@ -109,7 +109,7 @@
 }
 
 .openclaw-cron-item-actions button {
-    font-size: 12px;
+    font-size: var(--fs-base);
     padding: 4px 12px;
     border: 1px solid var(--border-color, #333);
     border-radius: 4px;
@@ -124,9 +124,9 @@
 }
 
 .openclaw-cron-item-actions button.delete:hover {
-    background: #f44336;
-    color: #fff;
-    border-color: #f44336;
+    background: var(--color-error);
+    color: var(--color-text-inverse);
+    border-color: var(--color-error);
 }
 
 .openclaw-cron-footer {
@@ -145,7 +145,7 @@
     border-radius: 6px;
     background: var(--bg-primary, #111);
     color: var(--text-primary, #eee);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 .openclaw-cron-select {
@@ -154,7 +154,7 @@
     border-radius: 6px;
     background: var(--bg-primary, #111);
     color: var(--text-primary, #eee);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 .openclaw-cron-custom {

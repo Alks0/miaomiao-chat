@@ -51,24 +51,13 @@
     50% { transform: translateY(3px); }
 }
 
-/* 暗色主题适配 */
-.dark-theme .scroll-to-bottom-btn {
-    background: var(--md-surface);
-    border-color: var(--md-border);
-}
-
-.dark-theme .scroll-to-bottom-btn:hover {
-    background: var(--md-teal);
-    color: var(--color-text-primary);
-}
-
 /* 移动端调整 */
 @media (max-width: 768px) {
     .scroll-to-bottom-btn {
-        width: 48px;
-        height: 48px;
-        bottom: 16px;
-        right: 16px;
+        width: 44px;
+        height: 44px;
+        bottom: 12px;
+        right: 12px;
     }
 }
 

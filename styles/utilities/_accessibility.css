@@ -49,13 +49,13 @@
 .delete-system-part:focus,
 .notification-close:focus,
 .export-import-btn:focus {
-    outline: 3px solid var(--md-blue);
+    outline: 3px solid var(--color-focus);
     outline-offset: 2px;
 }
 
 /* 输入框焦点样式已在各自的定义中 */
 .input-textarea:focus {
-    outline: 3px solid var(--md-blue);
+    outline: 3px solid var(--color-focus);
     outline-offset: 2px;
 }
 
@@ -63,15 +63,6 @@
 .session-item:focus {
     outline: 3px solid var(--md-orange);
     outline-offset: -3px;
-}
-
-/* 暗色主题下使用高对比度颜色 */
-.dark-theme .icon-button:focus,
-.dark-theme .send-btn:focus,
-.dark-theme .settings-select:focus,
-.dark-theme .settings-input:focus,
-.dark-theme .input-textarea:focus {
-    outline-color: var(--md-teal);
 }
 
 /* 确保焦点环在所有元素之上 */
@@ -87,7 +78,7 @@
 
 /* 对于支持 focus-visible 的浏览器，只在键盘导航时显示焦点环 */
 *:focus-visible {
-    outline: 3px solid var(--md-blue);
+    outline: 3px solid var(--color-focus);
     outline-offset: 2px;
 }
 

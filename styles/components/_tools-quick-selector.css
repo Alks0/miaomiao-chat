@@ -48,7 +48,7 @@
 }
 
 .selector-title {
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 600;
     color: var(--md-text);
     font-family: inherit;
@@ -59,7 +59,7 @@
     height: 24px;
     border: none;
     background: transparent;
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     cursor: pointer;
     color: var(--md-muted);
     transition: color 0.15s var(--ease);
@@ -77,7 +77,7 @@
     border: none;
     border-bottom: var(--border);
     background: var(--md-bg);
-    font-size: 13px;
+    font-size: var(--fs-md);
     color: var(--md-text);
     font-family: inherit;
 }
@@ -121,7 +121,7 @@
     gap: 6px;
     padding: 6px 8px;
     margin-bottom: 4px;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--md-muted);
     text-transform: uppercase;
@@ -130,7 +130,7 @@
 }
 
 .group-icon {
-    font-size: 14px;
+    font-size: var(--fs-lg);
 }
 
 .group-count {
@@ -185,7 +185,7 @@ input[type="checkbox"]:checked + .checkbox-custom::after {
     left: 50%;
     transform: translate(-50%, -50%);
     color: white;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: bold;
     line-height: 1;
 }
@@ -197,7 +197,7 @@ input[type="checkbox"]:focus-visible + .checkbox-custom {
 
 /* 工具图标 */
 .tool-icon {
-    font-size: 16px;
+    font-size: var(--fs-xl);
     width: 20px;
     text-align: center;
     flex-shrink: 0;
@@ -206,7 +206,7 @@ input[type="checkbox"]:focus-visible + .checkbox-custom {
 /* 工具名称 */
 .tool-name {
     flex: 1;
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 500;
     color: var(--md-text);
 }
@@ -214,7 +214,7 @@ input[type="checkbox"]:focus-visible + .checkbox-custom {
 /* MCP 标记 */
 .tool-badge {
     padding: 2px 6px;
-    font-size: 10px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     border-radius: 4px;
     background: var(--md-blue);
@@ -240,7 +240,7 @@ input[type="checkbox"]:focus-visible + .checkbox-custom {
 .quick-action-btn {
     flex: 1;
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 500;
     border: var(--border);
     border-radius: 6px;
@@ -298,7 +298,7 @@ input[type="checkbox"]:focus-visible + .checkbox-custom {
 .empty-state {
     padding: 24px;
     text-align: center;
-    font-size: 13px;
+    font-size: var(--fs-md);
     color: var(--md-muted);
 }
 

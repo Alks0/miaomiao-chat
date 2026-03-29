@@ -40,7 +40,7 @@
     background: var(--md-coral);
     border: 3px solid var(--color-border-primary);
     color: var(--color-text-primary);
-    font-size: 28px;
+    font-size: var(--fs-5xl);
     font-weight: bold;
     cursor: pointer;
     display: flex;
@@ -54,5 +54,13 @@
 .image-viewer-close:hover {
     transform: translate(3px, -3px);
     box-shadow: none;
+}
+
+/* 移动端 safe-area 适配 */
+@media (max-width: 768px) {
+    .image-viewer-close {
+        margin-top: calc(12px + env(safe-area-inset-top, 0px));
+        margin-right: calc(12px + env(safe-area-inset-right, 0px));
+    }
 }
 

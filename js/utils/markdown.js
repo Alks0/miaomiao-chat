@@ -216,28 +216,32 @@ function extractLatexFormulas(text) {
     const formulas = [];
     let result = text;
 
-    // 1. 提取块级公式 $$...$$ （必须在行内公式之前处理）
-    result = result.replace(/\$\$([^$]+?)\$\$/g, (match, formula) => {
+    // 1. 提取块级公式 $$...$$ （必须在行内公式之前处理，支持多行）
+    result = result.replace(/\$\$([\s\S]+?)\$\$/g, (match, formula) => {
         const index = formulas.length;
         formulas.push({ formula: formula.trim(), display: true });
         return `<span class="latex-placeholder" data-index="${index}"></span>`;
     });
 
-    // 2. 提取行内公式 $...$ （避免与货币符号冲突，要求公式前后有空格或标点）
-    result = result.replace(/(?:^|[\s(])(\$[^$\n]+?\$)(?=[\s.,;:!?)']|$)/gm, (match, formulaWithDollar, offset, fullText) => {
-        // 检查是否是真正的公式（包含数学符号）
-        const formula = formulaWithDollar.slice(1, -1); // 移除 $ 符号
+    // 2. 提取行内公式 $...$
+    // 确保 $ 前面不是 \ 或 $，用捕获组替代 lookbehind 以兼容旧版 Safari/WebView
+    result = result.replace(/(?:^|([^\\$]))(\$(?:[^$\n\\]|\\.)+\$)(?=[^$]|$)/gm, (match, prefix, formulaWithDollar) => {
+        const formula = formulaWithDollar.slice(1, -1);
+
+        // 过滤货币符号：以数字开头的很可能是 $100 之类
+        if (/^\d/.test(formula.trim())) {
+            return match;
+        }
+
+        // 必须包含数学相关字符（字母、反斜杠、花括号、上下标等）
         if (!/[a-zA-Z\\{}^_=+\-*/<>]/.test(formula)) {
-            // 可能是货币符号，不处理
             return match;
         }
 
         const index = formulas.length;
         formulas.push({ formula: formula.trim(), display: false });
 
-        // 保留前导字符（空格或括号）
-        const prefix = match.charAt(0) === '$' ? '' : match.charAt(0);
-        return `${prefix}<span class="latex-placeholder" data-index="${index}"></span>`;
+        return `${prefix || ''}<span class="latex-placeholder" data-index="${index}"></span>`;
     });
 
     return { text: result, formulas };

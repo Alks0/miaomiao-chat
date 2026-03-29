@@ -69,6 +69,15 @@ export function isImageMimeType(mimeType) {
 }
 
 /**
+ * 判断是否为音频 MIME 类型
+ * @param {string} mimeType - MIME 类型
+ * @returns {boolean}
+ */
+export function isAudioMimeType(mimeType) {
+    return typeof mimeType === 'string' && mimeType.toLowerCase().startsWith('audio/');
+}
+
+/**
  * 判断 Data URL 是否为视频
  * @param {string} dataUrl - Data URL
  * @returns {boolean}

@@ -4,7 +4,7 @@
     gap: 16px;
     padding: 10px 14px;
     margin-top: 12px;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-family: var(--font-mono);
     color: var(--color-text-primary);
     background: var(--color-bg-surface);
@@ -23,11 +23,6 @@
 .stream-stats svg {
     flex-shrink: 0;
     opacity: 0.7;
-}
-
-.dark-theme .stream-stats {
-    background: var(--md-surface);
-    color: var(--md-text);
 }
 
 .dark-theme .stream-stats svg {

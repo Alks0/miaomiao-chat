@@ -20,7 +20,7 @@
     border-radius: 20px;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s var(--ease);
@@ -50,7 +50,7 @@
 }
 
 .summary-status {
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 500;
 }
 
@@ -131,7 +131,7 @@
     border-radius: 6px;
     padding: 4px 6px;
     cursor: pointer;
-    color: #fff;
+    color: var(--color-text-inverse);
     opacity: 0;
     transition: opacity 0.15s;
 }
@@ -165,7 +165,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--overlay-heavy);
     cursor: pointer;
 }
 
@@ -195,7 +195,7 @@
 
 .tool-detail-panel-header h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -203,7 +203,7 @@
 .tool-detail-close-btn {
     background: none;
     border: none;
-    font-size: 28px;
+    font-size: var(--fs-5xl);
     color: var(--text-secondary);
     cursor: pointer;
     padding: 0;
@@ -289,13 +289,13 @@
 .tool-detail-name {
     flex: 1;
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     color: var(--text-primary);
     font-family: var(--font-mono);
 }
 
 .tool-detail-duration {
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--text-secondary);
     font-family: var(--font-mono);
 }
@@ -307,7 +307,7 @@
 
 .tool-detail-body summary {
     padding: 8px 0;
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
@@ -323,7 +323,7 @@
 }
 
 .tool-detail-section-label {
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -336,7 +336,7 @@
 
 .tool-detail-json {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     background: var(--md-bg);
     padding: 10px;
     border-radius: 6px;
@@ -349,7 +349,7 @@
 }
 
 .tool-detail-result-content {
-    font-size: 13px;
+    font-size: var(--fs-md);
     color: var(--text-primary);
     line-height: 1.5;
 }
@@ -372,7 +372,7 @@
     color: var(--md-blue);
     text-decoration: none;
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--fs-md);
     margin-bottom: 2px;
 }
 
@@ -381,7 +381,7 @@
 }
 
 .tool-detail-snippet {
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--text-secondary);
     margin: 0 0 8px;
 }
@@ -389,7 +389,7 @@
 .tool-detail-more {
     text-align: center;
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-style: italic;
     padding: 4px 0;
 }
@@ -402,7 +402,7 @@
 
 .tool-detail-error-msg {
     color: var(--md-coral);
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 500;
 }
 
@@ -417,7 +417,7 @@
     border: var(--border);
     border-radius: 6px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s var(--ease);
@@ -444,7 +444,7 @@
 
 @media (max-width: 768px) {
     .tool-calls-summary-btn {
-        font-size: 12px;
+        font-size: var(--fs-base);
         padding: 5px 12px;
         gap: 6px;
     }

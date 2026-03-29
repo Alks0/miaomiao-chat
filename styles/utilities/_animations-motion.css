@@ -95,7 +95,7 @@
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;
-    font-size: 13px;
+    font-size: var(--fs-md);
     transition: background 0.2s ease;
 }
 
@@ -120,7 +120,7 @@
 }
 
 .message-file-item.pdf svg {
-    color: #EF5350;
+    color: var(--md-red);
 }
 
 /* TXT 文件 - 蓝色 */
@@ -129,7 +129,7 @@
 }
 
 .message-file-item.txt svg {
-    color: #42A5F5;
+    color: var(--md-blue);
 }
 
 /* MD 文件 - 紫色 */
@@ -138,7 +138,7 @@
 }
 
 .message-file-item.md svg {
-    color: #9C27B0;
+    color: var(--md-pink);
 }
 
 /* AI 消息中的文件样式（深色背景上） */

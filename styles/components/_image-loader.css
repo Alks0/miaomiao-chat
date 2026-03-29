@@ -34,7 +34,7 @@
 .image-progress-text {
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     z-index: var(--z-above-base);
 }
 
@@ -54,13 +54,13 @@
     align-items: center;
     gap: 4px;
     color: var(--md-coral);
-    font-size: 12px;
+    font-size: var(--fs-base);
     padding: 20px;
 }
 
 .image-error-size {
     color: var(--md-muted);
-    font-size: 11px;
+    font-size: var(--fs-sm);
 }
 
 .config-manager {
@@ -85,7 +85,7 @@
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s var(--ease);

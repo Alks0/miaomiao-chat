@@ -25,36 +25,36 @@
 }
 
 .message-content h1 {
-    font-size: 28px;
+    font-size: var(--fs-5xl);
     margin-top: 32px;
     padding-bottom: 12px;
     border-bottom: 3px solid var(--md-blue);
 }
 
 .message-content h2 {
-    font-size: 24px;
+    font-size: var(--fs-4xl);
     margin-top: 28px;
     padding-bottom: 10px;
     border-bottom: 2px solid var(--md-orange);
 }
 
 .message-content h3 {
-    font-size: 20px;
+    font-size: var(--fs-3xl);
     color: var(--md-blue);
 }
 
 .message-content h4 {
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     color: var(--md-orange);
 }
 
 .message-content h5 {
-    font-size: 16px;
+    font-size: var(--fs-xl);
     color: var(--md-teal);
 }
 
 .message-content h6 {
-    font-size: 14px;
+    font-size: var(--fs-lg);
     color: var(--md-coral);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -62,12 +62,12 @@
 
 /* 第一个元素不需要上边距 */
 .message-content > *:first-child {
-    margin-top: 0 !important;
+    margin-top: 0;
 }
 
 /* 最后一个元素不需要下边距 */
 .message-content > *:last-child {
-    margin-bottom: 0 !important;
+    margin-bottom: 0;
 }
 
 /* 标题后紧跟的段落间距缩小 */
@@ -186,7 +186,7 @@
     display: inline-block;
     padding: 3px 8px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--color-text-primary);
     background: var(--color-bg-surface);
     border: var(--border);
@@ -200,16 +200,16 @@
 /* 响应式排版 - 移动端 */
 @media (max-width: 768px) {
     .message-content {
-        font-size: 14px;
+        font-size: var(--fs-lg);
         line-height: 1.7;
     }
 
-    .message-content h1 { font-size: 24px; margin-top: 24px; }
-    .message-content h2 { font-size: 20px; margin-top: 20px; }
-    .message-content h3 { font-size: 18px; }
-    .message-content h4 { font-size: 16px; }
-    .message-content h5 { font-size: 15px; }
-    .message-content h6 { font-size: 13px; }
+    .message-content h1 { font-size: var(--fs-4xl); margin-top: 24px; }
+    .message-content h2 { font-size: var(--fs-3xl); margin-top: 20px; }
+    .message-content h3 { font-size: var(--fs-2xl); }
+    .message-content h4 { font-size: var(--fs-xl); }
+    .message-content h5 { font-size: var(--fs-lg); }
+    .message-content h6 { font-size: var(--fs-md); }
 
     .message-content p { margin-bottom: 12px; }
     .message-content ul,
@@ -230,7 +230,7 @@
     overflow: hidden;
     margin: 10px 0;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 /* 代码块顶部栏 - 优化版 */
@@ -246,7 +246,7 @@
 
 .code-language {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     color: var(--md-blue);
     letter-spacing: 0.05em;
@@ -261,10 +261,10 @@
     padding: 6px 32px 6px 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: var(--overlay-light);
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     cursor: pointer;
     transition: all 0.15s ease;
     /* 自定义下拉箭头 */
@@ -432,7 +432,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 700;
     font-family: var(--font-mono);
     border: 2px solid var(--color-border-primary);
@@ -507,5 +507,21 @@
     max-width: 100%;
     max-height: 420px;
     margin: 0;
+}
+
+.message-content .audio-wrapper {
+    position: relative;
+    max-width: min(100%, 480px);
+    margin: 8px 0;
+}
+
+.message-content .audio-wrapper audio {
+    width: 100%;
+}
+
+.message-content .audio-wrapper .download-image-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
 }
 

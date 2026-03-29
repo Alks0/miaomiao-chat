@@ -10,7 +10,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--overlay-heavy);
     z-index: var(--z-modal-settings);
     align-items: center;
     justify-content: center;
@@ -85,7 +85,7 @@
     display: inline-block;
     padding: 0.25rem 0.75rem;
     background: var(--md-blue);
-    color: white;
+    color: var(--color-text-inverse);
     border-radius: 6px;
     font-size: 0.85rem;
     font-weight: 500;
@@ -109,7 +109,7 @@
     padding: 0.5rem;
     font-size: 0.9rem;
     border-left: 3px solid var(--md-yellow);
-    background: rgba(251, 191, 36, 0.1);
+    background: var(--color-warning-bg);
     color: var(--md-text);
 }
 
@@ -174,12 +174,12 @@
 
 .mcp-server-type-badge.local {
     background: var(--md-teal);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .mcp-server-type-badge.remote {
     background: var(--md-blue);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .mcp-server-actions {
@@ -249,7 +249,6 @@
 /* ========== 工具列表 ========== */
 .mcp-tools-list {
     --mcp-tools-bg: rgba(14, 165, 233, 0.05);
-    --scroll-shadow-color: rgba(56, 56, 56, 0.35);
     padding: 0.75rem;
     /* 添加滚动阴影指示器 */
     background:
@@ -277,10 +276,6 @@
     background: var(--mcp-tools-bg);
     padding-bottom: 0.25rem;
     z-index: var(--z-base);
-}
-
-.dark-theme .mcp-tools-list {
-    --scroll-shadow-color: rgba(229, 229, 229, 0.45);
 }
 
 .mcp-tools-list ul {
@@ -468,7 +463,7 @@
 .btn-primary {
     background: var(--md-blue);
     border-color: var(--md-blue);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-primary:hover {
@@ -478,51 +473,51 @@
 .btn-success {
     background: var(--md-teal);
     border-color: var(--md-teal);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-success:hover {
-    background: #10a896;
+    background: var(--md-teal);
 }
 
 .btn-warning {
     background: var(--md-orange);
     border-color: var(--md-orange);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-warning:hover {
-    background: #ea6b10;
+    background: var(--md-orange);
 }
 
 .btn-danger {
     background: var(--md-coral);
     border-color: var(--md-coral);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-danger:hover {
-    background: #dc2626;
+    background: var(--md-coral);
 }
 
 .btn-secondary {
     background: var(--md-muted);
     border-color: var(--md-muted);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-secondary:hover {
-    background: #777777;
+    background: var(--md-muted);
 }
 
 .retry-btn {
     background: var(--md-orange);
     border-color: var(--md-orange);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .retry-btn:hover {
-    background: #ea6b10;
+    background: var(--md-orange);
 }
 
 /* ========== 按钮加载状态 ========== */
@@ -530,7 +525,7 @@
     pointer-events: none;
     opacity: 0.7;
     position: relative;
-    color: transparent !important;
+    color: transparent;
 }
 
 .btn.loading::after {
@@ -550,8 +545,11 @@
 /* ========== 响应式设计 ========== */
 @media (max-width: 768px) {
     .mcp-settings-content {
-        width: 95%;
-        height: 90vh;
+        width: 100vw;
+        height: 100dvh;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
     }
 
     .mcp-server-form {
@@ -593,6 +591,14 @@
     #mcp-template-btn,
     #mcp-add-server-btn {
         flex: 1;
+        justify-content: center;
+    }
+
+    .close-mcp-settings {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
         justify-content: center;
     }
 }

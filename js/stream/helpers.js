@@ -403,6 +403,24 @@ function renderVideoCard(url, mimeType = '') {
 }
 
 /**
+ * 渲染音频卡片
+ * @param {string} url - 音频 URL
+ * @param {string} mimeType - MIME 类型（可选）
+ * @returns {string}
+ */
+function renderAudioCard(url, mimeType = '') {
+    const encodedUrl = encodeInlineUrl(url);
+    const ext = getMediaExtension(url, mimeType, 'mp3');
+
+    return `<div class="audio-wrapper">
+        <audio src="${url}" controls preload="metadata" title="AI 生成音频"></audio>
+        <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadMedia(decodeURIComponent('${encodedUrl}'), 'audio-${Date.now()}.${ext}')" title="下载音频">
+            ${renderDownloadIcon()}
+        </button>
+    </div>`;
+}
+
+/**
  * 渲染媒体卡片
  * @param {string} url - 媒体 URL
  * @param {'image'|'video'} mediaType - 媒体类型
@@ -412,6 +430,7 @@ function renderVideoCard(url, mimeType = '') {
 function renderMediaCard(url, mediaType, mimeType = '') {
     if (!url) return '';
     if (mediaType === 'video') return renderVideoCard(url, mimeType);
+    if (mediaType === 'audio') return renderAudioCard(url, mimeType);
     return renderImageCard(url);
 }
 
@@ -443,6 +462,8 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
                 html += safeMarkedParse(part.text);
             } else if (part.type === 'video_url' && part.complete) {
                 html += renderMediaCard(part.url, 'video', part.mimeType || part.mime_type);
+            } else if (part.type === 'audio_url' && part.complete) {
+                html += renderMediaCard(part.url, 'audio', part.mimeType || part.mime_type);
             } else if (part.type === 'image_url' && part.complete) {
                 const mediaType = isVideoUrl(part.url, part.mimeType || part.mime_type) ? 'video' : 'image';
                 html += renderMediaCard(part.url, mediaType, part.mimeType || part.mime_type);
@@ -470,6 +491,8 @@ export function renderFinalContentWithThinking(contentParts, thinkingContent, gr
                 html += safeMarkedParse(part.text);
             } else if (part.type === 'video_url' && part.complete) {
                 html += renderMediaCard(part.url, 'video', part.mimeType || part.mime_type);
+            } else if (part.type === 'audio_url' && part.complete) {
+                html += renderMediaCard(part.url, 'audio', part.mimeType || part.mime_type);
             } else if (part.type === 'image_url' && part.complete) {
                 const mediaType = isVideoUrl(part.url, part.mimeType || part.mime_type) ? 'video' : 'image';
                 html += renderMediaCard(part.url, mediaType, part.mimeType || part.mime_type);

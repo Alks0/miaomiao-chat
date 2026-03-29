@@ -82,7 +82,7 @@
 /* 标题 */
 .update-modal-title {
     font-family: var(--font-mono);
-    font-size: 24px;
+    font-size: var(--fs-4xl);
     font-weight: 700;
     text-align: center;
     color: var(--color-text-primary);
@@ -94,7 +94,7 @@
 /* 版本号 */
 .update-modal-version {
     font-family: var(--font-mono);
-    font-size: 16px;
+    font-size: var(--fs-xl);
     font-weight: 600;
     text-align: center;
     color: var(--md-blue);
@@ -104,7 +104,7 @@
 /* 描述 */
 .update-modal-description {
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     line-height: 1.6;
     text-align: center;
     color: var(--md-muted);
@@ -123,7 +123,7 @@
     flex: 1;
     padding: 12px 16px;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 700;
     text-transform: uppercase;
     border: 3px solid var(--color-border-primary);
@@ -189,7 +189,7 @@
 
 .update-progress-text {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     text-align: center;
     color: var(--md-muted);
     margin: 8px 0 0;
@@ -226,15 +226,15 @@
     }
 
     .update-modal-title {
-        font-size: 18px;
+        font-size: var(--fs-2xl);
     }
 
     .update-modal-version {
-        font-size: 13px;
+        font-size: var(--fs-md);
     }
 
     .update-modal-notes {
-        font-size: 13px;
+        font-size: var(--fs-md);
         max-height: 120px;
     }
 
@@ -267,7 +267,7 @@
     }
 
     .update-modal-title {
-        font-size: 16px;
+        font-size: var(--fs-xl);
     }
 
     .update-modal-close {
@@ -279,6 +279,6 @@
 
     .update-btn {
         padding: 10px 16px;
-        font-size: 13px;
+        font-size: var(--fs-md);
     }
 }

@@ -18,7 +18,7 @@
     border: 2px solid var(--md-border);
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     background: var(--md-surface);
     color: var(--md-text);
     transition: border-color 0.15s var(--ease);
@@ -60,7 +60,7 @@
 .remove-header-btn:hover {
     border-color: var(--md-coral);
     color: var(--md-coral);
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-error-bg);
 }
 
 .add-header-btn {
@@ -75,7 +75,7 @@
     background: transparent;
     color: var(--md-muted);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     cursor: pointer;
     transition: all 0.15s var(--ease);
 }

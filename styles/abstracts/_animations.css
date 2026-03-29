@@ -15,6 +15,6 @@ html.theme-transition *::after {
         border-color 0.3s ease,
         color 0.3s ease,
         box-shadow 0.2s ease,
-        opacity 0.2s ease !important;
+        opacity 0.2s ease;
 }
 

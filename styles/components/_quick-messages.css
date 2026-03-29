@@ -13,7 +13,6 @@
 /* ========== 消息列表 ========== */
 .quick-messages-list {
     --quick-messages-bg: var(--color-bg-primary);
-    --scroll-shadow-color: rgba(56, 56, 56, 0.35);
     padding: 16px;
     overflow-y: auto;
     max-height: 500px;
@@ -28,10 +27,6 @@
     background-size: 100% 32px, 100% 32px, 100% 12px, 100% 12px;
     background-attachment: local, local, scroll, scroll;
     border-radius: 8px;
-}
-
-.dark-theme .quick-messages-list {
-    --scroll-shadow-color: rgba(229, 229, 229, 0.45);
 }
 
 /* 空状态 */
@@ -52,11 +47,11 @@
 
 .empty-quick-messages p {
     margin: 4px 0;
-    font-size: 14px;
+    font-size: var(--fs-lg);
 }
 
 .empty-hint {
-    font-size: 12px;
+    font-size: var(--fs-base);
     opacity: 0.7;
 }
 
@@ -66,7 +61,7 @@
 }
 
 .category-header {
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--md-muted);
     text-transform: uppercase;
@@ -110,7 +105,7 @@
 }
 
 .qm-item-name {
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 600;
     color: var(--md-text);
     margin-bottom: 4px;
@@ -120,7 +115,7 @@
 }
 
 .qm-item-preview {
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--md-muted);
     font-family: var(--font-mono);
     white-space: nowrap;
@@ -179,7 +174,7 @@
 
 #edit-quick-message-modal label {
     display: block;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 500;
     color: var(--md-text);
     margin-bottom: 8px;
@@ -194,7 +189,7 @@
     border-radius: 8px;
     background: var(--md-bg);
     color: var(--md-text);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-family: var(--font-sans);
     transition: border-color 0.2s;
 }

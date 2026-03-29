@@ -33,17 +33,17 @@
 
 .openclaw-approval-header h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     flex: 1;
 }
 
 .openclaw-approval-icon {
-    font-size: 16px;
-    color: #ff9800;
+    font-size: var(--fs-xl);
+    color: var(--md-orange);
 }
 
 .openclaw-approval-countdown-wrap {
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--color-text-muted, #999);
     font-variant-numeric: tabular-nums;
 }
@@ -65,18 +65,18 @@
 
 .openclaw-approval-label {
     min-width: 56px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--color-text-secondary, #888);
     flex-shrink: 0;
 }
 
 .openclaw-approval-value {
-    font-size: 13px;
+    font-size: var(--fs-md);
     word-break: break-all;
 }
 
 .openclaw-approval-command {
-    font-size: 12px;
+    font-size: var(--fs-base);
     background: var(--color-bg-code, #f5f5f5);
     padding: 3px 6px;
     border-radius: 3px;
@@ -88,7 +88,7 @@
 
 .openclaw-approval-risk {
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 .openclaw-approval-actions {
@@ -103,7 +103,7 @@
     padding: 6px 20px;
     border: none;
     border-radius: 5px;
-    font-size: 13px;
+    font-size: var(--fs-md);
     cursor: pointer;
     transition: opacity 0.15s;
     min-height: 32px;
@@ -115,7 +115,7 @@
 
 .openclaw-approval-btn.approve {
     background: var(--md-teal, #14b8a6);
-    color: #fff;
+    color: var(--color-text-inverse);
 }
 
 .openclaw-approval-btn.reject {
@@ -141,7 +141,7 @@
     .openclaw-approval-btn {
         min-height: 44px;
         padding: 10px 24px;
-        font-size: 14px;
+        font-size: var(--fs-lg);
     }
 
     .openclaw-approval-actions {

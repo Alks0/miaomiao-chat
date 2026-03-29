@@ -4,7 +4,7 @@
     align-items: flex-start;
     gap: 12px;
     padding: 16px;
-    background: #fef2f2;
+    background: var(--color-error-bg);
     border: 2px solid var(--md-coral);
     border-radius: 4px;
     box-shadow: var(--shadow-sm);
@@ -21,14 +21,14 @@
 }
 
 .error-humanized-title {
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 600;
     color: var(--md-coral);
     margin-bottom: 4px;
 }
 
 .error-humanized-hint {
-    font-size: 13px;
+    font-size: var(--fs-md);
     color: var(--color-text-secondary);
     line-height: 1.4;
 }
@@ -40,7 +40,7 @@
 }
 
 .error-technical summary {
-    font-size: 11px;
+    font-size: var(--fs-sm);
     color: var(--md-muted);
     cursor: pointer;
     user-select: none;
@@ -51,7 +51,7 @@
 }
 
 .error-technical .details-hint {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     opacity: 0.7;
     font-style: italic;
 }
@@ -66,7 +66,7 @@
     background: var(--md-bg);
     border: 1px solid var(--md-border);
     border-radius: 2px;
-    font-size: 10px;
+    font-size: var(--fs-xs);
     font-family: var(--font-mono);
     overflow-x: auto;
     white-space: pre-wrap;
@@ -76,14 +76,4 @@
     overflow-y: auto;
 }
 
-/* 暗色主题 */
-.dark-theme .error-humanized {
-    background: rgba(255, 107, 107, 0.1);
-}
-
-.dark-theme .error-technical pre {
-    background: var(--color-bg-elevated);
-    border-color: var(--color-border-primary);
-    color: var(--color-text-primary);
-}
 

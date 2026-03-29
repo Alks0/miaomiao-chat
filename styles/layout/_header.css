@@ -1,3 +1,80 @@
+/* ========== Electron 自定义标题栏 ========== */
+.electron-titlebar {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    background: var(--color-bg-accent);
+    color: rgba(255, 255, 255, 0.8);
+    flex-shrink: 0;
+    user-select: none;
+    overflow: hidden;
+}
+
+.dark-theme .electron-titlebar {
+    background: var(--color-bg-titlebar);
+}
+
+.titlebar-title {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--fs-base);
+    font-weight: 600;
+    padding-left: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    -webkit-app-region: no-drag;
+}
+
+.titlebar-drag {
+    flex: 1;
+    height: 100%;
+    -webkit-app-region: drag;
+}
+
+.titlebar-controls {
+    display: flex;
+    -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.titlebar-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-inverse);
+}
+
+.titlebar-btn.titlebar-close:hover {
+    background: #e81123;
+    color: var(--color-text-inverse);
+}
+
+.titlebar-devtools-btn {
+    font-size: var(--fs-sm);
+    font-family: var(--font-mono, monospace);
+    padding: 0 10px;
+    margin-right: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    width: auto;
+    height: 22px;
+    line-height: 22px;
+    align-self: center;
+}
+
+.titlebar-devtools-btn:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
 /* ========== 顶部导航栏 ========== */
 .app-header {
     background: var(--color-bg-accent);
@@ -21,7 +98,7 @@
 
 .app-title {
     font-family: var(--font-mono);
-    font-size: 16px;
+    font-size: var(--fs-xl);
     font-weight: 600;
     color: var(--color-text-inverse);
 }
@@ -44,5 +121,42 @@
     background: var(--md-yellow);
     border-color: var(--md-yellow);
     color: var(--color-text-primary);
+}
+
+/* ========== 移动端 Header ========== */
+.mobile-header-title {
+    display: none;
+}
+
+.mobile-overflow-btn {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        position: relative;
+    }
+
+    .header-actions > .icon-button:not(.mobile-overflow-btn) {
+        display: none;
+    }
+
+    .mobile-overflow-btn {
+        display: flex;
+    }
+
+    .mobile-header-title {
+        display: block;
+        flex: 1;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: var(--fs-md);
+        font-weight: 600;
+        color: var(--color-text-inverse);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 4px;
+    }
 }
 

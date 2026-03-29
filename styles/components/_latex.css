@@ -5,7 +5,7 @@
 
 /* 占位符（应该在渲染后被替换，如果还在就隐藏它） */
 .latex-placeholder {
-    display: none !important;
+    display: none;
 }
 
 /* 行内公式包装器 */
@@ -52,23 +52,12 @@
 /* 渲染失败的公式 */
 .latex-error {
     font-family: var(--font-mono);
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-error-bg);
     padding: 2px 6px;
     border-radius: 3px;
     color: var(--md-coral);
     border: 1px dashed var(--md-coral);
     cursor: help;
-}
-
-/* 暗色主题适配 */
-.dark-theme .katex-display-wrapper {
-    background: var(--color-bg-code);
-    border-color: var(--color-border-primary);
-}
-
-.dark-theme .latex-fallback {
-    background: var(--color-bg-code);
-    color: var(--md-blue);
 }
 
 /* 移动端优化 */

@@ -12,7 +12,7 @@
     background: var(--md-surface);
     color: var(--md-muted);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 500;
     cursor: pointer;
     border-radius: 4px;
@@ -44,7 +44,7 @@
 }
 
 .thinking-budget-input label {
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 500;
     color: var(--md-text);
     white-space: nowrap;
@@ -57,7 +57,7 @@
     border: 2px solid var(--md-border);
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     background: var(--color-bg-surface);
     color: var(--md-text);
 }
@@ -68,7 +68,7 @@
 }
 
 .thinking-budget-input .budget-hint {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     color: var(--md-muted);
     white-space: nowrap;
 }

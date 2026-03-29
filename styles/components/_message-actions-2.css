@@ -24,6 +24,16 @@
     .message-actions {
         opacity: 1;
     }
+
+    .msg-action-btn {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 10px;
+    }
+
+    .msg-action-btn:hover {
+        transform: none;
+    }
 }
 
 .msg-action-btn {
@@ -75,7 +85,7 @@
     padding: 8px;
     border: 2px solid var(--md-green);
     border-radius: 4px;
-    font-size: 13px;
+    font-size: var(--fs-md);
     background: var(--md-bg);
     color: var(--md-text);
     resize: vertical;
@@ -92,7 +102,7 @@
 
 .message-edit-actions button {
     padding: 6px 14px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     cursor: pointer;
     font-family: var(--font-mono);
     font-weight: 500;

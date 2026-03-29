@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -103,6 +103,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
+        frame: false,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -111,6 +112,9 @@ function createWindow() {
         },
         icon: path.join(__dirname, '../assets/icon.png')
     });
+
+    // 去掉原生菜单栏
+    Menu.setApplicationMenu(null);
 
     // 设置 CSP 响应头（在 Electron 中生效，包含 frame-ancestors）
     mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
@@ -198,6 +202,27 @@ app.whenReady().then(() => {
             createWindow();
         }
     });
+});
+
+// ========== 窗口控制 IPC ==========
+ipcMain.on('window:minimize', () => {
+    mainWindow?.minimize();
+});
+
+ipcMain.on('window:maximize', () => {
+    if (mainWindow?.isMaximized()) {
+        mainWindow.unmaximize();
+    } else {
+        mainWindow?.maximize();
+    }
+});
+
+ipcMain.on('window:close', () => {
+    mainWindow?.close();
+});
+
+ipcMain.on('window:toggle-devtools', () => {
+    mainWindow?.webContents.toggleDevTools();
 });
 
 // ✅ IPC：手动检查更新

@@ -97,6 +97,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return true;
     },
 
+    // ========== 窗口控制 ==========
+    windowMinimize: () => ipcRenderer.send('window:minimize'),
+    windowMaximize: () => ipcRenderer.send('window:maximize'),
+    windowClose: () => ipcRenderer.send('window:close'),
+    toggleDevTools: () => ipcRenderer.send('window:toggle-devtools'),
+
     // ========== Computer Use API ==========
 
     /**

@@ -9,7 +9,7 @@
     border-radius: 0;
     overflow: hidden;
     box-shadow: var(--shadow-md);
-    font-size: 14px;
+    font-size: var(--fs-lg);
 }
 
 /* 表头样式 - 纯色像素风格 */
@@ -35,7 +35,7 @@
     text-align: left;
     font-weight: 600;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 3px solid var(--color-border-primary);
@@ -108,7 +108,7 @@
 /* 响应式表格（移动端） */
 @media (max-width: 768px) {
     .message-content table {
-        font-size: 12px;
+        font-size: var(--fs-base);
     }
 
     .message-content th,
@@ -292,7 +292,7 @@
     background: var(--md-yellow);
     border: var(--border);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 .image-error {
@@ -300,7 +300,7 @@
     background: var(--md-coral);
     border: var(--border);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 .error-details {
@@ -321,7 +321,7 @@
     border: var(--border);
     padding: 10px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     overflow-x: auto;
     white-space: pre-wrap;
     max-height: 150px;

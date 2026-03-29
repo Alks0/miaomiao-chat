@@ -8,6 +8,7 @@ import { elements } from '../core/elements.js';
 import { saveCurrentConfig } from '../state/config.js';
 import { eventBus } from '../core/events.js';
 import { renderCapabilityBadgesText } from '../utils/capability-badges.js';
+import { updateMobileHeaderTitle } from './mobile-overflow-menu.js';
 
 /**
  * 填充模型下拉列表（从提供商聚合）
@@ -76,6 +77,13 @@ export function populateModelSelect() {
     }
 
     console.log(`模型列表已更新 (${enabledProviders.length} 个提供商)`);
+
+    // 更新移动端标题栏
+    const selectedOption = elements.modelSelect.selectedOptions[0];
+    if (selectedOption) {
+        const modelName = typeof selectedOption.value === 'string' ? selectedOption.value : '';
+        updateMobileHeaderTitle(modelName.split('/').pop() || modelName);
+    }
 }
 
 /**
@@ -132,6 +140,9 @@ export function initModels() {
 
         saveCurrentConfig();
         console.log(`Model selected: ${selectedModel} from ${provider?.name || 'unknown'} (format: ${state.apiFormat})`);
+
+        // 更新移动端标题栏
+        updateMobileHeaderTitle(selectedModel.split('/').pop() || selectedModel);
     });
 
     // 初始填充

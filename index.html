@@ -377,15 +377,17 @@
                 </div>
                 <p class="settings-hint">关闭后将等待完整响应再显示</p>
 
-                <!-- PDF 兼容模式 -->
-                <div class="toggle-row" style="margin-top: 12px;">
-                    <label class="switch">
-                        <input type="checkbox" id="pdf-image-mode-enabled">
-                        <span class="slider"></span>
-                    </label>
-                    <span>PDF 兼容模式</span>
+                <!-- PDF 处理模式 -->
+                <div class="settings-row" style="margin-top: 12px;">
+                    <label class="settings-label" for="pdf-mode-select">PDF 处理模式</label>
+                    <select id="pdf-mode-select" class="settings-select">
+                        <option value="standard">标准模式</option>
+                        <option value="compat">兼容模式</option>
+                        <option value="render">渲染为图片</option>
+                    </select>
                 </div>
-                <p class="settings-hint">开启后将 PDF 作为图片传输（用于解决部分 OpenAI 兼容接口不支持文件对象的问题）</p>
+                <p class="settings-hint">标准：原生发送 PDF 文件（OpenAI/Claude/Gemini 均支持）<br>兼容：将 PDF 数据通过图片字段传输，适用于不支持 file 格式的 OpenAI 兼容接口<br>渲染为图片：使用 pdf.js 将 PDF 逐页渲染为 JPEG 图片后发送，适用于完全不支持 PDF 的 API（如 Copilot 代理）</p>
+
             </div>
 
             <!-- 图片压缩模式 -->
@@ -921,6 +923,24 @@
     </div>
 
     <div class="app-container">
+        <!-- Electron 自定义标题栏（仅桌面端显示） -->
+        <div id="electron-titlebar" class="electron-titlebar" style="display: none;">
+            <span class="titlebar-title">Web Chat</span>
+            <div class="titlebar-drag"></div>
+            <div class="titlebar-controls">
+                <button id="titlebar-devtools" class="titlebar-btn titlebar-devtools-btn" title="Toggle Developer Tools">DevTools</button>
+                <button id="titlebar-minimize" class="titlebar-btn" title="最小化">
+                    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg>
+                </button>
+                <button id="titlebar-maximize" class="titlebar-btn" title="最大化">
+                    <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+                </button>
+                <button id="titlebar-close" class="titlebar-btn titlebar-close" title="关闭">
+                    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"/></svg>
+                </button>
+            </div>
+        </div>
+
         <!-- 顶部栏 -->
         <header class="app-header">
             <div class="header-content">
@@ -930,8 +950,8 @@
                             <path d="M3 12h18M3 6h18M3 18h18"/>
                         </svg>
                     </button>
-                    <h1 class="app-title">Web Chat</h1>
                 </div>
+                <span class="mobile-header-title" id="mobile-header-title"></span>
                 <div class="header-actions">
                     <button id="providers-toggle" class="icon-button" title="提供商管理" aria-label="管理 API 提供商">
                         <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -961,7 +981,35 @@
                             <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                         </svg>
                     </button>
+                    <button id="mobile-overflow-btn" class="icon-button mobile-overflow-btn" title="更多" aria-label="更多选项">
+                        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <circle cx="4" cy="10" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="16" cy="10" r="2"/>
+                        </svg>
+                    </button>
                 </div>
+            </div>
+            <!-- 移动端溢出菜单 -->
+            <div class="mobile-overflow-menu" id="mobile-overflow-menu">
+                <button class="mobile-overflow-item" data-target="providers-toggle">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    <span>提供商管理</span>
+                </button>
+                <button class="mobile-overflow-item" data-target="tools-manager-toggle">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    <span>工具管理</span>
+                </button>
+                <button class="mobile-overflow-item" data-target="mcp-settings-toggle">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M1 12h6m6 0h6"/></svg>
+                    <span>MCP 设置</span>
+                </button>
+                <button class="mobile-overflow-item" data-target="theme-toggle">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <span>切换主题</span>
+                </button>
+                <button class="mobile-overflow-item" data-target="clear-chat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    <span>清空对话</span>
+                </button>
             </div>
         </header>
 
@@ -1197,6 +1245,16 @@
             <!-- 左侧：提供商列表 -->
             <div class="providers-sidebar">
                 <!-- 搜索栏 -->
+                <!-- 移动端列表页 header -->
+                <div class="providers-sidebar-header">
+                    <h2>提供商管理</h2>
+                    <button class="icon-button" id="mobile-close-providers" title="关闭" aria-label="关闭">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
                 <div class="providers-search">
                     <input type="text" id="providers-search-input" placeholder="搜索提供商..." />
                 </div>
@@ -1218,6 +1276,11 @@
             <!-- 右侧：提供商详情 -->
             <div class="providers-detail">
                 <div class="detail-header">
+                    <button class="mobile-back-btn icon-button" id="mobile-back-btn" title="返回列表" aria-label="返回提供商列表">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
                     <h2 id="providers-modal-title">提供商配置</h2>
                     <button id="close-providers-modal" class="icon-button" aria-label="关闭">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1424,6 +1487,15 @@
             <div class="tool-manager-body">
                 <!-- 左侧：工具列表 -->
                 <div class="tool-list-panel">
+                    <!-- 移动端列表头部 -->
+                    <div class="tool-list-header">
+                        <h2>工具调用管理</h2>
+                        <button class="mobile-close-tools icon-button" id="mobile-close-tools" aria-label="关闭">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
                     <!-- 搜索框 -->
                     <div class="tool-search-box">
                         <input type="search"
@@ -1447,6 +1519,14 @@
 
                 <!-- 右侧：工具详情 -->
                 <div class="tool-detail-panel">
+                    <div class="tool-detail-header">
+                        <button class="mobile-back-btn icon-button" id="tool-mobile-back-btn" title="返回列表" aria-label="返回工具列表">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                        <h2 class="tool-detail-title">工具详情</h2>
+                    </div>
                     <div id="tool-detail-container">
                         <!-- 工具详情表单将由 JS 动态渲染 -->
                     </div>
@@ -1459,8 +1539,13 @@
                 <div class="permissions-panel">
                     <div class="permissions-header">
                         <h3>工具权限设置</h3>
-                        <p class="permissions-description">控制各工具的执行权限和行为</p>
+                        <button class="mobile-close-tools icon-button" aria-label="关闭">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
                     </div>
+                    <p class="permissions-description">控制各工具的执行权限和行为</p>
                     <div id="permissions-list-container">
                         <!-- 权限列表将由 JS 动态渲染 -->
                     </div>
@@ -1473,6 +1558,11 @@
                     <div class="history-header">
                         <h3>工具执行历史</h3>
                         <div class="history-actions">
+                            <button class="mobile-close-tools icon-button" aria-label="关闭">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 6L6 18M6 6l12 12"/>
+                                </svg>
+                            </button>
                             <button id="clear-history-btn" class="btn-secondary">清空历史</button>
                         </div>
                     </div>

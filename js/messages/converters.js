@@ -54,8 +54,8 @@ export function toOpenAIMessage(role, content, attachments = null) {
                     parts.push({ type: 'video_url', video_url: { url: att } });
                 } else if (category === 'pdf') {
                     // PDF 处理策略
-                    if (state.pdfImageModeEnabled) {
-                        // 兼容模式：将 PDF 伪装成 image_url (适用于 Gemini 兼容接口)
+                    if (state.pdfMode === 'compat') {
+                        // 兼容模式：将 PDF 伪装成 image_url (适用于部分 OpenAI 兼容接口)
                         parts.push({ 
                             type: 'image_url', 
                             image_url: { url: att } 

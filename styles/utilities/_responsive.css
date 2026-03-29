@@ -1,12 +1,23 @@
 /* ========== 响应式 ========== */
 @media (max-width: 768px) {
+    /* 移动端全局：去粗边框，轻量化 */
+    :root {
+        --border: 1px solid var(--md-charcoal);
+        --border-thick: 2px solid var(--md-charcoal);
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+        --shadow-md: 0 2px 6px rgba(0,0,0,0.15);
+        --shadow-lg: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
     .chat-container {
-        padding: 12px;
+        padding: 8px;
     }
 
     .message {
-        padding: 12px;
-        gap: 10px;
+        padding: 10px;
+        gap: 8px;
+        box-shadow: none;
+        border-width: 1px;
     }
 
     .message.user,
@@ -16,107 +27,785 @@
     }
 
     .message-avatar {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        font-size: 11px;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        font-size: var(--fs-xs);
     }
 
-    .input-bar {
-        padding: 10px 12px;
-        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    }
-
-    .input-bar-inner {
-        gap: 6px;
+    /* ---- Header 紧凑化 ---- */
+    .header-content {
         padding: 6px 10px;
     }
 
+    .header-content .icon-button {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+    }
+
+    .header-content .icon-button svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* ---- 输入栏全面紧凑 ---- */
+    .input-bar {
+        padding: 4px 8px;
+        padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .input-bar-inner {
+        padding: 4px 8px;
+        gap: 4px;
+        border-width: 1px;
+        box-shadow: none;
+    }
+
+    .input-textarea {
+        font-size: var(--fs-xl);
+        height: 36px;
+        max-height: 35vh;
+    }
+
+    .send-btn,
+    .cancel-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .send-btn svg,
+    .cancel-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .input-icon-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .input-icon-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* resize handle */
+    .input-resize-handle {
+        height: 10px;
+        margin-bottom: 1px;
+        opacity: 0.5;
+    }
+
+    .input-resize-handle::before {
+        width: 32px;
+        height: 3px;
+    }
+
+    /* ---- 快捷开关：横向滑动 + 小巧 ---- */
+    .input-quick-toggles {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 4px;
+        padding: 2px 0;
+        margin-top: 4px;
+    }
+
+    .input-quick-toggles::-webkit-scrollbar {
+        display: none;
+    }
+
+    .quick-toggle-btn {
+        flex-shrink: 0;
+        padding: 4px 6px;
+        min-width: 32px;
+        min-height: 28px;
+        font-size: var(--fs-xs);
+        border-width: 1px;
+        box-shadow: none;
+    }
+
+    .quick-toggle-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-toggle-btn span {
+        display: none;
+    }
+
+    /* ---- 欢迎消息缩小 ---- */
+    .welcome-message {
+        padding: 20px 12px;
+        border-width: 1px;
+        box-shadow: none;
+    }
+
+    .welcome-message h2 {
+        font-size: var(--fs-xl);
+    }
+
+    .gemini-logo svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* ---- 设置/侧边栏 ---- */
     .settings-panel,
     .sidebar {
         width: 90%;
         max-width: 400px;
     }
 
-    /* 移动端禁用侧边栏resize手柄 */
     .settings-panel-resize-handle,
     .sidebar-resize-handle {
         display: none;
     }
 
-    /* 移动端输入框resize手柄 - 增大触摸区域 */
-    .input-resize-handle {
-        height: 20px;
-        margin-bottom: 4px;
-        opacity: 0.7;
-    }
-
-    .input-resize-handle::before {
-        width: 50px;
-        height: 5px;
-    }
-
-    /* 移动端增强关闭按钮可见性 */
     .settings-header,
     .sidebar-header {
         position: sticky;
         top: 0;
         z-index: var(--z-sticky);
-        box-shadow: var(--shadow-md);
+        box-shadow: var(--shadow-sm);
         background: var(--md-lime);
+        padding: 10px 12px;
     }
 
-    /* 防止内容被 sticky header 遮挡 */
     .session-list {
-        scroll-padding-top: 80px;
+        scroll-padding-top: 60px;
     }
 
-    /* 增强overlay的可点击性 */
     .settings-overlay,
     .sidebar-overlay {
         cursor: pointer;
         -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
     }
 
-    .welcome-message {
-        padding: 24px 16px;
-    }
-
-    .welcome-message h2 {
-        font-size: 20px;
-    }
-
-    /* 保持触摸目标最小44px（WCAG标准）*/
-    .session-action-btn {
-        width: 44px;
-        height: 44px;
+    .close-settings-btn,
+    .close-sidebar-btn {
+        width: 32px;
+        height: 32px;
     }
 
     .remove-image {
-        width: 44px;
-        height: 44px;
+        width: 24px;
+        height: 24px;
     }
 
-    /* 移动端字符计数器调整到输入框内部 */
-    .char-counter {
-        bottom: 8px;
-        right: 8px;
-        font-size: 10px;
-        background: var(--md-surface);
-        padding: 2px 6px;
-        border-radius: 3px;
-        opacity: 0.8;
+    /* ---- 消息操作按钮 ---- */
+    .msg-action-btn {
+        min-width: 36px;
+        min-height: 32px;
+        padding: 6px;
     }
 
-    /* 引用预览响应式调整 */
-    .quote-preview {
-        padding: 10px;
+    .scroll-to-bottom-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .scroll-to-bottom-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .retry-button,
+    .user .edit-button {
+        min-height: 36px;
+        padding: 6px 12px;
+        font-size: var(--fs-sm);
+    }
+
+    .message-edit-actions button {
+        min-height: 36px;
+        padding: 6px 12px;
+    }
+
+    /* ---- 字体/间距 ---- */
+    .message-model-badge {
+        font-size: var(--fs-base);
+    }
+
+    .messages-area {
         gap: 8px;
     }
 
+    .message-content {
+        line-height: 1.6;
+    }
+
+    .message.user::after,
+    .message.assistant::after {
+        display: none;
+    }
+
+    .message.assistant {
+        padding-bottom: 36px;
+    }
+
+    .char-counter {
+        bottom: 6px;
+        right: 6px;
+        font-size: var(--fs-xs);
+        background: var(--md-surface);
+        padding: 2px 4px;
+        border-radius: 3px;
+        opacity: 0.7;
+    }
+
+    .quote-preview {
+        padding: 8px;
+        gap: 6px;
+    }
+
     .quote-preview-message {
-        font-size: 13px;
+        font-size: var(--fs-md);
         -webkit-line-clamp: 3;
+    }
+
+    .quote-preview-close {
+        width: 28px;
+        height: 28px;
+    }
+
+    /* ---- 模态框全屏 ---- */
+    .modal-content {
+        width: 100vw;
+        height: 100dvh;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .modal-header {
+        padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    }
+
+    /* ---- 通知 ---- */
+    .notification {
+        left: 12px;
+        right: 12px;
+        width: auto;
+        font-size: var(--fs-base);
+        padding: 8px 36px 8px 12px;
+    }
+
+    .notification-close {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* ---- 侧边栏移动端 ---- */
+    .sidebar {
+        border-right-width: 1px;
+    }
+
+    .sidebar-header {
+        padding: 10px 12px;
+        gap: 6px;
+        border-bottom-width: 1px;
+    }
+
+    .sidebar-header h2 {
+        font-size: var(--fs-md);
+    }
+
+    .new-session-btn {
+        padding: 6px 10px;
+        font-size: var(--fs-sm);
+        border-width: 1px;
+        box-shadow: none;
+    }
+
+    .close-sidebar-btn {
+        width: 32px;
+        height: 32px;
+        border-width: 1px;
+    }
+
+    .session-list {
+        padding: 8px;
+    }
+
+    .session-item {
+        padding: 8px 10px;
+        margin-bottom: 4px;
+        border-width: 1px;
+        box-shadow: none;
+    }
+
+    .session-item:hover {
+        transform: none;
+    }
+
+    .session-name {
+        font-size: var(--fs-base);
+    }
+
+    .session-action-btn {
+        width: 28px;
+        height: 28px;
+        border-width: 1px;
+    }
+
+    .session-action-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* 搜索栏 */
+    .session-search-bar {
+        padding: 6px 8px;
+    }
+
+    #session-search-input {
+        font-size: var(--fs-xl);
+        padding: 6px 8px;
+    }
+
+    .search-clear-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    /* ---- 设置面板移动端 ---- */
+    .settings-panel {
+        border-left-width: 1px;
+        box-shadow: none;
+    }
+
+    .settings-header {
+        padding: 10px 12px;
+        border-bottom-width: 1px;
+    }
+
+    .settings-header h2 {
+        font-size: var(--fs-md);
+    }
+
+    .close-settings-btn {
+        width: 32px;
+        height: 32px;
+        border-width: 1px;
+    }
+
+    .settings-content {
+        padding: 8px;
+    }
+
+    .settings-group {
+        padding: 10px;
+        margin-bottom: 8px;
+        border-width: 1px;
+        box-shadow: none;
+    }
+
+    .settings-group:hover {
+        transform: none;
+    }
+
+    .settings-label {
+        font-size: var(--fs-sm);
+        margin-bottom: 8px;
+    }
+
+    .settings-select,
+    .settings-input {
+        padding: 8px 10px;
+        font-size: var(--fs-lg);
+        border-width: 1px;
+    }
+
+    .settings-panel input,
+    .settings-panel select,
+    .settings-panel textarea {
+        font-size: var(--fs-xl);
+    }
+
+    .settings-icon-btn {
+        width: 36px;
+        height: 36px;
+        border-width: 1px;
+    }
+
+    .format-btn {
+        padding: 8px 10px;
+        font-size: var(--fs-base);
+    }
+
+    .password-toggle {
+        width: 32px;
+        border-width: 1px;
+    }
+
+    /* ---- 快捷开关：均匀分散填满 ---- */
+    .input-quick-toggles {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 0;
+        padding: 2px 0;
+        margin-top: 4px;
+        justify-content: stretch;
+    }
+
+    .quick-toggle-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        justify-content: center;
+    }
+
+    /* ========== 通用模态框缩小 ========== */
+    .modal-header {
+        padding: 10px 12px;
+    }
+
+    .modal-header h2,
+    .modal-header h3 {
+        font-size: var(--fs-lg);
+    }
+
+    .modal-body {
+        padding: 12px;
+    }
+
+    .modal-footer {
+        padding: 10px 12px;
+    }
+
+    .modal-footer button {
+        font-size: var(--fs-md);
+        min-height: 36px;
+    }
+
+    .icon-button[aria-label="关闭"] {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* ========== MCP 设置缩小 ========== */
+    .mcp-settings-header {
+        padding: 10px 12px;
+    }
+
+    .mcp-settings-header h2 {
+        font-size: var(--fs-lg);
+    }
+
+    .mcp-settings-body {
+        padding: 10px;
+    }
+
+    .mcp-server-item {
+        padding: 10px;
+        border-width: 1px;
+    }
+
+    .mcp-server-name {
+        font-size: var(--fs-md);
+    }
+
+    .mcp-server-status {
+        font-size: var(--fs-sm);
+    }
+
+    .close-mcp-settings {
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 1.2rem;
+    }
+
+    .mcp-server-form input,
+    .mcp-server-form select,
+    .mcp-server-form textarea {
+        font-size: var(--fs-xl);
+    }
+
+    /* ========== 工具调用详情缩小 ========== */
+    .tool-call-detail-modal {
+        border-width: 1px;
+    }
+
+    .tool-call-detail-header {
+        padding: 10px 12px;
+        font-size: var(--fs-md);
+    }
+
+    .tool-call-detail-body {
+        padding: 10px;
+        font-size: var(--fs-base);
+    }
+
+    /* ========== 全局边框降级 ========== */
+    .message-edit-area,
+    .custom-header-item,
+    .error-message,
+    .prefill-item,
+    .prefill-textarea,
+    .reasoning-slider,
+    .edit-button,
+    .retry-button,
+    .add-provider-btn,
+    .model-chip,
+    blockquote,
+    details summary {
+        border-width: 1px;
+    }
+
+    /* ========== 设置面板内所有子组件通用缩小 ========== */
+    .settings-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+    .settings-content select,
+    .settings-content textarea {
+        font-size: var(--fs-lg);
+        padding: 5px 7px;
+        border-width: 1px;
+    }
+
+    .settings-content label {
+        font-size: var(--fs-sm);
+    }
+
+    .settings-content button {
+        font-size: var(--fs-sm);
+        padding: 4px 7px;
+        border-width: 1px;
+    }
+
+    .settings-content .settings-icon-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .settings-content .settings-icon-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .settings-content p,
+    .settings-content small,
+    .settings-content .form-hint,
+    .settings-content .settings-hint {
+        font-size: var(--fs-xs);
+    }
+
+    .settings-content details {
+        border-width: 1px;
+    }
+
+    .settings-content summary {
+        font-size: var(--fs-sm);
+        padding: 5px 7px;
+    }
+
+    .settings-content h3,
+    .settings-content h4 {
+        font-size: var(--fs-base);
+    }
+
+    .settings-content textarea {
+        min-height: 50px;
+    }
+
+    .settings-content .form-group,
+    .settings-content .toggle-row {
+        margin-bottom: 6px;
+    }
+
+    .settings-content .toggle-row {
+        gap: 6px;
+        font-size: var(--fs-sm);
+    }
+
+    .settings-content .switch {
+        width: 34px;
+        height: 18px;
+    }
+
+    .settings-content .slider::before {
+        height: 12px;
+        width: 12px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    .settings-content input:checked + .slider::before {
+        transform: translateX(16px);
+    }
+
+    /* 模型参数 */
+    .model-params-summary {
+        padding: 6px 8px;
+        font-size: var(--fs-sm);
+    }
+
+    .model-params-grid {
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .param-item label {
+        font-size: var(--fs-xs);
+    }
+
+    .param-item input {
+        font-size: var(--fs-base);
+        padding: 4px 6px;
+        border-width: 1px;
+    }
+
+    /* 预填充消息 */
+    .prefill-textarea {
+        padding: 6px;
+        border-width: 1px;
+        font-size: var(--fs-base);
+        min-height: 50px;
+        margin-bottom: 8px;
+    }
+
+    .prefill-label {
+        font-size: var(--fs-xs);
+        margin-bottom: 4px;
+    }
+
+    .prefill-preset-row {
+        gap: 4px;
+        margin-bottom: 8px;
+    }
+
+    .prefill-vars-row {
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .var-input input {
+        padding: 4px 6px;
+        border-width: 1px;
+        font-size: var(--fs-base);
+    }
+
+    .var-input label {
+        font-size: var(--fs-xs);
+    }
+
+    .prefill-message-item {
+        padding: 6px;
+        border-width: 1px;
+    }
+
+    .prefill-message-item textarea {
+        padding: 5px;
+        font-size: var(--fs-base);
+        min-height: 40px;
+    }
+
+    .prefill-message-header select {
+        padding: 3px 6px;
+        font-size: var(--fs-xs);
+        border-width: 1px;
+    }
+
+    .prefill-add-btn {
+        padding: 6px;
+        font-size: var(--fs-sm);
+        border-width: 1px;
+        margin-bottom: 8px;
+    }
+
+    .prefill-summary {
+        font-size: var(--fs-xs);
+        padding: 3px 0;
+    }
+
+    .prefill-details-content {
+        padding-top: 6px;
+    }
+
+    /* System Parts */
+    .system-part-item {
+        padding: 6px;
+        border-width: 1px;
+    }
+
+    .system-part-item textarea {
+        padding: 5px;
+        font-size: var(--fs-base);
+        min-height: 40px;
+    }
+
+    .delete-system-part {
+        font-size: var(--fs-base);
+        padding: 2px 4px;
+    }
+
+    /* 自定义请求头 */
+    .custom-header-item {
+        padding: 5px;
+        border-width: 1px;
+    }
+
+    .custom-header-item input {
+        font-size: var(--fs-base);
+        padding: 4px 6px;
+    }
+
+    /* 推理强度滑块 */
+    .reasoning-slider {
+        border-width: 1px;
+        padding: 5px;
+    }
+
+    /* ========== 工具管理：覆盖 enhancements 的级联 ========== */
+    .tool-manager-header {
+        display: none;
+    }
+
+    .tool-manager-tabs {
+        flex-shrink: 0;
+        padding: 0 4px;
+    }
+
+    .tool-manager-tabs .tab-btn {
+        padding: 8px 10px;
+        font-size: var(--fs-base);
+    }
+
+    .tab-content.active {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .tab-content.active[data-tab="tools"] {
+        overflow: hidden;
+    }
+
+    /* 权限/历史面板紧凑化 */
+    .permissions-panel,
+    .history-panel {
+        padding: 10px;
+        overflow-y: auto;
+    }
+
+    .permissions-header,
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .permission-item,
+    .history-item {
+        padding: 8px 10px;
     }
 }
 
@@ -129,46 +818,16 @@
         min-width: unset !important;
     }
 
-    /* 输入栏紧凑布局 */
-    .input-bar-inner {
-        padding: 4px 8px;
-    }
-
-    /* 保持触摸目标最小44px（WCAG标准）*/
-    .send-btn,
-    .input-icon-btn {
-        width: 44px;
-        height: 44px;
-    }
-
-    /* 快捷开关栏换行 */
-    .input-quick-toggles {
-        gap: 4px;
-    }
-
-    .quick-toggle-btn {
-        padding: 6px 10px;
-        font-size: 9px;
-        min-width: 44px; /* 保持触摸目标 */
-        min-height: 44px;
-    }
-
-    .quick-toggle-btn span {
-        font-size: 9px; /* 保留文字，使用更小字号 */
-        margin-left: 3px;
-    }
-
-    /* 消息更紧凑 */
     .message {
-        padding: 10px;
-        gap: 8px;
+        padding: 8px;
+        gap: 6px;
     }
 
     .message-avatar {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        font-size: 10px;
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        font-size: var(--fs-2xs);
     }
 
     /* 回复选择器紧凑 */
@@ -178,57 +837,53 @@
     }
 
     .reply-tab {
-        min-width: 44px;
-        height: 44px;
-        font-size: 11px;
+        min-width: 36px;
+        height: 36px;
+        font-size: var(--fs-xs);
         padding: 2px;
     }
 
-    /* 欢迎消息紧凑 */
     .welcome-message {
-        padding: 20px 12px;
+        padding: 16px 10px;
     }
 
     .welcome-message h2 {
-        font-size: 18px;
+        font-size: var(--fs-lg);
     }
 
     .gemini-logo svg {
-        width: 48px;
-        height: 48px;
+        width: 36px;
+        height: 36px;
     }
 
-    /* 设置面板内容紧凑 */
     .settings-content {
-        padding: 12px;
+        padding: 8px;
     }
 
     .settings-group {
-        padding: 12px;
-        margin-bottom: 16px;
+        padding: 8px;
+        margin-bottom: 8px;
     }
 
-    /* 图片删除按钮始终显示（移动端无hover）*/
     .remove-image {
         opacity: 1;
     }
 
-    /* 引用预览更紧凑 */
     .quote-preview {
-        padding: 8px;
-        gap: 6px;
+        padding: 6px;
+        gap: 4px;
     }
 
     .quote-preview-content {
-        gap: 6px;
+        gap: 4px;
     }
 
     .quote-preview-label {
-        font-size: 11px;
+        font-size: var(--fs-sm);
     }
 
     .quote-preview-message {
-        font-size: 12px;
+        font-size: var(--fs-base);
     }
 }
 
@@ -348,8 +1003,8 @@
     .remove-image,
     .password-toggle,
     .file-preview-delete {
-        opacity: 1 !important;
-        visibility: visible !important;
+        opacity: 1;
+        visibility: visible;
     }
 
     /* 增强触摸反馈 */
@@ -363,7 +1018,7 @@
     .message:hover,
     .quick-toggle-btn:hover,
     .send-btn:hover {
-        transform: none !important;
+        transform: none;
     }
 
     .session-item:active,
@@ -374,13 +1029,9 @@
         transition: transform 0.1s ease;
     }
 
-    /* 增大触摸区域的内边距 */
-    button,
-    .icon-button,
-    .session-action-btn {
-        min-width: 44px;
-        min-height: 44px;
-        padding: 8px;
+    /* 增大触摸区域（排除已在768px中缩小的按钮） */
+    button:not(.header-content .icon-button):not(.quick-toggle-btn):not(.session-action-btn):not(.close-settings-btn):not(.close-sidebar-btn):not(.msg-action-btn):not(.scroll-to-bottom-btn):not(.notification-close):not(.search-clear-btn):not(.mobile-overflow-item) {
+        min-height: 36px;
     }
 
     /* 滚动优化 */

@@ -103,6 +103,14 @@ export function initToolManager() {
     // 监听工具系统事件
     setupEventListeners();
 
+    // 移动端返回按钮
+    document.getElementById('tool-mobile-back-btn')?.addEventListener('click', backToToolList);
+
+    // 移动端关闭按钮（列表页 + 权限页 + 历史页）
+    document.querySelectorAll('.mobile-close-tools').forEach(btn => {
+        btn.addEventListener('click', closeModal);
+    });
+
     console.log('[Tool Manager] 工具管理界面已初始化');
 }
 
@@ -242,6 +250,7 @@ export function closeModal() {
             if (confirmed) {
                 modal.style.display = 'none';
                 resetForm();
+                modal.querySelector('.tool-manager-content')?.classList.remove('mobile-detail-view');
 
                 // 移除焦点陷阱
                 if (removeFocusTrap) {
@@ -253,6 +262,7 @@ export function closeModal() {
     } else {
         modal.style.display = 'none';
         resetForm();
+        modal.querySelector('.tool-manager-content')?.classList.remove('mobile-detail-view');
 
         // 移除焦点陷阱
         if (removeFocusTrap) {
@@ -262,6 +272,22 @@ export function closeModal() {
     }
 
     console.log('[Tool Manager] 📁 关闭工具管理界面');
+}
+
+/**
+ * 移动端：切换到工具详情视图
+ */
+function showMobileToolDetail() {
+    if (window.innerWidth <= 768 && modal) {
+        modal.querySelector('.tool-manager-content')?.classList.add('mobile-detail-view');
+    }
+}
+
+/**
+ * 移动端：返回工具列表视图
+ */
+function backToToolList() {
+    modal?.querySelector('.tool-manager-content')?.classList.remove('mobile-detail-view');
 }
 
 // ========== 工具列表渲染 ==========
@@ -395,6 +421,7 @@ function selectTool(toolId) {
 
     // 显示工具详情表单
     showToolForm(toolId);
+    showMobileToolDetail();
 }
 
 /**
@@ -604,6 +631,7 @@ function handleAddCustomTool() {
 
     // 传递工具对象而非 ID
     showToolForm(newTool);
+    showMobileToolDetail();
 
     // 不立即设置 isEditing，只有当用户开始输入时才设置
     // isEditing = true;  // 移除这一行，第 454-461 行的输入监听器会在用户输入时设置
@@ -830,6 +858,9 @@ function handleToolSearch(e) {
  */
 function handleTabSwitch(tabId) {
     if (!modal) return;
+
+    // 切换 tab 时重置移动端详情视图
+    modal.querySelector('.tool-manager-content')?.classList.remove('mobile-detail-view');
 
     // 更新 Tab 按钮状态
     modal.querySelectorAll('.tab-btn').forEach(btn => {

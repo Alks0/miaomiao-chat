@@ -16,7 +16,7 @@
 /* 模型信息标签 */
 .message-model-badge {
     font-family: var(--font-mono);
-    font-size: 15px;
+    font-size: var(--fs-lg);
     font-weight: 600;
     color: var(--color-text-primary);
     background: var(--color-bg-primary);
@@ -164,7 +164,7 @@
     justify-content: center;
     font-family: var(--font-mono);
     font-weight: 700;
-    font-size: 12px;
+    font-size: var(--fs-base);
     position: relative;
     overflow: hidden;
     transition: opacity 0.3s var(--ease);
@@ -196,7 +196,7 @@
 .message-content {
     line-height: 1.8;
     word-wrap: break-word;
-    font-size: 15px;
+    font-size: var(--fs-lg);
     letter-spacing: 0.01em;
 }
 
@@ -265,7 +265,7 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     line-height: 1;
     /* 照着 .remove-image 修改：opacity: 0 + transform: scale(0.8) */
     opacity: 0;
@@ -307,7 +307,7 @@
     justify-content: center;
     gap: 6px;
     transition: all 0.15s var(--ease);
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-family: var(--font-sans);
 }
 
@@ -330,7 +330,7 @@
     padding: 16px;
     margin-bottom: 16px;
     font-family: var(--font-sans);
-    font-size: 15px;
+    font-size: var(--fs-lg);
     line-height: 1.6;
     color: var(--color-text-primary);
     background: var(--color-bg-surface);
@@ -368,7 +368,7 @@
     height: 44px;
     padding: 0 24px;
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 600;
     border: var(--border);
     border-radius: 4px;
@@ -442,7 +442,7 @@
     background: var(--md-coral);
     color: var(--color-text-primary);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
     border-radius: 2px;
     cursor: help;
 }
@@ -453,7 +453,7 @@
     background: var(--md-muted);
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
     border-radius: 2px;
 }
 
@@ -498,7 +498,7 @@
     border: var(--border);
     color: var(--color-text-primary);
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: var(--fs-md);
     font-weight: 500;
     cursor: pointer;
     border-radius: 4px;
@@ -518,7 +518,7 @@
 
 .table-info {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--md-muted);
 }
 
@@ -567,7 +567,7 @@
 .edit-thinking-section {
     margin-bottom: 16px;
     padding: 12px;
-    background: rgba(251, 191, 36, 0.1);
+    background: var(--color-warning-bg);
     border: 2px dashed var(--md-yellow);
     border-radius: 4px;
 }
@@ -576,14 +576,14 @@
     display: block;
     margin-bottom: 8px;
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 600;
     color: var(--color-text-primary);
 }
 
 .edit-thinking-section .hint {
     font-weight: 400;
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--md-muted);
     opacity: 0.8;
 }
@@ -593,7 +593,7 @@
     min-height: 100px;
     padding: 12px;
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     line-height: 1.6;
     color: var(--color-text-primary);
     background: var(--color-bg-surface);
@@ -610,7 +610,7 @@
 .edit-thinking-textarea:focus {
     outline: none;
     border-color: var(--md-yellow);
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+    box-shadow: 0 0 0 3px var(--color-warning-bg);
 }
 
 .edit-thinking-textarea::placeholder {

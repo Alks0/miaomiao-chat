@@ -49,7 +49,7 @@
     flex: 1;
     font-family: var(--font-sans);
     font-weight: 600;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     color: var(--color-text-inverse);
     white-space: nowrap;
     overflow: hidden;
@@ -68,7 +68,7 @@
     background: var(--md-blue);
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     text-transform: uppercase;
     border-radius: 3px;
@@ -77,13 +77,13 @@
 
 .code-line-count {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--md-muted);
 }
 
 .code-toggle-icon {
     transition: transform 0.2s;
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--color-text-inverse);
     flex-shrink: 0;
 }
@@ -109,7 +109,7 @@
     background: transparent;
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -191,7 +191,7 @@
     }
 
     .code-action-btn {
-        font-size: 10px;
+        font-size: var(--fs-xs);
         padding: 5px 10px;
     }
 }

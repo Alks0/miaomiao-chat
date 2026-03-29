@@ -78,6 +78,31 @@ async function loadEruda() {
     });
 }
 
+/**
+ * 初始化 Electron 自定义标题栏
+ */
+function initElectronTitlebar() {
+    if (!window.electronAPI?.isElectron?.()) return;
+
+    const titlebar = document.getElementById('electron-titlebar');
+    if (!titlebar) return;
+
+    titlebar.style.display = '';
+
+    document.getElementById('titlebar-devtools')?.addEventListener('click', () => {
+        window.electronAPI.toggleDevTools();
+    });
+    document.getElementById('titlebar-minimize')?.addEventListener('click', () => {
+        window.electronAPI.windowMinimize();
+    });
+    document.getElementById('titlebar-maximize')?.addEventListener('click', () => {
+        window.electronAPI.windowMaximize();
+    });
+    document.getElementById('titlebar-close')?.addEventListener('click', () => {
+        window.electronAPI.windowClose();
+    });
+}
+
 // ========== Core Layer ==========
 import './core/events.js';
 import { eventBus } from './core/events.js';
@@ -155,6 +180,7 @@ import { initModels } from './ui/models.js';
 import { initFormatSwitcher } from './ui/format-switcher.js';
 import { initQuickToggles, exposeToggleFunctions } from './ui/quick-toggles.js';
 import { initPasswordToggles, initRippleEffects } from './ui/enhancements.js';
+import { initMobileOverflowMenu } from './ui/mobile-overflow-menu.js';
 
 // ========== UI Layer (Deferred — 非首屏，动态加载) ==========
 // settings, viewer, prefill, config-helpers, custom-headers,
@@ -177,6 +203,9 @@ async function init() {
     if (window.Capacitor && window.Capacitor.getPlatform() === 'android') {
         await loadEruda();
     }
+
+    // 初始化 Electron 自定义标题栏（仅桌面端）
+    initElectronTitlebar();
 
     try {
         // 0. 检查存储可用性（处理跟踪保护）
@@ -387,6 +416,7 @@ async function init() {
         exposeToggleFunctions();
         initSidebar();
         initScrollControl();
+        initMobileOverflowMenu();
 
         // 需要 await 的调整尺寸操作
         await Promise.all([

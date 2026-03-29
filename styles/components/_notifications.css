@@ -13,7 +13,7 @@
     box-shadow: var(--shadow-md);
     z-index: var(--z-notification);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
     animation: slideInRight 0.3s var(--ease);
 }
 
@@ -39,7 +39,7 @@
     background: transparent;
     color: inherit;
     cursor: pointer;
-    font-size: 20px;
+    font-size: var(--fs-3xl);
     line-height: 1;
     display: flex;
     align-items: center;

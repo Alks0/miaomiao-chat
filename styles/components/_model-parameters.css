@@ -8,7 +8,7 @@
 
 .model-params-summary {
     padding: 10px 12px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--color-text-primary);
     cursor: pointer;
@@ -25,7 +25,7 @@
 .model-params-summary .hint {
     font-weight: 400;
     color: var(--md-muted);
-    font-size: 11px;
+    font-size: var(--fs-sm);
 }
 
 .model-params-details[open] .model-params-summary {
@@ -46,7 +46,7 @@
 }
 
 .param-item label {
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 500;
     color: var(--md-muted);
     font-family: var(--font-mono);
@@ -56,7 +56,7 @@
     padding: 6px 8px;
     border: var(--border);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-family: var(--font-mono);
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
@@ -78,25 +78,10 @@
 /* 暗色主题 */
 .dark-theme .model-params-details {
     background: var(--color-bg-accent);
-    border-color: var(--md-border);
-}
-
-.dark-theme .model-params-summary {
-    color: var(--md-text);
 }
 
 .dark-theme .model-params-summary:hover {
     background: var(--md-surface);
-}
-
-.dark-theme .model-params-details[open] .model-params-summary {
-    border-bottom-color: var(--md-border);
-}
-
-.dark-theme .param-item input {
-    background: var(--md-surface);
-    color: var(--md-text);
-    border-color: var(--md-border);
 }
 
 .dark-theme .param-item input:focus {

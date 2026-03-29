@@ -6,7 +6,7 @@
     border: 2px solid var(--md-border);
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     line-height: 1.5;
     background: var(--md-surface);
     color: var(--md-text);
@@ -22,7 +22,7 @@
 
 .prefill-label {
     display: block;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--md-muted);
     margin-bottom: 6px;
@@ -53,7 +53,7 @@
 }
 
 .var-input label {
-    font-size: 11px;
+    font-size: var(--fs-sm);
     color: var(--md-muted);
     font-family: var(--font-mono);
 }
@@ -62,7 +62,7 @@
     padding: 6px 8px;
     border: 2px solid var(--md-border);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     background: var(--md-surface);
     color: var(--md-text);
 }
@@ -97,7 +97,7 @@
 .prefill-message-header select {
     flex: 0 0 auto;
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     border: 2px solid var(--md-border);
     border-radius: 4px;
     background: var(--md-bg);
@@ -105,7 +105,7 @@
 }
 
 .prefill-message-header .prefill-msg-index {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     color: var(--md-muted);
     font-weight: 600;
 }
@@ -117,7 +117,7 @@
     color: var(--md-coral);
     cursor: pointer;
     padding: 2px 6px;
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: bold;
 }
 
@@ -133,7 +133,7 @@
     padding: 8px;
     border: 1px solid var(--md-border);
     border-radius: 2px;
-    font-size: 12px;
+    font-size: var(--fs-base);
     background: var(--md-bg);
     color: var(--md-text);
     resize: vertical;
@@ -153,7 +153,7 @@
     background: transparent;
     color: var(--md-muted);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--fs-base);
     margin-bottom: 12px;
     font-family: var(--font-mono);
 }
@@ -179,7 +179,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--md-muted);
     text-transform: uppercase;

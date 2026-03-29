@@ -14,7 +14,7 @@ import { renderCapabilityBadgesText } from '../utils/capability-badges.js';
 import { renderHumanizedError } from '../utils/errors.js';
 import { categorizeFile, truncateFileName } from '../utils/file-helpers.js';
 import { lazyImageManager } from '../utils/lazy-image.js';
-import { getMediaExtension, isVideoMimeType, isVideoUrl } from '../utils/media.js';
+import { getMediaExtension, isVideoMimeType, isAudioMimeType, isVideoUrl } from '../utils/media.js';
 
 /**
  * 添加消息到 DOM
@@ -401,9 +401,27 @@ function renderVideoMedia(url, mimeType = '') {
 }
 
 /**
- * 渲染媒体块（图片/视频）
+ * 渲染音频媒体块
+ * @param {string} url - 音频 URL
+ * @param {string} mimeType - MIME 类型（可选）
+ * @returns {string}
+ */
+function renderAudioMedia(url, mimeType = '') {
+    const encodedUrl = encodeInlineUrl(url);
+    const ext = getMediaExtension(url, mimeType, 'mp3');
+
+    return `<div class="audio-wrapper">
+        <audio src="${url}" controls preload="metadata" title="AI 生成音频"></audio>
+        <button type="button" class="download-image-btn" onclick="event.stopPropagation();downloadMedia(decodeURIComponent('${encodedUrl}'), 'audio-${Date.now()}.${ext}')" title="下载音频">
+            ${renderDownloadIcon()}
+        </button>
+    </div>`;
+}
+
+/**
+ * 渲染媒体块（图片/视频/音频）
  * @param {string} url - 媒体 URL
- * @param {'image'|'video'} mediaType - 媒体类型
+ * @param {'image'|'video'|'audio'} mediaType - 媒体类型
  * @param {string} mimeType - MIME 类型（可选）
  * @returns {string}
  */
@@ -411,6 +429,9 @@ function renderMediaBlock(url, mediaType, mimeType = '') {
     if (!url) return '';
     if (mediaType === 'video') {
         return renderVideoMedia(url, mimeType);
+    }
+    if (mediaType === 'audio') {
+        return renderAudioMedia(url, mimeType);
     }
     return renderImageMedia(url);
 }
@@ -430,7 +451,10 @@ function renderGeminiParts(parts) {
             const inlineData = part.inlineData || part.inline_data;
             const mimeType = inlineData.mimeType || inlineData.mime_type;
             const dataUrl = `data:${mimeType};base64,${inlineData.data}`;
-            const mediaType = isVideoMimeType(mimeType) ? 'video' : 'image';
+            let mediaType;
+            if (isVideoMimeType(mimeType)) mediaType = 'video';
+            else if (isAudioMimeType(mimeType)) mediaType = 'audio';
+            else mediaType = 'image';
             html += renderMediaBlock(dataUrl, mediaType, mimeType);
         }
     }
@@ -449,6 +473,9 @@ function renderContent(content) {
             } else if (part.type === 'video_url') {
                 const url = part.video_url?.url || part.url;
                 html += renderMediaBlock(url, 'video', part.mime_type || part.mimeType || part.video_url?.mime_type || part.video_url?.mimeType);
+            } else if (part.type === 'audio_url') {
+                const url = part.audio_url?.url || part.url;
+                html += renderMediaBlock(url, 'audio', part.mime_type || part.mimeType);
             } else if (part.type === 'image_url' && part.image_url?.url) {
                 const url = part.image_url.url;
                 const mediaType = isVideoUrl(url) ? 'video' : 'image';
@@ -479,6 +506,8 @@ export function renderContentParts(contentParts) {
             }
         } else if (part.type === 'video_url' && part.complete && part.url) {
             html += renderMediaBlock(part.url, 'video', part.mimeType || part.mime_type);
+        } else if (part.type === 'audio_url' && part.complete && part.url) {
+            html += renderMediaBlock(part.url, 'audio', part.mimeType || part.mime_type);
         } else if (part.type === 'image_url' && part.complete && part.url) {
             const mediaType = isVideoUrl(part.url, part.mimeType || part.mime_type) ? 'video' : 'image';
             html += renderMediaBlock(part.url, mediaType, part.mimeType || part.mime_type);

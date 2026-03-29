@@ -25,7 +25,7 @@
 .code-editor-modal-content .modal-header h2 {
     margin: 0;
     font-family: var(--font-sans);
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     font-weight: 600;
     color: var(--color-text-inverse);
 }
@@ -49,7 +49,7 @@
     background: transparent;
     color: var(--md-muted);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     font-weight: 600;
     cursor: pointer;
     position: relative;
@@ -128,7 +128,7 @@
 .analysis-section h3 {
     margin: 0 0 12px 0;
     font-family: var(--font-sans);
-    font-size: 16px;
+    font-size: var(--fs-xl);
     color: var(--md-blue);
     display: flex;
     align-items: center;
@@ -152,14 +152,14 @@
 }
 
 .stat-label {
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--md-muted);
     font-family: var(--font-mono);
     text-transform: uppercase;
 }
 
 .stat-value {
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     font-weight: 700;
     color: var(--color-text-primary);
     font-family: var(--font-mono);
@@ -191,7 +191,7 @@
     background: var(--color-bg-primary);
     border-left: 3px solid var(--md-blue);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
 }
 
 /* ========== 代码标签页（左右分栏） ========== */
@@ -224,7 +224,7 @@
 
 .panel-title {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--color-text-inverse);
     text-transform: uppercase;
@@ -237,7 +237,7 @@
     background: rgba(0, 0, 0, 0.2);
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
 }
 
 .language-selector[disabled] {
@@ -278,7 +278,7 @@
     text-align: right;
     user-select: none;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
     color: var(--md-muted);
     overflow: hidden;
 }
@@ -294,7 +294,7 @@
     background: var(--color-bg-accent);
     color: var(--color-text-inverse);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--fs-md);
     line-height: 1.6;
     resize: none;
     outline: none;
@@ -304,7 +304,7 @@
 }
 
 .code-editor-textarea[readonly] {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--overlay-light);
     opacity: 0.9;
 }
 
@@ -352,7 +352,7 @@
 
     .code-editor-tabs .tab-btn {
         padding: 10px 14px;
-        font-size: 12px;
+        font-size: var(--fs-base);
     }
 }
 
@@ -405,7 +405,7 @@
 
 .preview-label {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--color-text-inverse);
     text-transform: uppercase;
@@ -452,13 +452,13 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--overlay-light);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .preview-console-header span {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--color-text-inverse);
     text-transform: uppercase;
@@ -470,7 +470,7 @@
     border-radius: 3px;
     background: transparent;
     color: var(--color-text-inverse);
-    font-size: 14px;
+    font-size: var(--fs-lg);
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -484,7 +484,7 @@
     flex: 1;
     padding: 8px 12px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--fs-base);
     color: var(--color-text-inverse);
     overflow-y: auto;
     max-height: 150px;
@@ -527,7 +527,7 @@
 
 .fullscreen-preview-title {
     font-family: var(--font-sans);
-    font-size: 18px;
+    font-size: var(--fs-2xl);
     font-weight: 600;
     color: var(--color-text-inverse);
 }

@@ -100,7 +100,72 @@
     --md-surface-container: var(--color-bg-surface);
     --md-surface-variant: var(--color-bg-secondary, #e0e0e0);
     --color-surface-secondary: var(--color-bg-secondary, #f0f0f0);
-    --radius-lg: 12px;
+    --radius-lg: var(--radius-2xl);
+
+    /* ===== 字体大小 ===== */
+    --fs-2xs: 9px;
+    --fs-xs: 10px;
+    --fs-sm: 11px;
+    --fs-base: 12px;
+    --fs-md: 13px;
+    --fs-lg: 14px;
+    --fs-xl: 16px;
+    --fs-2xl: 18px;
+    --fs-3xl: 20px;
+    --fs-4xl: 24px;
+    --fs-5xl: 28px;
+
+    /* ===== 间距 ===== */
+    --sp-1: 2px;
+    --sp-2: 4px;
+    --sp-3: 6px;
+    --sp-4: 8px;
+    --sp-5: 10px;
+    --sp-6: 12px;
+    --sp-7: 16px;
+    --sp-8: 20px;
+    --sp-9: 24px;
+    --sp-10: 32px;
+    --sp-11: 40px;
+    --sp-12: 48px;
+
+    /* ===== 圆角 ===== */
+    --radius-none: 0;
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-xl: 8px;
+    --radius-2xl: 12px;
+    --radius-full: 9999px;
+
+    /* ===== 过渡时间 ===== */
+    --duration-fast: 0.15s;
+    --duration-base: 0.2s;
+    --duration-slow: 0.25s;
+    --duration-slower: 0.3s;
+
+    /* ===== 语义状态色 ===== */
+    --color-success: #10b981;
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-warning: var(--md-yellow);
+    --color-warning-bg: rgba(251, 191, 36, 0.1);
+    --color-error-bg: rgba(239, 68, 68, 0.05);
+    --color-info: #3b82f6;
+    --color-info-bg: rgba(59, 130, 246, 0.1);
+
+    /* ===== 遮罩层 ===== */
+    --overlay-light: rgba(0, 0, 0, 0.3);
+    --overlay-medium: rgba(0, 0, 0, 0.5);
+    --overlay-heavy: rgba(0, 0, 0, 0.7);
+    --overlay-backdrop: rgba(40, 40, 43, 0.85);
+
+    /* ===== 边框补充 ===== */
+    --border-thin: 1px solid var(--color-border-primary);
+    --border-accent: 3px solid;
+
+    /* ===== 焦点/标题栏/滚动阴影 ===== */
+    --color-focus: var(--md-blue);
+    --color-bg-titlebar: transparent;
+    --scroll-shadow-color: rgba(0, 0, 0, 0.1);
 }
 
 /* ========== 暗色主题 - 彻底深色重构 ========== */
@@ -150,6 +215,19 @@
     --bg-primary: var(--color-bg-primary);
     --md-surface-variant: var(--color-bg-secondary);
     --color-surface-secondary: var(--color-bg-secondary);
+
+    /* 暗色主题 token 覆盖 */
+    --color-success-bg: rgba(16, 185, 129, 0.15);
+    --color-error-bg: rgba(239, 68, 68, 0.1);
+    --color-warning-bg: rgba(251, 191, 36, 0.15);
+    --color-info-bg: rgba(59, 130, 246, 0.15);
+    --overlay-light: rgba(0, 0, 0, 0.4);
+    --overlay-medium: rgba(0, 0, 0, 0.6);
+    --overlay-heavy: rgba(0, 0, 0, 0.8);
+    --overlay-backdrop: rgba(10, 10, 10, 0.9);
+    --color-focus: var(--md-teal);
+    --color-bg-titlebar: #1e1e1e;
+    --scroll-shadow-color: rgba(229, 229, 229, 0.15);
 }
 
 /* ========== 暗色主题下的像素装饰调整 ========== */

@@ -63,13 +63,13 @@
 
 .welcome-message h2 {
     font-family: var(--font-mono);
-    font-size: 24px;
+    font-size: var(--fs-4xl);
     font-weight: 700;
     margin-bottom: 8px;
 }
 
 .welcome-message p {
-    font-size: 14px;
+    font-size: var(--fs-lg);
     opacity: 0.9;
 }
 
